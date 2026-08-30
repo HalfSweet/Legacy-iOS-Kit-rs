@@ -937,6 +937,8 @@ dependencies = [
  "legacy-ios-core",
  "legacy-ios-image",
  "legacy-ios-transport",
+ "serde",
+ "thiserror",
 ]
 
 [[package]]
