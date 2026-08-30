@@ -26,6 +26,35 @@ pub struct SystemMux {
 }
 
 impl SystemMux {
+    pub async fn list_mux_devices(&self) -> Result<Vec<MuxDevice>, ServiceError> {
+        let mut connection = self.address.connect(0).await?;
+        Ok(connection
+            .get_devices()
+            .await?
+            .into_iter()
+            .filter(|device| device.connection_type == Connection::Usb)
+            .map(|device| MuxDevice {
+                id: device.device_id,
+                udid: Udid::new(device.udid),
+            })
+            .collect())
+    }
+
+    pub async fn connect_device_port(
+        &self,
+        device_id: u32,
+        port: u16,
+    ) -> Result<RawServiceConnection, ServiceError> {
+        let connection = self
+            .address
+            .connect(0)
+            .await?
+            .connect_to_device(device_id, port, "legacy-ios-kit")
+            .await?;
+        let inner = connection.get_socket().ok_or(ServiceError::MissingSocket)?;
+        Ok(RawServiceConnection { inner })
+    }
+
     pub async fn list_devices(&self) -> Result<Vec<NormalDevice>, ServiceError> {
         let mut connection = self.address.connect(0).await?;
         let devices = connection
@@ -59,6 +88,22 @@ impl SystemMux {
             provider: Arc::new(provider),
             system_mux: Some(self.address.clone()),
         })
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct MuxDevice {
+    id: u32,
+    udid: Udid,
+}
+
+impl MuxDevice {
+    pub const fn id(&self) -> u32 {
+        self.id
+    }
+
+    pub fn udid(&self) -> &Udid {
+        &self.udid
     }
 }
 
