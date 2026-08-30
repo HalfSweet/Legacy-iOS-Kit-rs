@@ -22,7 +22,7 @@ pub use legacy_ios_core::{
     Recoverability, Soc, Udid,
 };
 pub use legacy_ios_firmware::RestoreBehavior;
-pub use legacy_ios_services::{AppFilter, InstalledApp};
+pub use legacy_ios_services::{AppFilter, DeviceSyslog, InstalledApp};
 pub use legacy_ios_transport::RecoveryDeviceInfo;
 pub use legacy_ios_workflows::{
     BasebandPolicy, DestructiveConsent, ExploitPolicy, PlanId, RestoreComponent, RestorePlan,

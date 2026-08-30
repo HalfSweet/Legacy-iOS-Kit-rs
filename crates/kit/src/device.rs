@@ -2,7 +2,7 @@ use futures_util::StreamExt;
 use legacy_ios_assets::DeviceDatabase;
 use legacy_ios_core::{BoardConfig, ConnectionId, DeviceMode, Ecid, ProductType, Soc, Udid};
 use legacy_ios_services::SystemMux;
-use legacy_ios_services::{AppFilter, InstalledApp};
+use legacy_ios_services::{AppFilter, DeviceSyslog, InstalledApp};
 use legacy_ios_transport::{
     DeviceLocator, NusbDeviceLocator, ObservedUsbDevice, parse_iboot_serial,
 };
@@ -155,6 +155,10 @@ impl DeviceManager {
             .enter_recovery()
             .await?;
         Ok(())
+    }
+
+    pub async fn syslog(&self, udid: &Udid) -> Result<DeviceSyslog, KitError> {
+        Ok(self.normal.find_device(udid).await?.syslog().await?)
     }
 }
 
