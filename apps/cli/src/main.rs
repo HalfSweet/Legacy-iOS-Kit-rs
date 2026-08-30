@@ -303,7 +303,12 @@ async fn main() -> Result<()> {
     let config = AppConfig::load(cli.config.as_deref())?;
     let output = cli.output.or(config.output).unwrap_or_default();
     init_tracing(&cli, &config)?;
-    let kit = LegacyIosKit::new();
+    let kit = match config.network.tss_endpoint.as_deref() {
+        Some(endpoint) => LegacyIosKit::new()
+            .with_tss_endpoint(endpoint)
+            .context("invalid configured TSS endpoint")?,
+        None => LegacyIosKit::new(),
+    };
 
     match cli.command {
         Command::App {
