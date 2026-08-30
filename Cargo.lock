@@ -715,6 +715,10 @@ dependencies = [
  "legacy-ios-firmware",
  "legacy-ios-image",
  "legacy-ios-transport",
+ "plist",
+ "thiserror",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]
