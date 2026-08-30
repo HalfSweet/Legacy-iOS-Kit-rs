@@ -2,8 +2,10 @@
 
 //! High-level Legacy iOS Kit operations.
 
+mod personalization;
 mod restore;
 
+pub use personalization::{ComponentPersonalizer, PersonalizationError};
 pub use restore::{
     BasebandPolicy, DestructiveConsent, ExploitPolicy, PlanId, RestoreComponent, RestorePlan,
     RestorePlanError, RestoreRequest, RestoreStep, RestoreStepKind, SepPolicy, TicketPolicy,

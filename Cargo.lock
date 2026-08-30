@@ -899,6 +899,7 @@ dependencies = [
  "legacy-ios-restore",
  "legacy-ios-services",
  "legacy-ios-transport",
+ "plist",
  "serde",
  "sha2",
  "tempfile",
