@@ -991,8 +991,11 @@ dependencies = [
  "aes",
  "bzip2-rs",
  "cbc",
+ "crc32fast",
+ "flate2",
  "hex",
  "legacy-ios-core",
+ "plist",
  "thiserror 2.0.20",
 ]
 
