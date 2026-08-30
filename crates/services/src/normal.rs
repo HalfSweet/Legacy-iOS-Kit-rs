@@ -72,6 +72,37 @@ impl NormalDevice {
         &self.udid
     }
 
+    pub(crate) fn provider(&self) -> &dyn IdeviceProvider {
+        self.provider.as_ref()
+    }
+
+    pub(crate) async fn connect_service(
+        &self,
+        identifier: &str,
+    ) -> Result<RawServiceConnection, ServiceError> {
+        let mut lockdown = LockdownClient::connect(self.provider()).await?;
+        let product_version = lockdown
+            .get_value(Some("ProductVersion"), None)
+            .await?
+            .as_string()
+            .map(ToOwned::to_owned)
+            .ok_or(ServiceError::UnexpectedValue("ProductVersion"))?;
+        let pairing = self.provider.get_pairing_file().await?;
+        lockdown.start_session(&pairing).await?;
+        let (port, ssl) = lockdown.start_service(identifier).await?;
+        let mut connection = self.provider.connect(port).await?;
+        if ssl {
+            let legacy = product_version
+                .split('.')
+                .next()
+                .and_then(|value| value.parse::<u8>().ok())
+                .is_some_and(|major| major < 5);
+            connection.start_session(&pairing, legacy).await?;
+        }
+        let inner = connection.get_socket().ok_or(ServiceError::MissingSocket)?;
+        Ok(RawServiceConnection { inner })
+    }
+
     pub async fn query_info(&self) -> Result<NormalDeviceInfo, ServiceError> {
         let mut lockdown = LockdownClient::connect(self.provider.as_ref()).await?;
         let product_type = get_string(&mut lockdown, "ProductType").await?;
@@ -269,6 +300,18 @@ pub enum ServiceError {
     PairStoreUnavailable,
     #[error("device returned no diagnostics payload")]
     MissingDiagnostics,
+    #[error("invalid IPA path")]
+    InvalidIpaPath,
+    #[error("device file I/O failed: {0}")]
+    Io(#[from] std::io::Error),
+    #[error("device plist failed: {0}")]
+    Plist(#[from] plist::Error),
+    #[error("device plist frame is too large")]
+    FrameTooLarge,
+    #[error("device plist root is not a dictionary")]
+    PlistNotDictionary,
+    #[error("app installation failed: {0}")]
+    AppInstallation(String),
 }
 
 #[cfg(test)]
