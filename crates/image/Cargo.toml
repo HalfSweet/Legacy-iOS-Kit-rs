@@ -6,8 +6,12 @@ rust-version.workspace = true
 publish = false
 
 [dependencies]
+bzip2-rs = "=0.1.2"
 legacy-ios-core = { path = "../core" }
 thiserror.workspace = true
+
+[dev-dependencies]
+hex = "=0.4.3"
 
 [lints]
 workspace = true
