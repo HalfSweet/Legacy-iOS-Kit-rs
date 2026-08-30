@@ -9,6 +9,7 @@ publish = false
 legacy-ios-core = { path = "../core" }
 legacy-ios-firmware = { path = "../firmware" }
 legacy-ios-image = { path = "../image" }
+legacy-ios-services = { path = "../services" }
 legacy-ios-transport = { path = "../transport" }
 plist = "=1.8.0"
 sha1 = "=0.10.6"

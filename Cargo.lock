@@ -1038,6 +1038,7 @@ dependencies = [
  "legacy-ios-core",
  "legacy-ios-firmware",
  "legacy-ios-image",
+ "legacy-ios-services",
  "legacy-ios-transport",
  "plist",
  "sha1",
