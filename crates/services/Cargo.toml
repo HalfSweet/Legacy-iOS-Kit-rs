@@ -6,7 +6,7 @@ rust-version.workspace = true
 publish = false
 
 [dependencies]
-idevice = { version = "=0.1.50", default-features = false, features = ["afc", "diagnostics_relay", "pair", "ring", "usbmuxd"] }
+idevice = { version = "=0.1.50", default-features = false, features = ["afc", "diagnostics_relay", "pair", "ring", "syslog_relay", "usbmuxd"] }
 legacy-ios-core = { path = "../core" }
 legacy-ios-transport = { path = "../transport" }
 plist = "=1.8.0"

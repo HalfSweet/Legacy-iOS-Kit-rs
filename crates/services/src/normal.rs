@@ -8,7 +8,10 @@ use std::{
 use idevice::{
     IdeviceService,
     provider::IdeviceProvider,
-    services::{diagnostics_relay::DiagnosticsRelayClient, lockdown::LockdownClient},
+    services::{
+        diagnostics_relay::DiagnosticsRelayClient, lockdown::LockdownClient,
+        syslog_relay::SyslogRelayClient,
+    },
     usbmuxd::{Connection, UsbmuxdAddr},
 };
 use legacy_ios_core::{BoardConfig, Ecid, ProductType, Udid};
@@ -234,6 +237,23 @@ impl NormalDevice {
         } else {
             Err(ServiceError::EnterRecoveryRejected)
         }
+    }
+
+    pub async fn syslog(&self) -> Result<DeviceSyslog, ServiceError> {
+        Ok(DeviceSyslog {
+            client: SyslogRelayClient::connect(self.provider()).await?,
+        })
+    }
+}
+
+#[derive(Debug)]
+pub struct DeviceSyslog {
+    client: SyslogRelayClient,
+}
+
+impl DeviceSyslog {
+    pub async fn next_line(&mut self) -> Result<String, ServiceError> {
+        Ok(self.client.next().await?)
     }
 }
 

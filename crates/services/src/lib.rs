@@ -8,5 +8,6 @@ mod plist_service;
 
 pub use app::{AppFilter, InstalledApp};
 pub use normal::{
-    MuxDevice, NormalDevice, NormalDeviceInfo, RawServiceConnection, ServiceError, SystemMux,
+    DeviceSyslog, MuxDevice, NormalDevice, NormalDeviceInfo, RawServiceConnection, ServiceError,
+    SystemMux,
 };
