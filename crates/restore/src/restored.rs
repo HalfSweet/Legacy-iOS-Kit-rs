@@ -158,6 +158,10 @@ impl DataRequest {
     pub fn message(&self) -> &Dictionary {
         &self.message
     }
+
+    pub fn data_port(&self) -> Option<u16> {
+        unsigned(&self.message, "DataPort").and_then(|port| u16::try_from(port).ok())
+    }
 }
 
 #[derive(Clone, Debug)]

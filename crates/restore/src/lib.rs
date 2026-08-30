@@ -11,7 +11,9 @@ mod restored;
 
 pub use asr::{ASR_PORT, AsrClient, AsrError, AsrProgress};
 pub use dispatch::{DispatchAction, PreparedRestoreData, RestoreDispatchError};
-pub use engine::{RestoreOutcome, RestoreProgress, RestoreRunError, run_restored};
+pub use engine::{
+    RestoreOutcome, RestoreProgress, RestoreRunError, run_restored, run_restored_with_data_ports,
+};
 pub use options::RestoreOptions;
 pub use plist_framed::{PlistFrameError, PlistFramed};
 pub use restored::{

@@ -1,6 +1,6 @@
 use std::future::Future;
 
-use plist::Value;
+use plist::{Dictionary, Value};
 use thiserror::Error;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tracing::{debug, warn};
@@ -15,13 +15,42 @@ pub async fn run_restored<S, F, Fut, P>(
     options: &RestoreOptions,
     protocol_version: u64,
     prepared: &PreparedRestoreData,
+    send_system_image: F,
+    progress: P,
+) -> Result<RestoreOutcome, RestoreRunError>
+where
+    S: AsyncRead + AsyncWrite + Unpin,
+    F: FnMut(Option<u16>) -> Fut,
+    Fut: Future<Output = Result<(), RestoreRunError>>,
+    P: FnMut(RestoreProgress),
+{
+    run_restored_with_data_ports(
+        client,
+        options,
+        protocol_version,
+        prepared,
+        send_system_image,
+        |_port, _response| async { Err(RestoreRunError::DataPortNotConfigured) },
+        progress,
+    )
+    .await
+}
+
+pub async fn run_restored_with_data_ports<S, F, Fut, D, DFut, P>(
+    client: &mut RestoredClient<S>,
+    options: &RestoreOptions,
+    protocol_version: u64,
+    prepared: &PreparedRestoreData,
     mut send_system_image: F,
+    mut send_data_response: D,
     mut progress: P,
 ) -> Result<RestoreOutcome, RestoreRunError>
 where
     S: AsyncRead + AsyncWrite + Unpin,
-    F: FnMut() -> Fut,
+    F: FnMut(Option<u16>) -> Fut,
     Fut: Future<Output = Result<(), RestoreRunError>>,
+    D: FnMut(u16, Dictionary) -> DFut,
+    DFut: Future<Output = Result<(), RestoreRunError>>,
     P: FnMut(RestoreProgress),
 {
     client
@@ -32,8 +61,14 @@ where
         match client.next_message().await? {
             RestoredMessage::DataRequest(request) => {
                 match prepared.dispatch(request.data_type())? {
-                    DispatchAction::SystemImage => send_system_image().await?,
-                    DispatchAction::Send(response) => client.send(&response).await?,
+                    DispatchAction::SystemImage => send_system_image(request.data_port()).await?,
+                    DispatchAction::Send(response) => {
+                        if let Some(port) = request.data_port() {
+                            send_data_response(port, response).await?;
+                        } else {
+                            client.send(&response).await?;
+                        }
+                    }
                 }
             }
             RestoredMessage::Progress(message) => {
@@ -109,10 +144,14 @@ pub enum RestoreRunError {
     BasebandRejected,
     #[error("system image transfer failed: {0}")]
     SystemImage(String),
+    #[error("restored requested a separate data port without a configured connector")]
+    DataPortNotConfigured,
 }
 
 #[cfg(test)]
 mod tests {
+    use std::sync::{Arc, Mutex};
+
     use plist::Dictionary;
 
     use super::*;
@@ -149,12 +188,63 @@ mod tests {
             &RestoreOptions::erase(),
             15,
             &prepared,
-            || async { Ok(()) },
+            |_| async { Ok(()) },
             |_| {},
         )
         .await;
         server.await.unwrap();
         assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn routes_responses_to_requested_data_port() {
+        let (client_stream, server_stream) = tokio::io::duplex(16 * 1024);
+        let mut client = RestoredClient::new(client_stream, "test");
+        let server = tokio::spawn(async move {
+            let mut framed = PlistFramed::new(server_stream);
+            framed.receive().await.unwrap();
+            let mut request = Dictionary::new();
+            request.insert("MsgType".into(), "DataRequestMsg".into());
+            request.insert("DataType".into(), "RootTicket".into());
+            request.insert("DataPort".into(), 2345_u64.into());
+            framed.send(&request).await.unwrap();
+
+            let mut status = Dictionary::new();
+            status.insert("MsgType".into(), "StatusMsg".into());
+            status.insert("Status".into(), 0_u64.into());
+            framed.send(&status).await.unwrap();
+        });
+        let responses = Arc::new(Mutex::new(Vec::new()));
+        let response_sink = responses.clone();
+        let prepared = PreparedRestoreData::default().with_root_ticket(vec![1, 2, 3]);
+
+        run_restored_with_data_ports(
+            &mut client,
+            &RestoreOptions::erase(),
+            15,
+            &prepared,
+            |_| async { Ok(()) },
+            move |port, response| {
+                let response_sink = response_sink.clone();
+                async move {
+                    response_sink
+                        .lock()
+                        .expect("response mutex must remain available")
+                        .push((port, response));
+                    Ok(())
+                }
+            },
+            |_| {},
+        )
+        .await
+        .unwrap();
+        server.await.unwrap();
+
+        let responses = responses
+            .lock()
+            .expect("response mutex must remain available");
+        assert_eq!(responses[0].0, 2345);
+        assert!(responses[0].1.contains_key("RootTicketData"));
     }
 
     #[test]
