@@ -8,10 +8,11 @@ use std::{
 use idevice::{
     IdeviceService,
     provider::IdeviceProvider,
-    services::lockdown::LockdownClient,
+    services::{diagnostics_relay::DiagnosticsRelayClient, lockdown::LockdownClient},
     usbmuxd::{Connection, UsbmuxdAddr},
 };
 use legacy_ios_core::{BoardConfig, Ecid, ProductType, Udid};
+use plist::Dictionary;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
@@ -36,6 +37,7 @@ impl SystemMux {
                 NormalDevice {
                     udid,
                     provider: Arc::new(provider),
+                    system_mux: Some(self.address.clone()),
                 }
             })
             .collect::<Vec<_>>();
@@ -51,6 +53,7 @@ impl SystemMux {
 pub struct NormalDevice {
     udid: Udid,
     provider: Arc<dyn IdeviceProvider>,
+    system_mux: Option<UsbmuxdAddr>,
 }
 
 impl NormalDevice {
@@ -89,6 +92,44 @@ impl NormalDevice {
         let connection = self.provider.connect(port).await?;
         let inner = connection.get_socket().ok_or(ServiceError::MissingSocket)?;
         Ok(RawServiceConnection { inner })
+    }
+
+    pub async fn pair(&self) -> Result<(), ServiceError> {
+        let address = self
+            .system_mux
+            .as_ref()
+            .ok_or(ServiceError::PairStoreUnavailable)?;
+        let mut mux = address.connect(0).await?;
+        let buid = mux.get_buid().await?;
+        let mut lockdown = LockdownClient::connect(self.provider.as_ref()).await?;
+        let mut pairing = lockdown
+            .pair(uuid::Uuid::new_v4().to_string().to_uppercase(), buid)
+            .await?;
+        pairing.udid = Some(self.udid.to_string());
+        let serialized = pairing.serialize()?;
+        mux.save_pair_record(self.udid.as_str(), serialized).await?;
+        info!("paired normal-mode device");
+        Ok(())
+    }
+
+    pub async fn battery_info(&self) -> Result<Dictionary, ServiceError> {
+        let mut diagnostics = DiagnosticsRelayClient::connect(self.provider.as_ref()).await?;
+        diagnostics
+            .gasguage()
+            .await?
+            .ok_or(ServiceError::MissingDiagnostics)
+    }
+
+    pub async fn restart(&self) -> Result<(), ServiceError> {
+        let mut diagnostics = DiagnosticsRelayClient::connect(self.provider.as_ref()).await?;
+        diagnostics.restart().await?;
+        Ok(())
+    }
+
+    pub async fn shutdown(&self) -> Result<(), ServiceError> {
+        let mut diagnostics = DiagnosticsRelayClient::connect(self.provider.as_ref()).await?;
+        diagnostics.shutdown().await?;
+        Ok(())
     }
 }
 
@@ -213,6 +254,10 @@ pub enum ServiceError {
     UnexpectedValue(&'static str),
     #[error("iOS service connection did not expose a socket")]
     MissingSocket,
+    #[error("pairing record storage is unavailable for this transport")]
+    PairStoreUnavailable,
+    #[error("device returned no diagnostics payload")]
+    MissingDiagnostics,
 }
 
 #[cfg(test)]
