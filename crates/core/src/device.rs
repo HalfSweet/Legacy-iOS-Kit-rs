@@ -1,4 +1,4 @@
-use std::{collections::BTreeSet, fmt, str::FromStr};
+use std::{collections::BTreeSet, convert::Infallible, fmt, str::FromStr};
 
 use serde::{Deserialize, Serialize};
 
@@ -35,6 +35,14 @@ macro_rules! string_id {
         impl From<&str> for $name {
             fn from(value: &str) -> Self {
                 Self(value.to_owned())
+            }
+        }
+
+        impl FromStr for $name {
+            type Err = Infallible;
+
+            fn from_str(value: &str) -> Result<Self, Self::Err> {
+                Ok(Self::from(value))
             }
         }
     };
