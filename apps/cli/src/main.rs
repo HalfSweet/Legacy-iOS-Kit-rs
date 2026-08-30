@@ -12,8 +12,8 @@ use clap::{ArgAction, Parser, Subcommand, ValueEnum};
 use legacy_ios_kit::{
     AppFilter, BasebandPolicy, BoardConfig, DeviceDiagnostics, DeviceInventory, DeviceSummary,
     Ecid, ExploitPolicy, FirmwareSummary, InstalledApp, LegacyIosKit, ProductType,
-    RecoveryDeviceInfo, RecoveryUploadResult, RestoreBehavior, RestorePlan, RestoreRequest,
-    SepPolicy, ShshRequest, ShshSummary, TicketPolicy, Udid,
+    RecoveryDeviceInfo, RecoveryUploadResult, RemoteFirmwareSummary, RestoreBehavior, RestorePlan,
+    RestoreRequest, SepPolicy, ShshRequest, ShshSummary, TicketPolicy, Udid,
 };
 use tracing::level_filters::LevelFilter;
 
@@ -183,6 +183,8 @@ enum DeviceCommand {
 enum FirmwareCommand {
     /// Inspect a local IPSW and its BuildManifest.
     Inspect { path: PathBuf },
+    /// Inspect a remote IPSW by fetching only its ZIP directory and BuildManifest.
+    InspectRemote { url: String },
 }
 
 #[derive(Debug, Subcommand)]
@@ -453,6 +455,15 @@ async fn main() -> Result<()> {
                 .inspect_firmware(path)
                 .context("failed to inspect firmware")?;
             write_firmware(output, &summary)?;
+        }
+        Command::Firmware {
+            command: FirmwareCommand::InspectRemote { url },
+        } => {
+            let summary = kit
+                .inspect_remote_firmware(url)
+                .await
+                .context("failed to inspect remote firmware")?;
+            write_remote_firmware(output, &summary)?;
         }
         Command::Restore {
             command:
@@ -781,6 +792,38 @@ fn write_firmware(format: OutputFormat, summary: &FirmwareSummary) -> Result<()>
                     identity.component_count()
                 )?;
             }
+        }
+    }
+    Ok(())
+}
+
+fn write_remote_firmware(format: OutputFormat, summary: &RemoteFirmwareSummary) -> Result<()> {
+    let stdout = io::stdout();
+    let mut output = stdout.lock();
+    match format {
+        OutputFormat::Json => {
+            serde_json::to_writer_pretty(&mut output, summary)?;
+            writeln!(output)?;
+        }
+        OutputFormat::Human => {
+            writeln!(
+                output,
+                "{} {} ({} bytes)",
+                summary.product_version(),
+                summary.build_id(),
+                summary.length()
+            )?;
+            writeln!(output, "URL: {}", summary.url())?;
+            writeln!(
+                output,
+                "Products: {}",
+                summary
+                    .supported_product_types()
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            )?;
         }
     }
     Ok(())
