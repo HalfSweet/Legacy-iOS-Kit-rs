@@ -1,3 +1,4 @@
+use futures_util::StreamExt;
 use legacy_ios_assets::DeviceDatabase;
 use legacy_ios_core::{BoardConfig, ConnectionId, DeviceMode, Ecid, ProductType, Soc, Udid};
 use legacy_ios_services::SystemMux;
@@ -8,7 +9,7 @@ use legacy_ios_transport::{
 use serde::{Deserialize, Serialize};
 use tracing::warn;
 
-use crate::KitError;
+use crate::{KitError, OperationHandle};
 
 #[derive(Clone, Debug, Default)]
 pub struct DeviceManager {
@@ -17,6 +18,32 @@ pub struct DeviceManager {
 }
 
 impl DeviceManager {
+    pub fn watch_bootloader(&self) -> Result<OperationHandle, KitError> {
+        let mut watch = self.bootloader.watch()?;
+        let (emitter, handle) = OperationHandle::channel(32);
+        tokio::spawn(async move {
+            while !emitter.is_cancelled() {
+                let Some(event) = watch.next().await else {
+                    break;
+                };
+                let event = match event {
+                    legacy_ios_transport::UsbDeviceEvent::Connected(device) => {
+                        legacy_ios_core::OperationEvent::ModeChanged {
+                            mode: device.mode(),
+                        }
+                    }
+                    legacy_ios_transport::UsbDeviceEvent::Disconnected(_) => {
+                        legacy_ios_core::OperationEvent::DeviceDisconnected
+                    }
+                };
+                if !emitter.emit(event).await {
+                    break;
+                }
+            }
+        });
+        Ok(handle)
+    }
+
     pub async fn list(&self) -> Result<DeviceInventory, KitError> {
         let (bootloader, normal) = tokio::join!(self.list_bootloader(), self.list_normal());
         match (bootloader, normal) {

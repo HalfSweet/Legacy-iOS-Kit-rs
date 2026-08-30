@@ -5,6 +5,7 @@
 mod device;
 mod error;
 mod firmware;
+mod operation;
 
 pub use device::{
     BackendFailure, DeviceDiagnostics, DeviceInventory, DeviceManager, DeviceSummary,
@@ -22,6 +23,7 @@ pub use legacy_ios_workflows::{
     BasebandPolicy, DestructiveConsent, ExploitPolicy, PlanId, RestoreComponent, RestorePlan,
     RestorePlanError, RestoreRequest, RestoreStep, RestoreStepKind, SepPolicy, TicketPolicy,
 };
+pub use operation::OperationHandle;
 
 #[derive(Clone, Debug, Default)]
 pub struct LegacyIosKit {

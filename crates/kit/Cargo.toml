@@ -6,6 +6,7 @@ rust-version.workspace = true
 publish = false
 
 [dependencies]
+futures-util = "0.3.31"
 legacy-ios-assets = { path = "../assets" }
 legacy-ios-core = { path = "../core" }
 legacy-ios-firmware = { path = "../firmware" }
@@ -16,6 +17,7 @@ plist = "=1.8.0"
 serde.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
+tokio-util = "0.7.19"
 tracing.workspace = true
 
 [lints]
