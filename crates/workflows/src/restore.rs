@@ -2,7 +2,9 @@ use std::path::PathBuf;
 
 use legacy_ios_assets::DeviceDatabase;
 use legacy_ios_core::{CancellationSafety, DeviceIdentity, DeviceSelector, OperationPhase};
-use legacy_ios_firmware::{FirmwareArchive, FirmwareError, RestoreBehavior};
+use legacy_ios_firmware::{
+    FirmwareArchive, FirmwareError, RestoreBehavior, SigningTicket, TicketError,
+};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest as _, Sha256};
 use thiserror::Error;
@@ -95,8 +97,18 @@ impl RestorePlan {
             return Err(RestorePlanError::BoardConfigMismatch);
         }
         if let TicketPolicy::Provided(path) = &request.ticket {
-            if !path.is_file() {
-                return Err(RestorePlanError::TicketNotFound(path.clone()));
+            let ticket =
+                SigningTicket::open(path).map_err(|source| RestorePlanError::InvalidTicket {
+                    path: path.clone(),
+                    source,
+                })?;
+            if let Some(ecid) = request.device.ecid() {
+                ticket
+                    .verify_ecid(ecid)
+                    .map_err(|source| RestorePlanError::InvalidTicket {
+                        path: path.clone(),
+                        source,
+                    })?;
             }
         }
 
@@ -318,8 +330,12 @@ pub enum RestorePlanError {
     BoardConfigMismatch,
     #[error("firmware does not support the selected product type")]
     UnsupportedProduct,
-    #[error("provided signing ticket does not exist: {}", .0.display())]
-    TicketNotFound(PathBuf),
+    #[error("invalid signing ticket {}: {source}", path.display())]
+    InvalidTicket {
+        path: PathBuf,
+        #[source]
+        source: TicketError,
+    },
     #[error(transparent)]
     Firmware(#[from] FirmwareError),
 }
