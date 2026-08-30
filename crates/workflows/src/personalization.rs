@@ -27,8 +27,61 @@ impl ComponentPersonalizer {
     }
 
     pub fn personalize(&self, component: &str) -> Result<Vec<u8>, PersonalizationError> {
-        let path = self
-            .tss
+        let path = self.component_path(component)?;
+        self.personalize_path(component, &path)
+    }
+
+    pub fn nor_response(&self, flash_version_1: bool) -> Result<Dictionary, PersonalizationError> {
+        let llb = self.personalize("LLB")?;
+        let firmware = self.firmware_components()?;
+        let mut images = firmware
+            .into_iter()
+            .filter(|(component, _)| component != "LLB" && component != "RestoreSEP")
+            .map(|(component, path)| {
+                let data = self.personalize_path(&component, &path)?;
+                Ok((component, data))
+            })
+            .collect::<Result<Vec<_>, PersonalizationError>>()?;
+        if images.is_empty() {
+            return Err(PersonalizationError::MissingFirmwarePayloads);
+        }
+        if !flash_version_1 {
+            images.sort_by_key(|(component, _)| !component.starts_with("iBoot"));
+        }
+
+        let mut response = Dictionary::new();
+        response.insert("LlbImageData".into(), Value::Data(llb));
+        if flash_version_1 {
+            let images = images
+                .into_iter()
+                .map(|(component, data)| (component, Value::Data(data)))
+                .collect::<Dictionary>();
+            response.insert("NorImageData".into(), images.into());
+        } else {
+            response.insert(
+                "NorImageData".into(),
+                Value::Array(
+                    images
+                        .into_iter()
+                        .map(|(_, data)| Value::Data(data))
+                        .collect(),
+                ),
+            );
+        }
+        for (component, key) in [
+            ("RestoreSEP", "RestoreSEPImageData"),
+            ("SEP", "SEPImageData"),
+            ("SepStage1", "SEPPatchImageData"),
+        ] {
+            if self.identity.manifest().contains_key(component) {
+                response.insert(key.into(), Value::Data(self.personalize(component)?));
+            }
+        }
+        Ok(response)
+    }
+
+    fn component_path(&self, component: &str) -> Result<String, PersonalizationError> {
+        self.tss
             .get(component)
             .and_then(Value::as_dictionary)
             .and_then(|entry| entry.get("Path"))
@@ -41,10 +94,90 @@ impl ComponentPersonalizer {
                         .map(ToOwned::to_owned)
                 },
                 Ok,
-            )?;
-        let data = self.archive.read_entry(&path)?;
+            )
+            .map_err(Into::into)
+    }
+
+    fn personalize_path(
+        &self,
+        component: &str,
+        path: &str,
+    ) -> Result<Vec<u8>, PersonalizationError> {
+        let data = self.archive.read_entry(path)?;
         personalize_data(component, data, &self.tss)
     }
+
+    fn firmware_components(&self) -> Result<Vec<(String, String)>, PersonalizationError> {
+        let llb_path = self.component_path("LLB")?;
+        let directory = llb_path
+            .rsplit_once('/')
+            .map(|(directory, _)| directory)
+            .ok_or(PersonalizationError::MissingFirmwareDirectory)?;
+        let manifest_path = format!("{directory}/manifest");
+        match self.archive.read_entry(&manifest_path) {
+            Ok(data) => {
+                let manifest = String::from_utf8(data)?;
+                Ok(manifest
+                    .lines()
+                    .filter_map(|line| {
+                        let filename = line.trim_end_matches('\r');
+                        component_name(filename).map(|component| {
+                            (component.to_owned(), format!("{directory}/{filename}"))
+                        })
+                    })
+                    .collect())
+            }
+            Err(FirmwareError::ArchiveEntryNotFound(_)) => Ok(self
+                .identity
+                .manifest()
+                .iter()
+                .filter_map(|(component, value)| {
+                    let info = value.as_dictionary()?.get("Info")?.as_dictionary()?;
+                    let firmware = info
+                        .get("IsFirmwarePayload")
+                        .and_then(Value::as_boolean)
+                        .unwrap_or(false);
+                    let secondary = info
+                        .get("IsSecondaryFirmwarePayload")
+                        .and_then(Value::as_boolean)
+                        .unwrap_or(false);
+                    let loaded_by_iboot = info
+                        .get("IsLoadedByiBoot")
+                        .and_then(Value::as_boolean)
+                        .unwrap_or(false);
+                    (firmware || secondary && loaded_by_iboot).then(|| {
+                        let path = info.get("Path")?.as_string()?;
+                        Some((component.clone(), path.to_owned()))
+                    })?
+                })
+                .collect()),
+            Err(error) => Err(error.into()),
+        }
+    }
+}
+
+fn component_name(filename: &str) -> Option<&'static str> {
+    [
+        ("LLB", "LLB"),
+        ("iBoot", "iBoot"),
+        ("DeviceTree", "DeviceTree"),
+        ("applelogo", "AppleLogo"),
+        ("liquiddetect", "Liquid"),
+        ("lowpowermode", "LowPowerWallet0"),
+        ("recoverymode", "RecoveryMode"),
+        ("batterylow0", "BatteryLow0"),
+        ("batterylow1", "BatteryLow1"),
+        ("glyphcharging", "BatteryCharging"),
+        ("glyphplugin", "BatteryPlugin"),
+        ("batterycharging0", "BatteryCharging0"),
+        ("batterycharging1", "BatteryCharging1"),
+        ("batteryfull", "BatteryFull"),
+        ("needservice", "NeedService"),
+        ("SCAB", "SCAB"),
+        ("sep-firmware", "RestoreSEP"),
+    ]
+    .into_iter()
+    .find_map(|(prefix, component)| filename.starts_with(prefix).then_some(component))
 }
 
 fn personalize_data(
@@ -74,11 +207,23 @@ pub enum PersonalizationError {
     Img3(#[from] Img3Error),
     #[error(transparent)]
     Img4(#[from] Img4Error),
+    #[error("LLB path has no firmware directory")]
+    MissingFirmwareDirectory,
+    #[error("firmware manifest contains no NOR payloads")]
+    MissingFirmwarePayloads,
+    #[error("firmware manifest is not UTF-8")]
+    ManifestEncoding(#[from] std::string::FromUtf8Error),
 }
 
 #[cfg(test)]
 mod tests {
+    use std::io::Write;
+
+    use legacy_ios_core::BoardConfig;
+    use legacy_ios_firmware::{BuildManifest, RestoreBehavior};
     use legacy_ios_image::{Img3Element, Img3Tag};
+    use tempfile::NamedTempFile;
+    use zip::{ZipWriter, write::SimpleFileOptions};
 
     use super::*;
 
@@ -104,4 +249,59 @@ mod tests {
         let result = personalize_data("iBSS", image.to_bytes(), &tss).unwrap();
         assert!(Img3::parse(&result).unwrap().is_personalized());
     }
+
+    #[test]
+    fn builds_nor_response_from_all_flash_manifest() {
+        let file = NamedTempFile::new().unwrap();
+        let mut writer = ZipWriter::new(file.reopen().unwrap());
+        writer
+            .start_file("BuildManifest.plist", SimpleFileOptions::default())
+            .unwrap();
+        writer.write_all(MANIFEST.as_bytes()).unwrap();
+        for (name, data) in [
+            (
+                "Firmware/all_flash/manifest",
+                b"iBoot.n90\nLLB.n90\n".as_slice(),
+            ),
+            ("Firmware/all_flash/LLB.n90", b"llb".as_slice()),
+            ("Firmware/all_flash/iBoot.n90", b"iboot".as_slice()),
+        ] {
+            writer
+                .start_file(name, SimpleFileOptions::default())
+                .unwrap();
+            writer.write_all(data).unwrap();
+        }
+        writer.finish().unwrap();
+
+        let archive = FirmwareArchive::open(file.path()).unwrap();
+        let manifest = BuildManifest::from_reader(std::io::Cursor::new(MANIFEST)).unwrap();
+        let identity = manifest
+            .select_identity(&BoardConfig::from("n90"), RestoreBehavior::Erase)
+            .unwrap()
+            .clone();
+        let response = ComponentPersonalizer::new(archive, identity, Dictionary::new())
+            .nor_response(false)
+            .unwrap();
+
+        assert_eq!(
+            response.get("LlbImageData").and_then(Value::as_data),
+            Some(b"llb".as_slice())
+        );
+        let images = response
+            .get("NorImageData")
+            .and_then(Value::as_array)
+            .unwrap();
+        assert_eq!(images[0].as_data(), Some(b"iboot".as_slice()));
+    }
+
+    const MANIFEST: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
+<plist version="1.0"><dict>
+<key>ProductVersion</key><string>7.1.2</string>
+<key>ProductBuildVersion</key><string>11D257</string>
+<key>SupportedProductTypes</key><array><string>iPhone3,1</string></array>
+<key>BuildIdentities</key><array><dict>
+<key>Info</key><dict><key>DeviceClass</key><string>n90ap</string><key>RestoreBehavior</key><string>Erase</string></dict>
+<key>Manifest</key><dict><key>LLB</key><dict><key>Info</key><dict><key>Path</key><string>Firmware/all_flash/LLB.n90</string></dict></dict></dict>
+</dict></array>
+</dict></plist>"#;
 }
