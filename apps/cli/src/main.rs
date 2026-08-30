@@ -177,6 +177,12 @@ enum DeviceCommand {
         #[arg(long)]
         yes: bool,
     },
+    /// Read a finite batch of lines from the device syslog relay.
+    Syslog {
+        udid: Udid,
+        #[arg(long, default_value_t = 20)]
+        lines: usize,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -448,6 +454,27 @@ async fn main() -> Result<()> {
                 .context("failed to shut down device")?;
             write_message(output, "shut-down", &udid)?;
         }
+        Command::Device {
+            command: DeviceCommand::Syslog { udid, lines },
+        } => {
+            let mut syslog = kit
+                .devices()
+                .syslog(&udid)
+                .await
+                .context("failed to connect to device syslog")?;
+            let mut records = Vec::with_capacity(lines);
+            for _ in 0..lines {
+                records.push(
+                    syslog
+                        .next_line()
+                        .await
+                        .context("failed to read device syslog")?
+                        .trim_end_matches(['\n', '\0'])
+                        .to_owned(),
+                );
+            }
+            write_syslog(output, &records)?;
+        }
         Command::Firmware {
             command: FirmwareCommand::Inspect { path },
         } => {
@@ -609,6 +636,23 @@ fn write_status(format: OutputFormat, status: &str) -> Result<()> {
         OutputFormat::Json => {
             serde_json::to_writer(&mut output, &serde_json::json!({ "status": status }))?;
             writeln!(output)?;
+        }
+    }
+    Ok(())
+}
+
+fn write_syslog(format: OutputFormat, records: &[String]) -> Result<()> {
+    let stdout = io::stdout();
+    let mut output = stdout.lock();
+    match format {
+        OutputFormat::Json => {
+            serde_json::to_writer(&mut output, records)?;
+            writeln!(output)?;
+        }
+        OutputFormat::Human => {
+            for record in records {
+                writeln!(output, "{record}")?;
+            }
         }
     }
     Ok(())
