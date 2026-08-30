@@ -1,6 +1,6 @@
 use std::{collections::BTreeMap, sync::OnceLock};
 
-use legacy_ios_core::{BoardConfig, ProductType, Soc};
+use legacy_ios_core::{BoardConfig, Capability, CapabilitySet, ProductType, Soc};
 use serde::Deserialize;
 use thiserror::Error;
 
@@ -35,6 +35,84 @@ impl DeviceProfile {
     pub const fn has_baseband(&self) -> bool {
         self.has_baseband
     }
+
+    pub fn capabilities(&self) -> CapabilitySet {
+        let mut capabilities = vec![
+            Capability::Recovery,
+            Capability::Dfu,
+            Capability::PwnDfu,
+            Capability::Restore,
+            Capability::BlobRestore,
+            Capability::SshRamdisk,
+            Capability::AppManagement,
+            Capability::DataManagement,
+        ];
+        if is_32_bit(self.soc) {
+            capabilities.extend([
+                Capability::TetheredRestore,
+                Capability::OnboardShsh,
+                Capability::Jailbreak,
+            ]);
+        }
+        if matches!(self.soc, Soc::A4 | Soc::A5 | Soc::A5x | Soc::A6 | Soc::A6x) {
+            capabilities.push(Capability::KDfu);
+        }
+        if supports_ota(self.product_type.as_str()) {
+            capabilities.push(Capability::OtaDowngrade);
+        }
+        if matches!(
+            self.product_type.as_str(),
+            "iPhone1,1" | "iPhone1,2" | "iPhone2,1" | "iPhone3,1" | "iPhone3,2" | "iPhone3,3"
+        ) {
+            capabilities.push(Capability::Hacktivation);
+        }
+        CapabilitySet::from_capabilities(capabilities)
+    }
+}
+
+const fn is_32_bit(soc: Soc) -> bool {
+    matches!(
+        soc,
+        Soc::S5l8900
+            | Soc::S5l8720
+            | Soc::S5l8920
+            | Soc::S5l8922
+            | Soc::A4
+            | Soc::A5
+            | Soc::A5x
+            | Soc::A6
+            | Soc::A6x
+    )
+}
+
+fn supports_ota(product_type: &str) -> bool {
+    matches!(
+        product_type,
+        "iPhone4,1"
+            | "iPhone5,1"
+            | "iPhone5,2"
+            | "iPhone6,1"
+            | "iPhone6,2"
+            | "iPad2,1"
+            | "iPad2,2"
+            | "iPad2,3"
+            | "iPad2,4"
+            | "iPad2,5"
+            | "iPad2,6"
+            | "iPad2,7"
+            | "iPad3,1"
+            | "iPad3,2"
+            | "iPad3,3"
+            | "iPad3,4"
+            | "iPad3,5"
+            | "iPad3,6"
+            | "iPad4,1"
+            | "iPad4,2"
+            | "iPad4,3"
+            | "iPad4,4"
+            | "iPad4,5"
+            | "iPod5,1"
+    )
 }
 
 #[derive(Clone, Debug)]
@@ -164,5 +242,20 @@ mod tests {
             .find_board_config(&BoardConfig::from("n71m"))
             .unwrap();
         assert_eq!(a9.product_type(), &ProductType::from("iPhone8,1"));
+    }
+
+    #[test]
+    fn derives_capabilities_from_device_family() {
+        let database = DeviceDatabase::bundled();
+        let a5 = database
+            .find_product(&ProductType::from("iPhone4,1"))
+            .unwrap();
+        assert!(a5.capabilities().contains(Capability::OtaDowngrade));
+        assert!(a5.capabilities().contains(Capability::KDfu));
+
+        let a11 = database
+            .find_product(&ProductType::from("iPhone10,6"))
+            .unwrap();
+        assert!(!a11.capabilities().contains(Capability::Jailbreak));
     }
 }
