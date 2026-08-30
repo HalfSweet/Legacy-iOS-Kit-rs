@@ -110,17 +110,31 @@ impl NormalDevice {
         request.insert("ClientOptions".into(), Dictionary::new().into());
         request.insert("PackagePath".into(), device_path.clone().into());
         installer.send(&request).await?;
-        let installed = wait_for_installation(&mut installer).await;
+        let installed = wait_for_operation(&mut installer, "install").await;
         let cleanup = afc.remove(&device_path).await;
         installed?;
         cleanup?;
         info!("installed IPA");
         Ok(())
     }
+
+    pub async fn uninstall_app(&self, bundle_id: &str) -> Result<(), ServiceError> {
+        let stream = self.connect_service(INSTALLATION_PROXY).await?;
+        let mut installer = PropertyListService::new(stream);
+        let mut request = Dictionary::new();
+        request.insert("Command".into(), "Uninstall".into());
+        request.insert("ClientOptions".into(), Dictionary::new().into());
+        request.insert("ApplicationIdentifier".into(), bundle_id.into());
+        installer.send(&request).await?;
+        wait_for_operation(&mut installer, "uninstall").await?;
+        info!(bundle_id, "uninstalled application");
+        Ok(())
+    }
 }
 
-async fn wait_for_installation(
+async fn wait_for_operation(
     installer: &mut PropertyListService<crate::RawServiceConnection>,
+    operation: &'static str,
 ) -> Result<(), ServiceError> {
     loop {
         let mut response = installer.receive().await?;
@@ -128,13 +142,13 @@ async fn wait_for_installation(
             .remove("ErrorDescription")
             .and_then(Value::into_string)
         {
-            return Err(ServiceError::AppInstallation(error));
+            return Err(ServiceError::AppOperation { operation, error });
         }
         if let Some(percent) = response
             .get("PercentComplete")
             .and_then(Value::as_unsigned_integer)
         {
-            debug!(percent, "installing IPA");
+            debug!(percent, operation, "application operation progress");
         }
         if response.get("Status").and_then(Value::as_string) == Some("Complete") {
             return Ok(());

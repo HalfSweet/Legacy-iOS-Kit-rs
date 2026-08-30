@@ -392,8 +392,11 @@ pub enum ServiceError {
     FrameTooLarge,
     #[error("device plist root is not a dictionary")]
     PlistNotDictionary,
-    #[error("app installation failed: {0}")]
-    AppInstallation(String),
+    #[error("app {operation} failed: {error}")]
+    AppOperation {
+        operation: &'static str,
+        error: String,
+    },
     #[error("device rejected EnterRecovery")]
     EnterRecoveryRejected,
 }
