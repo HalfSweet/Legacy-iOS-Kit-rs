@@ -178,6 +178,18 @@ fn normalize_board_config(board_config: &str) -> String {
 
 #[derive(Debug, Error)]
 pub enum FirmwareError {
+    #[error("firmware I/O failed: {0}")]
+    Io(#[from] std::io::Error),
+    #[error("invalid firmware archive: {0}")]
+    Zip(#[from] zip::result::ZipError),
+    #[error("firmware archive does not contain {0}")]
+    ArchiveEntryNotFound(String),
+    #[error("firmware entry {name} is {size} bytes, exceeding the {maximum} byte limit")]
+    ArchiveEntryTooLarge {
+        name: String,
+        size: u64,
+        maximum: u64,
+    },
     #[error("failed to parse plist: {0}")]
     Plist(#[from] plist::Error),
     #[error("BuildManifest root is not a dictionary")]
