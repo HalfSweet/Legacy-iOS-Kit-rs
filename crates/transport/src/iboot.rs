@@ -134,6 +134,56 @@ impl IbootClient {
         Ok(())
     }
 
+    pub async fn exploit_control_out(
+        &self,
+        request: u8,
+        data: &[u8],
+        timeout: Duration,
+    ) -> Result<(), RecoveryError> {
+        if self.mode != DeviceMode::Dfu {
+            return Err(RecoveryError::ExploitRequiresDfu(self.mode));
+        }
+        self.interface
+            .control_out(
+                ControlOut {
+                    control_type: ControlType::Class,
+                    recipient: Recipient::Interface,
+                    request,
+                    value: 0,
+                    index: 0,
+                    data,
+                },
+                timeout,
+            )
+            .await?;
+        Ok(())
+    }
+
+    pub async fn exploit_control_in(
+        &self,
+        request: u8,
+        length: u16,
+        timeout: Duration,
+    ) -> Result<Vec<u8>, RecoveryError> {
+        if self.mode != DeviceMode::Dfu {
+            return Err(RecoveryError::ExploitRequiresDfu(self.mode));
+        }
+        Ok(self
+            .interface
+            .control_in(
+                ControlIn {
+                    control_type: ControlType::Class,
+                    recipient: Recipient::Interface,
+                    request,
+                    value: 0,
+                    index: 0,
+                    length,
+                },
+                timeout,
+            )
+            .await?)
+    }
+
     async fn upload(&mut self, data: &[u8], finish_dfu: bool) -> Result<(), RecoveryError> {
         if data.is_empty() {
             return Err(RecoveryError::EmptyUpload);
@@ -389,6 +439,8 @@ pub enum RecoveryError {
     KisUploadNotImplemented,
     #[error("image upload requires a bootloader mode, found {0:?}")]
     UploadRequiresBootloader(DeviceMode),
+    #[error("bootrom exploit transfers require DFU mode, found {0:?}")]
+    ExploitRequiresDfu(DeviceMode),
     #[error("cannot upload an empty image")]
     EmptyUpload,
     #[error("DFU state response was empty")]
