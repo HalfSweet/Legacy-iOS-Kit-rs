@@ -14,6 +14,7 @@ pub use legacy_ios_core::{
     DeviceSelector, DeviceSnapshot, Ecid, IosVersion, OperationEvent, OperationId, ProductType,
     Soc, Udid,
 };
+pub use legacy_ios_firmware::RestoreBehavior;
 
 #[derive(Clone, Debug, Default)]
 pub struct LegacyIosKit {

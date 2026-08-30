@@ -1,10 +1,15 @@
 #![forbid(unsafe_code)]
 
-use std::io::{self, Write};
+use std::{
+    io::{self, Write},
+    path::PathBuf,
+};
 
 use anyhow::{Context, Result, anyhow};
 use clap::{ArgAction, Parser, Subcommand, ValueEnum};
-use legacy_ios_kit::{DeviceInventory, DeviceSummary, LegacyIosKit};
+use legacy_ios_kit::{
+    DeviceInventory, DeviceSummary, FirmwareSummary, LegacyIosKit, RestoreBehavior,
+};
 use tracing::level_filters::LevelFilter;
 
 #[derive(Debug, Parser)]
@@ -26,12 +31,22 @@ enum Command {
         #[command(subcommand)]
         command: DeviceCommand,
     },
+    Firmware {
+        #[command(subcommand)]
+        command: FirmwareCommand,
+    },
 }
 
 #[derive(Debug, Subcommand)]
 enum DeviceCommand {
     /// List normal, Recovery, DFU, WTF, and KIS devices.
     List,
+}
+
+#[derive(Debug, Subcommand)]
+enum FirmwareCommand {
+    /// Inspect a local IPSW and its BuildManifest.
+    Inspect { path: PathBuf },
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, ValueEnum)]
@@ -57,6 +72,58 @@ async fn main() -> Result<()> {
                 .await
                 .context("failed to list devices")?;
             write_inventory(cli.output, &inventory)?;
+        }
+        Command::Firmware {
+            command: FirmwareCommand::Inspect { path },
+        } => {
+            let summary = kit
+                .inspect_firmware(path)
+                .context("failed to inspect firmware")?;
+            write_firmware(cli.output, &summary)?;
+        }
+    }
+    Ok(())
+}
+
+fn write_firmware(format: OutputFormat, summary: &FirmwareSummary) -> Result<()> {
+    let stdout = io::stdout();
+    let mut output = stdout.lock();
+    match format {
+        OutputFormat::Json => {
+            serde_json::to_writer_pretty(&mut output, summary)?;
+            writeln!(output)?;
+        }
+        OutputFormat::Human => {
+            writeln!(
+                output,
+                "{} {} ({})",
+                summary.product_version(),
+                summary.build_id(),
+                summary.path().display()
+            )?;
+            writeln!(
+                output,
+                "Products: {}",
+                summary
+                    .supported_product_types()
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            )?;
+            for identity in summary.identities() {
+                let behavior = match identity.restore_behavior() {
+                    RestoreBehavior::Erase => "erase",
+                    RestoreBehavior::Update => "update",
+                };
+                writeln!(
+                    output,
+                    "  {}  {}  {} components",
+                    identity.board_config(),
+                    behavior,
+                    identity.component_count()
+                )?;
+            }
         }
     }
     Ok(())
