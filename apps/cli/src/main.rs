@@ -8,9 +8,9 @@ use std::{
 use anyhow::{Context, Result, anyhow};
 use clap::{ArgAction, Parser, Subcommand, ValueEnum};
 use legacy_ios_kit::{
-    BasebandPolicy, BoardConfig, DeviceInventory, DeviceSummary, Ecid, ExploitPolicy,
-    FirmwareSummary, LegacyIosKit, ProductType, RestoreBehavior, RestorePlan, RestoreRequest,
-    SepPolicy, TicketPolicy,
+    BasebandPolicy, BoardConfig, DeviceDiagnostics, DeviceInventory, DeviceSummary, Ecid,
+    ExploitPolicy, FirmwareSummary, LegacyIosKit, ProductType, RestoreBehavior, RestorePlan,
+    RestoreRequest, SepPolicy, TicketPolicy, Udid,
 };
 use tracing::level_filters::LevelFilter;
 
@@ -47,6 +47,22 @@ enum Command {
 enum DeviceCommand {
     /// List normal, Recovery, DFU, WTF, and KIS devices.
     List,
+    /// Pair a normal-mode device and persist its pairing record in the system mux.
+    Pair { udid: Udid },
+    /// Read battery diagnostics from a paired normal-mode device.
+    Battery { udid: Udid },
+    /// Restart a paired normal-mode device.
+    Restart {
+        udid: Udid,
+        #[arg(long)]
+        yes: bool,
+    },
+    /// Shut down a paired normal-mode device.
+    Shutdown {
+        udid: Udid,
+        #[arg(long)]
+        yes: bool,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -140,6 +156,45 @@ async fn main() -> Result<()> {
                 .context("failed to list devices")?;
             write_inventory(cli.output, &inventory)?;
         }
+        Command::Device {
+            command: DeviceCommand::Pair { udid },
+        } => {
+            kit.devices()
+                .pair(&udid)
+                .await
+                .context("failed to pair device")?;
+            write_message(cli.output, "paired", &udid)?;
+        }
+        Command::Device {
+            command: DeviceCommand::Battery { udid },
+        } => {
+            let diagnostics = kit
+                .devices()
+                .battery_info(&udid)
+                .await
+                .context("failed to read battery diagnostics")?;
+            write_diagnostics(cli.output, &diagnostics)?;
+        }
+        Command::Device {
+            command: DeviceCommand::Restart { udid, yes },
+        } => {
+            confirm("restart the device", yes)?;
+            kit.devices()
+                .restart(&udid)
+                .await
+                .context("failed to restart device")?;
+            write_message(cli.output, "restarted", &udid)?;
+        }
+        Command::Device {
+            command: DeviceCommand::Shutdown { udid, yes },
+        } => {
+            confirm("shut down the device", yes)?;
+            kit.devices()
+                .shutdown(&udid)
+                .await
+                .context("failed to shut down device")?;
+            write_message(cli.output, "shut-down", &udid)?;
+        }
         Command::Firmware {
             command: FirmwareCommand::Inspect { path },
         } => {
@@ -192,6 +247,58 @@ async fn main() -> Result<()> {
                 })
                 .context("failed to resolve restore plan")?;
             write_restore_plan(cli.output, &plan)?;
+        }
+    }
+    Ok(())
+}
+
+fn confirm(action: &str, accepted: bool) -> Result<()> {
+    if accepted {
+        return Ok(());
+    }
+    let mut stdout = io::stdout().lock();
+    write!(stdout, "Confirm {action} [y/N]: ")?;
+    stdout.flush()?;
+    let mut input = String::new();
+    io::stdin().read_line(&mut input)?;
+    if input.trim().eq_ignore_ascii_case("y") {
+        Ok(())
+    } else {
+        Err(anyhow!("operation cancelled"))
+    }
+}
+
+fn write_message(format: OutputFormat, action: &str, udid: &Udid) -> Result<()> {
+    let stdout = io::stdout();
+    let mut output = stdout.lock();
+    match format {
+        OutputFormat::Human => writeln!(output, "Device {action}: {udid}")?,
+        OutputFormat::Json => {
+            serde_json::to_writer(
+                &mut output,
+                &serde_json::json!({
+                    "action": action,
+                    "udid": udid,
+                }),
+            )?;
+            writeln!(output)?;
+        }
+    }
+    Ok(())
+}
+
+fn write_diagnostics(format: OutputFormat, diagnostics: &DeviceDiagnostics) -> Result<()> {
+    let stdout = io::stdout();
+    let mut output = stdout.lock();
+    match format {
+        OutputFormat::Json => {
+            serde_json::to_writer_pretty(&mut output, diagnostics)?;
+            writeln!(output)?;
+        }
+        OutputFormat::Human => {
+            for (key, value) in diagnostics.values() {
+                writeln!(output, "{key}: {value:?}")?;
+            }
         }
     }
     Ok(())
