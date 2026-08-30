@@ -888,6 +888,7 @@ dependencies = [
 name = "legacy-ios-workflows"
 version = "0.1.0"
 dependencies = [
+ "hex",
  "legacy-ios-assets",
  "legacy-ios-core",
  "legacy-ios-exploits",
@@ -896,6 +897,11 @@ dependencies = [
  "legacy-ios-restore",
  "legacy-ios-services",
  "legacy-ios-transport",
+ "serde",
+ "sha2",
+ "tempfile",
+ "thiserror",
+ "zip",
 ]
 
 [[package]]
