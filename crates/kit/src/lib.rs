@@ -17,6 +17,7 @@ pub use legacy_ios_core::{
     Soc, Udid,
 };
 pub use legacy_ios_firmware::RestoreBehavior;
+pub use legacy_ios_services::{AppFilter, InstalledApp};
 pub use legacy_ios_workflows::{
     BasebandPolicy, DestructiveConsent, ExploitPolicy, PlanId, RestoreComponent, RestorePlan,
     RestorePlanError, RestoreRequest, RestoreStep, RestoreStepKind, SepPolicy, TicketPolicy,

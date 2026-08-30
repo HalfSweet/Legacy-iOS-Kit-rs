@@ -1,6 +1,7 @@
 use legacy_ios_assets::DeviceDatabase;
 use legacy_ios_core::{BoardConfig, ConnectionId, DeviceMode, Ecid, ProductType, Soc, Udid};
 use legacy_ios_services::SystemMux;
+use legacy_ios_services::{AppFilter, InstalledApp};
 use legacy_ios_transport::{
     DeviceLocator, NusbDeviceLocator, ObservedUsbDevice, parse_iboot_serial,
 };
@@ -95,6 +96,28 @@ impl DeviceManager {
 
     pub async fn shutdown(&self, udid: &Udid) -> Result<(), KitError> {
         self.normal.find_device(udid).await?.shutdown().await?;
+        Ok(())
+    }
+
+    pub async fn list_apps(
+        &self,
+        udid: &Udid,
+        filter: AppFilter,
+    ) -> Result<Vec<InstalledApp>, KitError> {
+        Ok(self
+            .normal
+            .find_device(udid)
+            .await?
+            .list_apps(filter)
+            .await?)
+    }
+
+    pub async fn install_ipa(&self, udid: &Udid, ipa: &std::path::Path) -> Result<(), KitError> {
+        self.normal
+            .find_device(udid)
+            .await?
+            .install_ipa(ipa)
+            .await?;
         Ok(())
     }
 }
