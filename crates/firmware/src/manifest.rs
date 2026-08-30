@@ -97,6 +97,7 @@ impl BuildManifest {
 pub struct BuildIdentity {
     board_config: BoardConfig,
     restore_behavior: RestoreBehavior,
+    raw: Dictionary,
     manifest: Dictionary,
 }
 
@@ -120,6 +121,7 @@ impl BuildIdentity {
         Ok(Self {
             board_config,
             restore_behavior,
+            raw: dictionary.clone(),
             manifest,
         })
     }
@@ -149,6 +151,10 @@ impl BuildIdentity {
 
     pub fn manifest(&self) -> &Dictionary {
         &self.manifest
+    }
+
+    pub fn raw(&self) -> &Dictionary {
+        &self.raw
     }
 }
 

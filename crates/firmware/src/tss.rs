@@ -1,9 +1,12 @@
 use std::io::Cursor;
 
+use legacy_ios_core::Ecid;
 use plist::{Dictionary, Value};
 use reqwest::Url;
 use thiserror::Error;
 use tracing::{debug, info};
+
+use crate::BuildIdentity;
 
 const DEFAULT_TSS_ENDPOINT: &str = "https://gs.apple.com/TSS/controller?action=2";
 const TSS_VERSION: &str = "libauthinstall-1033.0.2";
@@ -32,11 +35,95 @@ impl TssRequest {
     pub fn dictionary(&self) -> &Dictionary {
         &self.dictionary
     }
+
+    pub fn for_build_identity(identity: &BuildIdentity, parameters: &ApParameters) -> Self {
+        let mut request = Self::new();
+        request.insert("@APTicket", true);
+        request.insert("@ApImg4Ticket", parameters.supports_img4);
+        request.insert("ApBoardID", parameters.board_id);
+        request.insert("ApChipID", parameters.chip_id);
+        request.insert("ApECID", parameters.ecid.get());
+        request.insert("ApProductionMode", parameters.production_mode);
+        request.insert("ApSecurityDomain", parameters.security_domain);
+        request.insert("ApSecurityMode", parameters.security_mode);
+        request.insert("ApSupportsImg4", parameters.supports_img4);
+        request.insert("UID_MODE", false);
+        if let Some(nonce) = &parameters.ap_nonce {
+            request.insert("ApNonce", Value::Data(nonce.clone()));
+        }
+        if let Some(nonce) = &parameters.sep_nonce {
+            request.insert("SepNonce", Value::Data(nonce.clone()));
+        }
+
+        let condition_parameters = parameters.rule_dictionary();
+        for (name, value) in identity.manifest() {
+            let Some(component) = value.as_dictionary() else {
+                continue;
+            };
+            if component.get("Trusted").and_then(Value::as_boolean) == Some(false) {
+                continue;
+            }
+            let mut entry = component.clone();
+            let info = entry.remove("Info").and_then(Value::into_dictionary);
+            if let Some(rules) = info
+                .as_ref()
+                .and_then(|info| info.get("RestoreRequestRules"))
+                .and_then(Value::as_array)
+            {
+                apply_restore_request_rules(&mut entry, &condition_parameters, rules);
+            }
+            if !entry.contains_key("Digest") {
+                entry.insert("Digest".into(), Value::Data(Vec::new()));
+            }
+            request.insert(name, entry);
+        }
+        request
+    }
 }
 
 impl Default for TssRequest {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ApParameters {
+    pub board_id: u64,
+    pub chip_id: u64,
+    pub ecid: Ecid,
+    pub ap_nonce: Option<Vec<u8>>,
+    pub sep_nonce: Option<Vec<u8>>,
+    pub production_mode: bool,
+    pub security_domain: u64,
+    pub security_mode: bool,
+    pub supports_img4: bool,
+    pub in_rom_dfu: bool,
+}
+
+impl ApParameters {
+    pub fn new(board_id: u64, chip_id: u64, ecid: Ecid) -> Self {
+        Self {
+            board_id,
+            chip_id,
+            ecid,
+            ap_nonce: None,
+            sep_nonce: None,
+            production_mode: true,
+            security_domain: 1,
+            security_mode: true,
+            supports_img4: true,
+            in_rom_dfu: false,
+        }
+    }
+
+    fn rule_dictionary(&self) -> Dictionary {
+        let mut parameters = Dictionary::new();
+        parameters.insert("ApProductionMode".into(), self.production_mode.into());
+        parameters.insert("ApSecurityMode".into(), self.security_mode.into());
+        parameters.insert("ApSupportsImg4".into(), self.supports_img4.into());
+        parameters.insert("ApInRomDFU".into(), self.in_rom_dfu.into());
+        parameters
     }
 }
 
@@ -189,7 +276,10 @@ pub enum TssError {
 
 #[cfg(test)]
 mod tests {
+    use legacy_ios_core::BoardConfig;
+
     use super::*;
+    use crate::{BuildManifest, RestoreBehavior};
 
     #[test]
     fn parses_success_response() {
@@ -230,5 +320,46 @@ mod tests {
 
         assert_eq!(input.get("EPRO").and_then(Value::as_boolean), Some(true));
         assert!(!input.contains_key("Skip"));
+    }
+
+    #[test]
+    fn builds_request_from_trusted_manifest_components() {
+        let manifest = BuildManifest::from_reader(Cursor::new(
+            br#"<?xml version="1.0" encoding="UTF-8"?>
+<plist version="1.0"><dict>
+<key>ProductVersion</key><string>10.3.3</string>
+<key>ProductBuildVersion</key><string>14G60</string>
+<key>SupportedProductTypes</key><array><string>iPhone6,1</string></array>
+<key>BuildIdentities</key><array><dict>
+<key>Info</key><dict><key>DeviceClass</key><string>n51ap</string><key>RestoreBehavior</key><string>Erase</string></dict>
+<key>Manifest</key><dict><key>KernelCache</key><dict>
+<key>Digest</key><data>AQID</data><key>Trusted</key><true/>
+<key>Info</key><dict><key>Path</key><string>kernelcache</string></dict>
+</dict></dict>
+</dict></array>
+</dict></plist>"#,
+        ))
+        .unwrap();
+        let identity = manifest
+            .select_identity(&BoardConfig::from("n51"), RestoreBehavior::Erase)
+            .unwrap();
+        let parameters = ApParameters::new(1, 0x8960, Ecid::new(42));
+
+        let request = TssRequest::for_build_identity(identity, &parameters);
+
+        assert_eq!(
+            request
+                .dictionary()
+                .get("ApECID")
+                .and_then(Value::as_unsigned_integer),
+            Some(42)
+        );
+        let kernel = request
+            .dictionary()
+            .get("KernelCache")
+            .and_then(Value::as_dictionary)
+            .unwrap();
+        assert!(kernel.contains_key("Digest"));
+        assert!(!kernel.contains_key("Info"));
     }
 }
