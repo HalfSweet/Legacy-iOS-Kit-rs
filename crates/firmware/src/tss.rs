@@ -79,6 +79,63 @@ impl TssRequest {
         }
         request
     }
+
+    pub fn for_baseband(
+        identity: &BuildIdentity,
+        parameters: &BasebandParameters,
+    ) -> Result<Self, TssError> {
+        let mut request = Self::new();
+        request.insert("@APTicket", false);
+        request.insert("@ApImg4Ticket", false);
+        request.insert("@BBTicket", true);
+        request.insert("ApECID", parameters.ecid.get());
+        request.insert("BbChipID", parameters.chip_id);
+        request.insert("BbGoldCertId", parameters.gold_cert_id);
+        request.insert("BbSNUM", Value::Data(parameters.serial_number.clone()));
+        if let Some(nonce) = &parameters.nonce {
+            request.insert("BbNonce", Value::Data(nonce.clone()));
+        }
+
+        for key in [
+            "UniqueBuildID",
+            "BbProvisioningManifestKeyHash",
+            "BbActivationManifestKeyHash",
+            "BbCalibrationManifestKeyHash",
+            "BbFactoryActivationManifestKeyHash",
+            "BbFDRSecurityKeyHash",
+            "BbSkeyId",
+        ] {
+            if let Some(value) = identity.raw().get(key) {
+                request.insert(key, value.clone());
+            }
+        }
+        for key in ["ApChipID", "ApBoardID", "ApSecurityDomain"] {
+            if let Some(value) = identity.raw().get(key).and_then(plist_integer) {
+                request.insert(key, value);
+            }
+        }
+
+        let mut baseband = identity
+            .manifest()
+            .get("BasebandFirmware")
+            .and_then(Value::as_dictionary)
+            .cloned()
+            .ok_or(TssError::MissingBasebandManifest)?;
+        baseband.remove("Info");
+        request.insert("BasebandFirmware", baseband);
+        if identity
+            .raw()
+            .get("Info")
+            .and_then(Value::as_dictionary)
+            .and_then(|info| info.get("FDRSupport"))
+            .and_then(Value::as_boolean)
+            == Some(true)
+        {
+            request.insert("ApProductionMode", true);
+            request.insert("ApSecurityMode", true);
+        }
+        Ok(request)
+    }
 }
 
 impl Default for TssRequest {
@@ -124,6 +181,32 @@ impl ApParameters {
         parameters.insert("ApSupportsImg4".into(), self.supports_img4.into());
         parameters.insert("ApInRomDFU".into(), self.in_rom_dfu.into());
         parameters
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct BasebandParameters {
+    pub ecid: Ecid,
+    pub chip_id: u64,
+    pub gold_cert_id: u64,
+    pub serial_number: Vec<u8>,
+    pub nonce: Option<Vec<u8>>,
+}
+
+impl BasebandParameters {
+    pub fn new(ecid: Ecid, chip_id: u64, gold_cert_id: u64, serial_number: Vec<u8>) -> Self {
+        Self {
+            ecid,
+            chip_id,
+            gold_cert_id,
+            serial_number,
+            nonce: None,
+        }
+    }
+
+    pub fn with_nonce(mut self, nonce: Vec<u8>) -> Self {
+        self.nonce = Some(nonce);
+        self
     }
 }
 
@@ -240,6 +323,13 @@ fn condition_parameter(condition: &str) -> Option<&'static str> {
     }
 }
 
+fn plist_integer(value: &Value) -> Option<u64> {
+    value.as_unsigned_integer().or_else(|| {
+        let value = value.as_string()?;
+        u64::from_str_radix(value.strip_prefix("0x").unwrap_or(value), 16).ok()
+    })
+}
+
 fn parse_response(response: &str) -> Result<TssResponse, TssError> {
     let response = response.trim();
     if !response.starts_with("STATUS=0&MESSAGE=SUCCESS") {
@@ -272,6 +362,8 @@ pub enum TssError {
     MissingPayload,
     #[error("TSS payload is not a dictionary")]
     PayloadNotDictionary,
+    #[error("BuildIdentity has no BasebandFirmware manifest")]
+    MissingBasebandManifest,
 }
 
 #[cfg(test)]
@@ -361,5 +453,44 @@ mod tests {
             .unwrap();
         assert!(kernel.contains_key("Digest"));
         assert!(!kernel.contains_key("Info"));
+    }
+
+    #[test]
+    fn builds_baseband_ticket_request() {
+        let manifest = BuildManifest::from_reader(Cursor::new(
+            br#"<?xml version="1.0" encoding="UTF-8"?>
+<plist version="1.0"><dict>
+<key>ProductVersion</key><string>8.4.1</string>
+<key>ProductBuildVersion</key><string>12H321</string>
+<key>SupportedProductTypes</key><array><string>iPhone4,1</string></array>
+<key>BuildIdentities</key><array><dict>
+<key>ApBoardID</key><string>0x08</string><key>ApChipID</key><string>0x8940</string>
+<key>ApSecurityDomain</key><string>0x01</string><key>UniqueBuildID</key><data>AQID</data>
+<key>Info</key><dict><key>DeviceClass</key><string>n94ap</string><key>RestoreBehavior</key><string>Erase</string></dict>
+<key>Manifest</key><dict><key>BasebandFirmware</key><dict><key>Digest</key><data>BAUG</data>
+<key>Info</key><dict><key>Path</key><string>baseband.bbfw</string></dict></dict></dict>
+</dict></array></dict></plist>"#,
+        ))
+        .unwrap();
+        let identity = manifest
+            .select_identity(&BoardConfig::from("n94"), RestoreBehavior::Erase)
+            .unwrap();
+        let parameters = BasebandParameters::new(Ecid::new(42), 0x5a00e1, 257, vec![1, 2]);
+
+        let request = TssRequest::for_baseband(identity, &parameters).unwrap();
+
+        assert_eq!(
+            request
+                .dictionary()
+                .get("BbGoldCertId")
+                .and_then(Value::as_unsigned_integer),
+            Some(257)
+        );
+        let firmware = request
+            .dictionary()
+            .get("BasebandFirmware")
+            .and_then(Value::as_dictionary)
+            .unwrap();
+        assert!(!firmware.contains_key("Info"));
     }
 }

@@ -11,5 +11,6 @@ pub use archive::FirmwareArchive;
 pub use artifact::{ArtifactError, ArtifactSpec, ArtifactStore, Digest};
 pub use manifest::{BuildIdentity, BuildManifest, FirmwareError, RestoreBehavior};
 pub use tss::{
-    ApParameters, TssClient, TssError, TssRequest, TssResponse, apply_restore_request_rules,
+    ApParameters, BasebandParameters, TssClient, TssError, TssRequest, TssResponse,
+    apply_restore_request_rules,
 };
