@@ -110,6 +110,49 @@ impl Default for TssClient {
     }
 }
 
+pub fn apply_restore_request_rules(
+    input: &mut Dictionary,
+    parameters: &Dictionary,
+    rules: &[Value],
+) {
+    for rule in rules {
+        let Some(rule) = rule.as_dictionary() else {
+            continue;
+        };
+        let Some(conditions) = rule.get("Conditions").and_then(Value::as_dictionary) else {
+            continue;
+        };
+        let matches = conditions.iter().all(|(key, expected)| {
+            condition_parameter(key)
+                .and_then(|parameter| parameters.get(parameter))
+                .is_some_and(|actual| actual == expected)
+        });
+        if !matches {
+            continue;
+        }
+        let Some(actions) = rule.get("Actions").and_then(Value::as_dictionary) else {
+            continue;
+        };
+        for (key, value) in actions {
+            if value.as_unsigned_integer() == Some(255) || value.as_signed_integer() == Some(255) {
+                continue;
+            }
+            input.insert(key.clone(), value.clone());
+        }
+    }
+}
+
+fn condition_parameter(condition: &str) -> Option<&'static str> {
+    match condition {
+        "ApRawProductionMode" | "ApCurrentProductionMode" => Some("ApProductionMode"),
+        "ApRawSecurityMode" => Some("ApSecurityMode"),
+        "ApRequiresImage4" => Some("ApSupportsImg4"),
+        "ApDemotionPolicyOverride" => Some("DemotionPolicy"),
+        "ApInRomDFU" => Some("ApInRomDFU"),
+        _ => None,
+    }
+}
+
 fn parse_response(response: &str) -> Result<TssResponse, TssError> {
     let response = response.trim();
     if !response.starts_with("STATUS=0&MESSAGE=SUCCESS") {
@@ -166,5 +209,26 @@ mod tests {
         assert!(
             matches!(error, TssError::Rejected(message) if message == "This device isn't eligible")
         );
+    }
+
+    #[test]
+    fn applies_matching_restore_request_rules() {
+        let mut input = Dictionary::new();
+        let mut parameters = Dictionary::new();
+        parameters.insert("ApProductionMode".into(), true.into());
+
+        let mut conditions = Dictionary::new();
+        conditions.insert("ApRawProductionMode".into(), true.into());
+        let mut actions = Dictionary::new();
+        actions.insert("EPRO".into(), true.into());
+        actions.insert("Skip".into(), 255_u64.into());
+        let mut rule = Dictionary::new();
+        rule.insert("Conditions".into(), conditions.into());
+        rule.insert("Actions".into(), actions.into());
+
+        apply_restore_request_rules(&mut input, &parameters, &[rule.into()]);
+
+        assert_eq!(input.get("EPRO").and_then(Value::as_boolean), Some(true));
+        assert!(!input.contains_key("Skip"));
     }
 }
