@@ -89,6 +89,12 @@ enum DeviceCommand {
     Pair { udid: Udid },
     /// Read battery diagnostics from a paired normal-mode device.
     Battery { udid: Udid },
+    /// Ask lockdownd to reboot a normal-mode device into Recovery mode.
+    EnterRecovery {
+        udid: Udid,
+        #[arg(long)]
+        yes: bool,
+    },
     /// Restart a paired normal-mode device.
     Restart {
         udid: Udid,
@@ -232,6 +238,16 @@ async fn main() -> Result<()> {
                 .await
                 .context("failed to read battery diagnostics")?;
             write_diagnostics(cli.output, &diagnostics)?;
+        }
+        Command::Device {
+            command: DeviceCommand::EnterRecovery { udid, yes },
+        } => {
+            confirm("enter Recovery mode", yes)?;
+            kit.devices()
+                .enter_recovery(&udid)
+                .await
+                .context("failed to enter Recovery mode")?;
+            write_message(cli.output, "entered-recovery", &udid)?;
         }
         Command::Device {
             command: DeviceCommand::Restart { udid, yes },
