@@ -95,6 +95,21 @@ pub enum DeviceMode {
     Ramdisk,
 }
 
+impl fmt::Display for DeviceMode {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let value = match self {
+            Self::Normal => "normal",
+            Self::Recovery => "recovery",
+            Self::Dfu => "dfu",
+            Self::Wtf => "wtf",
+            Self::Kis => "kis",
+            Self::Restore => "restore",
+            Self::Ramdisk => "ramdisk",
+        };
+        formatter.write_str(value)
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum Soc {
@@ -116,6 +131,31 @@ pub enum Soc {
     A10x,
     A11,
     Other(u32),
+}
+
+impl fmt::Display for Soc {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::S5l8900 => formatter.write_str("S5L8900"),
+            Self::S5l8720 => formatter.write_str("S5L8720"),
+            Self::S5l8920 => formatter.write_str("S5L8920"),
+            Self::S5l8922 => formatter.write_str("S5L8922"),
+            Self::A4 => formatter.write_str("A4"),
+            Self::A5 => formatter.write_str("A5"),
+            Self::A5x => formatter.write_str("A5X"),
+            Self::A6 => formatter.write_str("A6"),
+            Self::A6x => formatter.write_str("A6X"),
+            Self::A7 => formatter.write_str("A7"),
+            Self::A8 => formatter.write_str("A8"),
+            Self::A8x => formatter.write_str("A8X"),
+            Self::A9 => formatter.write_str("A9"),
+            Self::A9x => formatter.write_str("A9X"),
+            Self::A10 => formatter.write_str("A10"),
+            Self::A10x => formatter.write_str("A10X"),
+            Self::A11 => formatter.write_str("A11"),
+            Self::Other(value) => write!(formatter, "CPID {value:#x}"),
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
