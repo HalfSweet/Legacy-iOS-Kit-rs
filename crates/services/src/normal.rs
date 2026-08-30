@@ -18,6 +18,8 @@ use thiserror::Error;
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 use tracing::{debug, info};
 
+use crate::plist_service::PropertyListService;
+
 #[derive(Clone, Debug, Default)]
 pub struct SystemMux {
     address: UsbmuxdAddr,
@@ -173,6 +175,21 @@ impl NormalDevice {
         diagnostics.shutdown().await?;
         Ok(())
     }
+
+    pub async fn enter_recovery(&self) -> Result<(), ServiceError> {
+        let stream = self.connect_port(LockdownClient::LOCKDOWND_PORT).await?;
+        let mut lockdown = PropertyListService::new(stream);
+        let mut request = Dictionary::new();
+        request.insert("Label".into(), "legacy-ios-kit".into());
+        request.insert("Request".into(), "EnterRecovery".into());
+        lockdown.send(&request).await?;
+        let response = lockdown.receive().await?;
+        if response.get("Result").and_then(plist::Value::as_string) == Some("Success") {
+            Ok(())
+        } else {
+            Err(ServiceError::EnterRecoveryRejected)
+        }
+    }
 }
 
 pub struct RawServiceConnection {
@@ -312,6 +329,8 @@ pub enum ServiceError {
     PlistNotDictionary,
     #[error("app installation failed: {0}")]
     AppInstallation(String),
+    #[error("device rejected EnterRecovery")]
+    EnterRecoveryRejected,
 }
 
 #[cfg(test)]
