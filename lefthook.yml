@@ -1,0 +1,9 @@
+pre-commit:
+  piped: true
+  commands:
+    01-format:
+      run: cargo fmt --all
+      stage_fixed: true
+    02-clippy:
+      run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+
