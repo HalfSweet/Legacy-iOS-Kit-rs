@@ -15,6 +15,7 @@ sha1 = "=0.10.6"
 thiserror.workspace = true
 tokio = { workspace = true, features = ["fs", "io-util"] }
 tracing.workspace = true
+uuid = { version = "1.16.0", features = ["v4"] }
 
 [lints]
 workspace = true
