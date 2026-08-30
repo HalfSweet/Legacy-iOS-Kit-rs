@@ -47,6 +47,17 @@ impl SystemMux {
         );
         Ok(devices)
     }
+
+    pub async fn find_device(&self, udid: &Udid) -> Result<NormalDevice, ServiceError> {
+        let mut connection = self.address.connect(0).await?;
+        let device = connection.get_device(udid.as_str()).await?;
+        let provider = device.to_provider(self.address.clone(), "legacy-ios-kit");
+        Ok(NormalDevice {
+            udid: udid.clone(),
+            provider: Arc::new(provider),
+            system_mux: Some(self.address.clone()),
+        })
+    }
 }
 
 #[derive(Clone, Debug)]
