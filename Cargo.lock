@@ -695,8 +695,15 @@ dependencies = [
 name = "legacy-ios-kit"
 version = "0.1.0"
 dependencies = [
+ "legacy-ios-assets",
  "legacy-ios-core",
+ "legacy-ios-services",
+ "legacy-ios-transport",
  "legacy-ios-workflows",
+ "serde",
+ "thiserror",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]

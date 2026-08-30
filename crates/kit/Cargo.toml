@@ -6,9 +6,15 @@ rust-version.workspace = true
 publish = false
 
 [dependencies]
+legacy-ios-assets = { path = "../assets" }
 legacy-ios-core = { path = "../core" }
+legacy-ios-services = { path = "../services" }
+legacy-ios-transport = { path = "../transport" }
 legacy-ios-workflows = { path = "../workflows" }
+serde.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tracing.workspace = true
 
 [lints]
 workspace = true
-
