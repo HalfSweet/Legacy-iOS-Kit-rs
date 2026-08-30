@@ -43,16 +43,13 @@ impl DeviceProfile {
             Capability::PwnDfu,
             Capability::Restore,
             Capability::BlobRestore,
+            Capability::OnboardShsh,
             Capability::SshRamdisk,
             Capability::AppManagement,
             Capability::DataManagement,
         ];
         if is_32_bit(self.soc) {
-            capabilities.extend([
-                Capability::TetheredRestore,
-                Capability::OnboardShsh,
-                Capability::Jailbreak,
-            ]);
+            capabilities.extend([Capability::TetheredRestore, Capability::Jailbreak]);
         }
         if matches!(self.soc, Soc::A4 | Soc::A5 | Soc::A5x | Soc::A6 | Soc::A6x) {
             capabilities.push(Capability::KDfu);
