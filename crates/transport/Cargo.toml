@@ -12,6 +12,7 @@ legacy-ios-core = { path = "../core" }
 nusb = { version = "=0.2.7", features = ["tokio"] }
 serde.workspace = true
 thiserror.workspace = true
+tokio.workspace = true
 tracing.workspace = true
 
 [lints]
