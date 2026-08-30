@@ -7,6 +7,9 @@ use crate::DataType;
 pub struct PreparedRestoreData {
     root_ticket: Option<Vec<u8>>,
     kernel_cache: Option<Vec<u8>>,
+    device_tree: Option<Vec<u8>>,
+    system_image_root_hash: Option<Vec<u8>>,
+    system_image_canonical_metadata: Option<Vec<u8>>,
     nor: Option<Dictionary>,
     baseband: Option<Dictionary>,
     fud: Option<Dictionary>,
@@ -21,6 +24,21 @@ impl PreparedRestoreData {
 
     pub fn with_kernel_cache(mut self, kernel_cache: Vec<u8>) -> Self {
         self.kernel_cache = Some(kernel_cache);
+        self
+    }
+
+    pub fn with_device_tree(mut self, device_tree: Vec<u8>) -> Self {
+        self.device_tree = Some(device_tree);
+        self
+    }
+
+    pub fn with_system_image_root_hash(mut self, data: Vec<u8>) -> Self {
+        self.system_image_root_hash = Some(data);
+        self
+    }
+
+    pub fn with_system_image_canonical_metadata(mut self, data: Vec<u8>) -> Self {
+        self.system_image_canonical_metadata = Some(data);
         self
     }
 
@@ -55,22 +73,43 @@ impl PreparedRestoreData {
                 Ok(DispatchAction::Send(response))
             }
             DataType::KernelCache => {
-                let data = self
-                    .kernel_cache
-                    .clone()
-                    .ok_or(RestoreDispatchError::MissingData("KernelCache"))?;
-                let mut response = Dictionary::new();
-                response.insert("KernelCacheFile".into(), Value::Data(data));
-                Ok(DispatchAction::Send(response))
+                component(&self.kernel_cache, "KernelCacheFile", "KernelCache")
             }
+            DataType::DeviceTree => component(&self.device_tree, "DeviceTreeFile", "DeviceTree"),
+            DataType::SystemImageRootHash => component(
+                &self.system_image_root_hash,
+                "SystemImageRootHashFile",
+                "SystemImageRootHash",
+            ),
+            DataType::SystemImageCanonicalMetadata => component(
+                &self.system_image_canonical_metadata,
+                "SystemImageCanonicalMetadataFile",
+                "SystemImageCanonicalMetadata",
+            ),
             DataType::Nor => response(&self.nor, "NORData"),
             DataType::Baseband => response(&self.baseband, "BasebandData"),
             DataType::FdrTrust => Ok(DispatchAction::Send(Dictionary::new())),
             DataType::Fud => response(&self.fud, "FUDData"),
             DataType::FirmwareUpdater => response(&self.firmware_updater, "FirmwareUpdaterData"),
+            DataType::FirmwareUpdaterPreflight | DataType::DeviceRestoreInfoPreflight => {
+                Ok(DispatchAction::Send(Dictionary::new()))
+            }
             DataType::Unknown(value) => Err(RestoreDispatchError::UnknownDataType(value.clone())),
         }
     }
+}
+
+fn component(
+    data: &Option<Vec<u8>>,
+    key: &'static str,
+    name: &'static str,
+) -> Result<DispatchAction, RestoreDispatchError> {
+    let data = data
+        .clone()
+        .ok_or(RestoreDispatchError::MissingData(name))?;
+    let mut response = Dictionary::new();
+    response.insert(key.into(), Value::Data(data));
+    Ok(DispatchAction::Send(response))
 }
 
 fn response(

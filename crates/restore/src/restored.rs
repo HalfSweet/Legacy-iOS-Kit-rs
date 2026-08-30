@@ -120,11 +120,16 @@ pub enum DataType {
     SystemImage,
     RootTicket,
     KernelCache,
+    DeviceTree,
+    SystemImageRootHash,
+    SystemImageCanonicalMetadata,
     Nor,
     Baseband,
     FdrTrust,
     Fud,
     FirmwareUpdater,
+    FirmwareUpdaterPreflight,
+    DeviceRestoreInfoPreflight,
     Unknown(String),
 }
 
@@ -134,11 +139,16 @@ impl DataType {
             "SystemImageData" => Self::SystemImage,
             "RootTicket" => Self::RootTicket,
             "KernelCache" => Self::KernelCache,
+            "DeviceTree" => Self::DeviceTree,
+            "SystemImageRootHash" => Self::SystemImageRootHash,
+            "SystemImageCanonicalMetadata" => Self::SystemImageCanonicalMetadata,
             "NORData" => Self::Nor,
             "BasebandData" => Self::Baseband,
             "FDRTrustData" => Self::FdrTrust,
             "FUDData" => Self::Fud,
             "FirmwareUpdaterData" => Self::FirmwareUpdater,
+            "FirmwareUpdaterPreflight" => Self::FirmwareUpdaterPreflight,
+            "DeviceRestoreInfoPreflight" => Self::DeviceRestoreInfoPreflight,
             value => Self::Unknown(value.to_owned()),
         }
     }
