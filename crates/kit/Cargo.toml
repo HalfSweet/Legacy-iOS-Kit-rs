@@ -12,6 +12,7 @@ legacy-ios-firmware = { path = "../firmware" }
 legacy-ios-services = { path = "../services" }
 legacy-ios-transport = { path = "../transport" }
 legacy-ios-workflows = { path = "../workflows" }
+plist = "=1.8.0"
 serde.workspace = true
 thiserror.workspace = true
 tokio.workspace = true

@@ -77,6 +77,38 @@ impl DeviceManager {
         }
         Ok(summaries)
     }
+
+    pub async fn pair(&self, udid: &Udid) -> Result<(), KitError> {
+        self.normal.find_device(udid).await?.pair().await?;
+        Ok(())
+    }
+
+    pub async fn battery_info(&self, udid: &Udid) -> Result<DeviceDiagnostics, KitError> {
+        let values = self.normal.find_device(udid).await?.battery_info().await?;
+        Ok(DeviceDiagnostics { values })
+    }
+
+    pub async fn restart(&self, udid: &Udid) -> Result<(), KitError> {
+        self.normal.find_device(udid).await?.restart().await?;
+        Ok(())
+    }
+
+    pub async fn shutdown(&self, udid: &Udid) -> Result<(), KitError> {
+        self.normal.find_device(udid).await?.shutdown().await?;
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(transparent)]
+pub struct DeviceDiagnostics {
+    values: plist::Dictionary,
+}
+
+impl DeviceDiagnostics {
+    pub fn values(&self) -> &plist::Dictionary {
+        &self.values
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]

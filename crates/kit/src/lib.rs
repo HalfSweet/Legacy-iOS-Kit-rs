@@ -6,7 +6,9 @@ mod device;
 mod error;
 mod firmware;
 
-pub use device::{BackendFailure, DeviceInventory, DeviceManager, DeviceSummary};
+pub use device::{
+    BackendFailure, DeviceDiagnostics, DeviceInventory, DeviceManager, DeviceSummary,
+};
 pub use error::KitError;
 pub use firmware::{FirmwareIdentitySummary, FirmwareSummary};
 pub use legacy_ios_core::{

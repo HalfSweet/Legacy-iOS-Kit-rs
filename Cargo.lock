@@ -918,6 +918,7 @@ dependencies = [
  "legacy-ios-services",
  "legacy-ios-transport",
  "legacy-ios-workflows",
+ "plist",
  "serde",
  "thiserror",
  "tokio",
