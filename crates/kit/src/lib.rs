@@ -14,7 +14,7 @@ pub use device::{
     BackendFailure, DeviceDiagnostics, DeviceInventory, DeviceManager, DeviceSummary,
 };
 pub use error::KitError;
-pub use firmware::{FirmwareIdentitySummary, FirmwareSummary};
+pub use firmware::{FirmwareIdentitySummary, FirmwareSummary, RemoteFirmwareSummary};
 pub use lease::DeviceLease;
 pub use legacy_ios_core::{
     BoardConfig, BuildId, Capability, CapabilitySet, ConnectionId, DeviceIdentity, DeviceMode,
@@ -62,6 +62,13 @@ impl LegacyIosKit {
         path: impl Into<std::path::PathBuf>,
     ) -> Result<FirmwareSummary, KitError> {
         FirmwareSummary::inspect(path.into())
+    }
+
+    pub async fn inspect_remote_firmware(
+        &self,
+        url: impl Into<String>,
+    ) -> Result<RemoteFirmwareSummary, KitError> {
+        RemoteFirmwareSummary::inspect(url.into()).await
     }
 
     pub fn resolve_device_identity(

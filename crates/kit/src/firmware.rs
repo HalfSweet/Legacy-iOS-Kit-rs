@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use legacy_ios_core::{BoardConfig, BuildId, IosVersion, ProductType};
-use legacy_ios_firmware::{FirmwareArchive, RestoreBehavior};
+use legacy_ios_firmware::{BuildManifest, FirmwareArchive, RemoteFirmwareArchive, RestoreBehavior};
 use serde::{Deserialize, Serialize};
 
 use crate::KitError;
@@ -56,6 +56,68 @@ impl FirmwareSummary {
     pub fn identities(&self) -> &[FirmwareIdentitySummary] {
         &self.identities
     }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct RemoteFirmwareSummary {
+    url: String,
+    length: u64,
+    product_version: IosVersion,
+    build_id: BuildId,
+    supported_product_types: Vec<ProductType>,
+    identities: Vec<FirmwareIdentitySummary>,
+}
+
+impl RemoteFirmwareSummary {
+    pub(crate) async fn inspect(url: String) -> Result<Self, KitError> {
+        let archive = RemoteFirmwareArchive::open(&url).await?;
+        let length = archive.length();
+        let manifest = archive.build_manifest().await?;
+        Ok(Self {
+            url,
+            length,
+            product_version: manifest.product_version().clone(),
+            build_id: manifest.build_id().clone(),
+            supported_product_types: manifest.supported_product_types().to_vec(),
+            identities: identities(&manifest),
+        })
+    }
+
+    pub fn url(&self) -> &str {
+        &self.url
+    }
+
+    pub const fn length(&self) -> u64 {
+        self.length
+    }
+
+    pub fn product_version(&self) -> &IosVersion {
+        &self.product_version
+    }
+
+    pub fn build_id(&self) -> &BuildId {
+        &self.build_id
+    }
+
+    pub fn supported_product_types(&self) -> &[ProductType] {
+        &self.supported_product_types
+    }
+
+    pub fn identities(&self) -> &[FirmwareIdentitySummary] {
+        &self.identities
+    }
+}
+
+fn identities(manifest: &BuildManifest) -> Vec<FirmwareIdentitySummary> {
+    manifest
+        .identities()
+        .iter()
+        .map(|identity| FirmwareIdentitySummary {
+            board_config: identity.board_config().clone(),
+            restore_behavior: identity.restore_behavior(),
+            component_count: identity.manifest().len(),
+        })
+        .collect()
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]

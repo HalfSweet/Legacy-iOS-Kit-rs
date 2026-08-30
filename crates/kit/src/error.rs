@@ -10,6 +10,8 @@ pub enum KitError {
     Service(#[from] legacy_ios_services::ServiceError),
     #[error("firmware operation failed: {0}")]
     Firmware(#[from] legacy_ios_firmware::FirmwareError),
+    #[error("remote firmware operation failed: {0}")]
+    RemoteFirmware(#[from] legacy_ios_firmware::RemoteFirmwareError),
     #[error("signing service operation failed: {0}")]
     Signing(#[from] legacy_ios_firmware::TssError),
     #[error("property list operation failed: {0}")]
@@ -39,6 +41,7 @@ impl KitError {
     pub const fn stage(&self) -> OperationPhase {
         match self {
             Self::Firmware(_)
+            | Self::RemoteFirmware(_)
             | Self::RestorePlan(_)
             | Self::UnknownProduct(_)
             | Self::UnknownBoardConfig { .. }
@@ -61,6 +64,7 @@ impl KitError {
             Self::Recovery(_) | Self::Limera1n(_) => Recoverability::ReenterDfu,
             Self::Plist(_) => Recoverability::RestartOperation,
             Self::Firmware(_)
+            | Self::RemoteFirmware(_)
             | Self::RestorePlan(_)
             | Self::UnknownProduct(_)
             | Self::UnknownBoardConfig { .. }
