@@ -968,6 +968,8 @@ dependencies = [
 name = "legacy-ios-firmware"
 version = "0.1.0"
 dependencies = [
+ "crc32fast",
+ "flate2",
  "hex",
  "legacy-ios-assets",
  "legacy-ios-core",

@@ -7,6 +7,8 @@ publish = false
 
 [dependencies]
 hex = "=0.4.3"
+crc32fast = "=1.5.1"
+flate2 = { version = "=1.1.10", default-features = false, features = ["rust_backend"] }
 legacy-ios-assets = { path = "../assets" }
 legacy-ios-core = { path = "../core" }
 plist = "=1.8.0"
