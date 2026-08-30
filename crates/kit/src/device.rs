@@ -147,6 +147,15 @@ impl DeviceManager {
             .await?;
         Ok(())
     }
+
+    pub async fn enter_recovery(&self, udid: &Udid) -> Result<(), KitError> {
+        self.normal
+            .find_device(udid)
+            .await?
+            .enter_recovery()
+            .await?;
+        Ok(())
+    }
 }
 
 #[derive(Clone, Debug, Serialize)]
