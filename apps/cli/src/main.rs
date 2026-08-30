@@ -8,9 +8,9 @@ use std::{
 use anyhow::{Context, Result, anyhow};
 use clap::{ArgAction, Parser, Subcommand, ValueEnum};
 use legacy_ios_kit::{
-    BasebandPolicy, BoardConfig, DeviceDiagnostics, DeviceInventory, DeviceSummary, Ecid,
-    ExploitPolicy, FirmwareSummary, LegacyIosKit, ProductType, RestoreBehavior, RestorePlan,
-    RestoreRequest, SepPolicy, TicketPolicy, Udid,
+    AppFilter, BasebandPolicy, BoardConfig, DeviceDiagnostics, DeviceInventory, DeviceSummary,
+    Ecid, ExploitPolicy, FirmwareSummary, InstalledApp, LegacyIosKit, ProductType, RestoreBehavior,
+    RestorePlan, RestoreRequest, SepPolicy, TicketPolicy, Udid,
 };
 use tracing::level_filters::LevelFilter;
 
@@ -29,6 +29,10 @@ struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum Command {
+    App {
+        #[command(subcommand)]
+        command: AppCommand,
+    },
     Device {
         #[command(subcommand)]
         command: DeviceCommand,
@@ -41,6 +45,40 @@ enum Command {
         #[command(subcommand)]
         command: RestoreCommand,
     },
+}
+
+#[derive(Debug, Subcommand)]
+enum AppCommand {
+    /// List installed applications.
+    List {
+        udid: Udid,
+        #[arg(long, value_enum, default_value_t = AppFilterArg::User)]
+        filter: AppFilterArg,
+    },
+    /// Upload and install an IPA through AFC and installation_proxy.
+    Install {
+        udid: Udid,
+        ipa: PathBuf,
+        #[arg(long)]
+        yes: bool,
+    },
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
+enum AppFilterArg {
+    User,
+    System,
+    All,
+}
+
+impl From<AppFilterArg> for AppFilter {
+    fn from(value: AppFilterArg) -> Self {
+        match value {
+            AppFilterArg::User => Self::User,
+            AppFilterArg::System => Self::System,
+            AppFilterArg::All => Self::All,
+        }
+    }
 }
 
 #[derive(Debug, Subcommand)]
@@ -146,6 +184,26 @@ async fn main() -> Result<()> {
     let kit = LegacyIosKit::new();
 
     match cli.command {
+        Command::App {
+            command: AppCommand::List { udid, filter },
+        } => {
+            let apps = kit
+                .devices()
+                .list_apps(&udid, filter.into())
+                .await
+                .context("failed to list apps")?;
+            write_apps(cli.output, &apps)?;
+        }
+        Command::App {
+            command: AppCommand::Install { udid, ipa, yes },
+        } => {
+            confirm("install the IPA", yes)?;
+            kit.devices()
+                .install_ipa(&udid, &ipa)
+                .await
+                .context("failed to install IPA")?;
+            write_message(cli.output, "installed-ipa", &udid)?;
+        }
         Command::Device {
             command: DeviceCommand::List,
         } => {
@@ -247,6 +305,29 @@ async fn main() -> Result<()> {
                 })
                 .context("failed to resolve restore plan")?;
             write_restore_plan(cli.output, &plan)?;
+        }
+    }
+    Ok(())
+}
+
+fn write_apps(format: OutputFormat, apps: &[InstalledApp]) -> Result<()> {
+    let stdout = io::stdout();
+    let mut output = stdout.lock();
+    match format {
+        OutputFormat::Json => {
+            serde_json::to_writer_pretty(&mut output, apps)?;
+            writeln!(output)?;
+        }
+        OutputFormat::Human => {
+            for app in apps {
+                writeln!(
+                    output,
+                    "{}  {}  {}",
+                    app.bundle_id(),
+                    app.version().unwrap_or("unknown version"),
+                    app.name().unwrap_or("unnamed")
+                )?;
+            }
         }
     }
     Ok(())
