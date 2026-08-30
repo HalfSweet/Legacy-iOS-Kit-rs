@@ -119,7 +119,8 @@ impl IbootClient {
     }
 
     pub async fn upload_image(mut self, data: &[u8]) -> Result<UploadResult, RecoveryError> {
-        let reenumerates = matches!(self.mode, DeviceMode::Dfu | DeviceMode::Wtf);
+        let reenumerates =
+            matches!(self.mode, DeviceMode::Dfu | DeviceMode::Wtf) || self.uses_ios2_upload();
         self.upload(data, reenumerates).await?;
         if reenumerates {
             self.device.reset().await?;
@@ -189,8 +190,11 @@ impl IbootClient {
             return Err(RecoveryError::EmptyUpload);
         }
         match self.mode {
+            DeviceMode::Recovery if self.uses_ios2_upload() => {
+                self.upload_dfu(data, true, true).await
+            }
             DeviceMode::Recovery => self.upload_recovery(data).await,
-            DeviceMode::Dfu | DeviceMode::Wtf => self.upload_dfu(data, finish_dfu).await,
+            DeviceMode::Dfu | DeviceMode::Wtf => self.upload_dfu(data, finish_dfu, false).await,
             DeviceMode::Kis => Err(RecoveryError::KisUploadNotImplemented),
             mode => Err(RecoveryError::UploadRequiresBootloader(mode)),
         }
@@ -200,10 +204,6 @@ impl IbootClient {
         if self.info.effective_cpid() == 0x8900 && self.info.ecid().is_none() {
             return Err(RecoveryError::LegacyUploadProtocol);
         }
-        if matches!(self.info.effective_cpid(), 0x8900 | 0x8720) && self.info.ibfl().is_none() {
-            return Err(RecoveryError::Ios2UploadProtocol);
-        }
-
         self.interface
             .control_out(
                 ControlOut {
@@ -228,8 +228,13 @@ impl IbootClient {
         Ok(())
     }
 
-    async fn upload_dfu(&self, data: &[u8], finish: bool) -> Result<(), RecoveryError> {
-        self.prepare_dfu_download().await?;
+    async fn upload_dfu(
+        &self,
+        data: &[u8],
+        finish: bool,
+        allow_wait_reset: bool,
+    ) -> Result<(), RecoveryError> {
+        self.prepare_dfu_download(allow_wait_reset).await?;
 
         let suffix = [
             0xff, 0xff, 0xff, 0xff, 0xac, 0x05, 0x00, 0x01, 0x55, 0x46, 0x44, 0x10,
@@ -269,10 +274,11 @@ impl IbootClient {
         Ok(())
     }
 
-    async fn prepare_dfu_download(&self) -> Result<(), RecoveryError> {
+    async fn prepare_dfu_download(&self, allow_wait_reset: bool) -> Result<(), RecoveryError> {
         let state = self.get_dfu_state().await?;
         match state {
             2 => Ok(()),
+            8 if allow_wait_reset => Ok(()),
             8 => {
                 self.dfu_abort().await?;
                 Err(RecoveryError::UnexpectedDfuState(state))
@@ -285,6 +291,17 @@ impl IbootClient {
                 self.dfu_abort().await?;
                 Err(RecoveryError::UnexpectedDfuState(state))
             }
+        }
+    }
+
+    fn uses_ios2_upload(&self) -> bool {
+        if self.mode != DeviceMode::Recovery || self.info.ibfl().is_some() {
+            return false;
+        }
+        match self.info.effective_cpid() {
+            0x8720 => true,
+            0x8900 => self.info.ecid().is_some(),
+            _ => false,
         }
     }
 
@@ -433,8 +450,6 @@ pub enum RecoveryError {
     LegacyCommandProtocol,
     #[error("the early iOS upload protocol is required for this device")]
     LegacyUploadProtocol,
-    #[error("the iOS 2 recovery upload protocol is required for this device")]
-    Ios2UploadProtocol,
     #[error("KIS image upload is not implemented yet")]
     KisUploadNotImplemented,
     #[error("image upload requires a bootloader mode, found {0:?}")]
