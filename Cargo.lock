@@ -716,6 +716,7 @@ dependencies = [
  "legacy-ios-image",
  "legacy-ios-transport",
  "plist",
+ "sha1",
  "thiserror",
  "tokio",
  "tracing",
