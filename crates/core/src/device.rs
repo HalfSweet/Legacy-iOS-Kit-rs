@@ -88,6 +88,7 @@ pub enum DeviceMode {
     Recovery,
     Dfu,
     Wtf,
+    Kis,
     Restore,
     Ramdisk,
 }
