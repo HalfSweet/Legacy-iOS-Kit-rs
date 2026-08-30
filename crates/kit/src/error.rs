@@ -6,6 +6,8 @@ pub enum KitError {
     Transport(#[from] legacy_ios_transport::TransportError),
     #[error("normal-mode device discovery failed: {0}")]
     Service(#[from] legacy_ios_services::ServiceError),
+    #[error("firmware operation failed: {0}")]
+    Firmware(#[from] legacy_ios_firmware::FirmwareError),
     #[error("both device discovery backends failed (bootloader: {bootloader}; normal: {normal})")]
     DeviceDiscovery { bootloader: String, normal: String },
 }

@@ -811,6 +811,7 @@ version = "0.1.0"
 dependencies = [
  "legacy-ios-assets",
  "legacy-ios-core",
+ "legacy-ios-firmware",
  "legacy-ios-services",
  "legacy-ios-transport",
  "legacy-ios-workflows",

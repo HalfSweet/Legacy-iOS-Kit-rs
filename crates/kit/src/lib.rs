@@ -4,9 +4,11 @@
 
 mod device;
 mod error;
+mod firmware;
 
 pub use device::{BackendFailure, DeviceInventory, DeviceManager, DeviceSummary};
 pub use error::KitError;
+pub use firmware::{FirmwareIdentitySummary, FirmwareSummary};
 pub use legacy_ios_core::{
     BoardConfig, BuildId, Capability, CapabilitySet, ConnectionId, DeviceIdentity, DeviceMode,
     DeviceSelector, DeviceSnapshot, Ecid, IosVersion, OperationEvent, OperationId, ProductType,
@@ -25,5 +27,12 @@ impl LegacyIosKit {
 
     pub fn devices(&self) -> &DeviceManager {
         &self.devices
+    }
+
+    pub fn inspect_firmware(
+        &self,
+        path: impl Into<std::path::PathBuf>,
+    ) -> Result<FirmwareSummary, KitError> {
+        FirmwareSummary::inspect(path.into())
     }
 }

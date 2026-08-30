@@ -8,6 +8,7 @@ publish = false
 [dependencies]
 legacy-ios-assets = { path = "../assets" }
 legacy-ios-core = { path = "../core" }
+legacy-ios-firmware = { path = "../firmware" }
 legacy-ios-services = { path = "../services" }
 legacy-ios-transport = { path = "../transport" }
 legacy-ios-workflows = { path = "../workflows" }
