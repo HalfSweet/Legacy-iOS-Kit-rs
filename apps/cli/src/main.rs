@@ -1,5 +1,7 @@
 #![forbid(unsafe_code)]
 
+mod config;
+
 use std::{
     io::{self, Write},
     path::PathBuf,
@@ -15,11 +17,15 @@ use legacy_ios_kit::{
 };
 use tracing::level_filters::LevelFilter;
 
+use config::AppConfig;
+
 #[derive(Debug, Parser)]
 #[command(name = "lik", version, about = "Pure-Rust legacy iOS device toolkit")]
 struct Cli {
-    #[arg(long, value_enum, default_value_t = OutputFormat::Human, global = true)]
-    output: OutputFormat,
+    #[arg(long, value_enum, global = true)]
+    output: Option<OutputFormat>,
+    #[arg(long, global = true)]
+    config: Option<PathBuf>,
     #[arg(short, long, action = ArgAction::Count, global = true, conflicts_with = "quiet")]
     verbose: u8,
     #[arg(short, long, global = true)]
@@ -34,6 +40,10 @@ enum Command {
         #[command(subcommand)]
         command: AppCommand,
     },
+    Config {
+        #[command(subcommand)]
+        command: ConfigCommand,
+    },
     Device {
         #[command(subcommand)]
         command: DeviceCommand,
@@ -46,6 +56,14 @@ enum Command {
         #[command(subcommand)]
         command: RestoreCommand,
     },
+}
+
+#[derive(Debug, Subcommand)]
+enum ConfigCommand {
+    /// Print the effective configuration.
+    Show,
+    /// Print the configuration file path.
+    Path,
 }
 
 #[derive(Debug, Subcommand)]
@@ -216,7 +234,10 @@ impl From<ExploitArg> for ExploitPolicy {
     }
 }
 
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, ValueEnum)]
+#[derive(
+    Clone, Copy, Debug, Default, Eq, PartialEq, ValueEnum, serde::Serialize, serde::Deserialize,
+)]
+#[serde(rename_all = "lowercase")]
 enum OutputFormat {
     #[default]
     Human,
@@ -226,7 +247,9 @@ enum OutputFormat {
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
-    init_tracing(&cli)?;
+    let config = AppConfig::load(cli.config.as_deref())?;
+    let output = cli.output.or(config.output).unwrap_or_default();
+    init_tracing(&cli, &config)?;
     let kit = LegacyIosKit::new();
 
     match cli.command {
@@ -238,7 +261,7 @@ async fn main() -> Result<()> {
                 .list_apps(&udid, filter.into())
                 .await
                 .context("failed to list apps")?;
-            write_apps(cli.output, &apps)?;
+            write_apps(output, &apps)?;
         }
         Command::App {
             command: AppCommand::Install { udid, ipa, yes },
@@ -248,8 +271,14 @@ async fn main() -> Result<()> {
                 .install_ipa(&udid, &ipa)
                 .await
                 .context("failed to install IPA")?;
-            write_message(cli.output, "installed-ipa", &udid)?;
+            write_message(output, "installed-ipa", &udid)?;
         }
+        Command::Config {
+            command: ConfigCommand::Show,
+        } => write_config(output, &config)?,
+        Command::Config {
+            command: ConfigCommand::Path,
+        } => write_config_path(output, &config.path)?,
         Command::Device {
             command: DeviceCommand::List,
         } => {
@@ -258,7 +287,7 @@ async fn main() -> Result<()> {
                 .list()
                 .await
                 .context("failed to list devices")?;
-            write_inventory(cli.output, &inventory)?;
+            write_inventory(output, &inventory)?;
         }
         Command::Device {
             command: DeviceCommand::Pair { udid },
@@ -267,7 +296,7 @@ async fn main() -> Result<()> {
                 .pair(&udid)
                 .await
                 .context("failed to pair device")?;
-            write_message(cli.output, "paired", &udid)?;
+            write_message(output, "paired", &udid)?;
         }
         Command::Device {
             command: DeviceCommand::Battery { udid },
@@ -277,7 +306,7 @@ async fn main() -> Result<()> {
                 .battery_info(&udid)
                 .await
                 .context("failed to read battery diagnostics")?;
-            write_diagnostics(cli.output, &diagnostics)?;
+            write_diagnostics(output, &diagnostics)?;
         }
         Command::Device {
             command: DeviceCommand::EnterRecovery { udid, yes },
@@ -287,13 +316,13 @@ async fn main() -> Result<()> {
                 .enter_recovery(&udid)
                 .await
                 .context("failed to enter Recovery mode")?;
-            write_message(cli.output, "entered-recovery", &udid)?;
+            write_message(output, "entered-recovery", &udid)?;
         }
         Command::Device {
             command: DeviceCommand::RecoveryInfo { ecid },
         } => {
             let device = kit.recovery().open(ecid).await?;
-            write_recovery_info(cli.output, device.mode(), device.info())?;
+            write_recovery_info(output, device.mode(), device.info())?;
         }
         Command::Device {
             command: DeviceCommand::Iboot { command, ecid },
@@ -303,7 +332,7 @@ async fn main() -> Result<()> {
                 .await?
                 .send_command(&command)
                 .await?;
-            write_status(cli.output, "sent-command")?;
+            write_status(output, "sent-command")?;
         }
         Command::Device {
             command: DeviceCommand::SendImage { path, ecid, yes },
@@ -315,7 +344,7 @@ async fn main() -> Result<()> {
                 RecoveryUploadResult::Connected(_) => "uploaded-image",
                 RecoveryUploadResult::Reenumerating => "uploaded-image-reenumerating",
             };
-            write_status(cli.output, status)?;
+            write_status(output, status)?;
         }
         Command::Device {
             command: DeviceCommand::SendPayload { path, ecid, yes },
@@ -327,20 +356,20 @@ async fn main() -> Result<()> {
                 .await?
                 .upload_payload(&data)
                 .await?;
-            write_status(cli.output, "uploaded-payload")?;
+            write_status(output, "uploaded-payload")?;
         }
         Command::Device {
             command: DeviceCommand::ExitRecovery { ecid },
         } => {
             kit.recovery().open(ecid).await?.reboot_to_normal().await?;
-            write_status(cli.output, "exited-recovery")?;
+            write_status(output, "exited-recovery")?;
         }
         Command::Device {
             command: DeviceCommand::Reset { ecid, yes },
         } => {
             confirm("reset the USB device", yes)?;
             kit.recovery().open(ecid).await?.reset().await?;
-            write_status(cli.output, "reset-device")?;
+            write_status(output, "reset-device")?;
         }
         Command::Device {
             command: DeviceCommand::Restart { udid, yes },
@@ -350,7 +379,7 @@ async fn main() -> Result<()> {
                 .restart(&udid)
                 .await
                 .context("failed to restart device")?;
-            write_message(cli.output, "restarted", &udid)?;
+            write_message(output, "restarted", &udid)?;
         }
         Command::Device {
             command: DeviceCommand::Shutdown { udid, yes },
@@ -360,7 +389,7 @@ async fn main() -> Result<()> {
                 .shutdown(&udid)
                 .await
                 .context("failed to shut down device")?;
-            write_message(cli.output, "shut-down", &udid)?;
+            write_message(output, "shut-down", &udid)?;
         }
         Command::Firmware {
             command: FirmwareCommand::Inspect { path },
@@ -368,7 +397,7 @@ async fn main() -> Result<()> {
             let summary = kit
                 .inspect_firmware(path)
                 .context("failed to inspect firmware")?;
-            write_firmware(cli.output, &summary)?;
+            write_firmware(output, &summary)?;
         }
         Command::Restore {
             command:
@@ -413,7 +442,33 @@ async fn main() -> Result<()> {
                     exploit: exploit.into(),
                 })
                 .context("failed to resolve restore plan")?;
-            write_restore_plan(cli.output, &plan)?;
+            write_restore_plan(output, &plan)?;
+        }
+    }
+    Ok(())
+}
+
+fn write_config(format: OutputFormat, config: &AppConfig) -> Result<()> {
+    let stdout = io::stdout();
+    let mut output = stdout.lock();
+    match format {
+        OutputFormat::Json => {
+            serde_json::to_writer_pretty(&mut output, config)?;
+            writeln!(output)?;
+        }
+        OutputFormat::Human => write!(output, "{}", toml::to_string_pretty(config)?)?,
+    }
+    Ok(())
+}
+
+fn write_config_path(format: OutputFormat, path: &std::path::Path) -> Result<()> {
+    let stdout = io::stdout();
+    let mut output = stdout.lock();
+    match format {
+        OutputFormat::Human => writeln!(output, "{}", path.display())?,
+        OutputFormat::Json => {
+            serde_json::to_writer(&mut output, &serde_json::json!({ "path": path }))?;
+            writeln!(output)?;
         }
     }
     Ok(())
@@ -615,12 +670,12 @@ fn write_firmware(format: OutputFormat, summary: &FirmwareSummary) -> Result<()>
     Ok(())
 }
 
-fn init_tracing(cli: &Cli) -> Result<()> {
+fn init_tracing(cli: &Cli, config: &AppConfig) -> Result<()> {
     let level = if cli.quiet {
         LevelFilter::WARN
     } else {
         match cli.verbose {
-            0 => LevelFilter::INFO,
+            0 => config.log_level()?,
             1 => LevelFilter::DEBUG,
             _ => LevelFilter::TRACE,
         }
