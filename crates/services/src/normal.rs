@@ -1,4 +1,9 @@
-use std::sync::Arc;
+use std::{
+    fmt,
+    pin::Pin,
+    sync::Arc,
+    task::{Context, Poll},
+};
 
 use idevice::{
     IdeviceService,
@@ -9,6 +14,7 @@ use idevice::{
 use legacy_ios_core::{BoardConfig, Ecid, ProductType, Udid};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
+use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 use tracing::{debug, info};
 
 #[derive(Clone, Debug, Default)]
@@ -77,6 +83,58 @@ impl NormalDevice {
             "queried normal-mode device"
         );
         Ok(info)
+    }
+
+    pub async fn connect_port(&self, port: u16) -> Result<RawServiceConnection, ServiceError> {
+        let connection = self.provider.connect(port).await?;
+        let inner = connection.get_socket().ok_or(ServiceError::MissingSocket)?;
+        Ok(RawServiceConnection { inner })
+    }
+}
+
+pub struct RawServiceConnection {
+    inner: Box<dyn idevice::ReadWrite>,
+}
+
+impl fmt::Debug for RawServiceConnection {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("RawServiceConnection")
+            .finish_non_exhaustive()
+    }
+}
+
+impl AsyncRead for RawServiceConnection {
+    fn poll_read(
+        mut self: Pin<&mut Self>,
+        context: &mut Context<'_>,
+        buffer: &mut ReadBuf<'_>,
+    ) -> Poll<std::io::Result<()>> {
+        Pin::new(&mut *self.inner).poll_read(context, buffer)
+    }
+}
+
+impl AsyncWrite for RawServiceConnection {
+    fn poll_write(
+        mut self: Pin<&mut Self>,
+        context: &mut Context<'_>,
+        buffer: &[u8],
+    ) -> Poll<Result<usize, std::io::Error>> {
+        Pin::new(&mut *self.inner).poll_write(context, buffer)
+    }
+
+    fn poll_flush(
+        mut self: Pin<&mut Self>,
+        context: &mut Context<'_>,
+    ) -> Poll<Result<(), std::io::Error>> {
+        Pin::new(&mut *self.inner).poll_flush(context)
+    }
+
+    fn poll_shutdown(
+        mut self: Pin<&mut Self>,
+        context: &mut Context<'_>,
+    ) -> Poll<Result<(), std::io::Error>> {
+        Pin::new(&mut *self.inner).poll_shutdown(context)
     }
 }
 
@@ -153,6 +211,8 @@ pub enum ServiceError {
     Idevice(#[from] idevice::IdeviceError),
     #[error("lockdown returned an unexpected value for {0}")]
     UnexpectedValue(&'static str),
+    #[error("iOS service connection did not expose a socket")]
+    MissingSocket,
 }
 
 #[cfg(test)]

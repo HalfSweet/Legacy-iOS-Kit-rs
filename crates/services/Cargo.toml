@@ -13,6 +13,7 @@ plist = "=1.8.0"
 serde.workspace = true
 thiserror.workspace = true
 time = "=0.3.41"
+tokio = { workspace = true, features = ["io-util"] }
 tracing.workspace = true
 
 [lints]

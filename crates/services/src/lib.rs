@@ -4,4 +4,4 @@
 
 mod normal;
 
-pub use normal::{NormalDevice, NormalDeviceInfo, ServiceError, SystemMux};
+pub use normal::{NormalDevice, NormalDeviceInfo, RawServiceConnection, ServiceError, SystemMux};
