@@ -19,7 +19,7 @@ pub use lease::DeviceLease;
 pub use legacy_ios_core::{
     BoardConfig, BuildId, Capability, CapabilitySet, ConnectionId, DeviceIdentity, DeviceMode,
     DeviceSelector, DeviceSnapshot, Ecid, IosVersion, OperationEvent, OperationId, ProductType,
-    Soc, Udid,
+    Recoverability, Soc, Udid,
 };
 pub use legacy_ios_firmware::RestoreBehavior;
 pub use legacy_ios_services::{AppFilter, InstalledApp};

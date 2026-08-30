@@ -1,5 +1,7 @@
 use thiserror::Error;
 
+use legacy_ios_core::{OperationPhase, Recoverability};
+
 #[derive(Debug, Error)]
 pub enum KitError {
     #[error("bootloader device discovery failed: {0}")]
@@ -31,4 +33,38 @@ pub enum KitError {
     MissingDeviceSelector,
     #[error("both device discovery backends failed (bootloader: {bootloader}; normal: {normal})")]
     DeviceDiscovery { bootloader: String, normal: String },
+}
+
+impl KitError {
+    pub const fn stage(&self) -> OperationPhase {
+        match self {
+            Self::Firmware(_)
+            | Self::RestorePlan(_)
+            | Self::UnknownProduct(_)
+            | Self::UnknownBoardConfig { .. }
+            | Self::MissingDeviceSelector => OperationPhase::Planning,
+            Self::Signing(_) | Self::Plist(_) => OperationPhase::Personalizing,
+            Self::Transport(_) | Self::Service(_) | Self::DeviceDiscovery { .. } | Self::Io(_) => {
+                OperationPhase::Preflight
+            }
+            Self::Recovery(_) => OperationPhase::Booting,
+            Self::Limera1n(_) => OperationPhase::Exploiting,
+        }
+    }
+
+    pub const fn recovery(&self) -> Recoverability {
+        match self {
+            Self::Transport(_) | Self::Service(_) | Self::DeviceDiscovery { .. } => {
+                Recoverability::ReconnectDevice
+            }
+            Self::Signing(_) | Self::Io(_) => Recoverability::RetryImmediately,
+            Self::Recovery(_) | Self::Limera1n(_) => Recoverability::ReenterDfu,
+            Self::Plist(_) => Recoverability::RestartOperation,
+            Self::Firmware(_)
+            | Self::RestorePlan(_)
+            | Self::UnknownProduct(_)
+            | Self::UnknownBoardConfig { .. }
+            | Self::MissingDeviceSelector => Recoverability::NotRecoverable,
+        }
+    }
 }
