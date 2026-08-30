@@ -9,5 +9,6 @@ mod restored;
 pub use asr::{ASR_PORT, AsrClient, AsrError, AsrProgress};
 pub use plist_framed::{PlistFrameError, PlistFramed};
 pub use restored::{
-    BasebandStatus, DataRequest, DataType, ProgressMessage, RestoredMessage, StatusMessage,
+    BasebandStatus, DataRequest, DataType, ProgressMessage, RestoredClient, RestoredError,
+    RestoredMessage, RestoredType, StatusMessage,
 };
