@@ -13,7 +13,7 @@ use legacy_ios_kit::{
     AppFilter, BasebandPolicy, BoardConfig, DeviceDiagnostics, DeviceInventory, DeviceSummary,
     Ecid, ExploitPolicy, FirmwareSummary, InstalledApp, LegacyIosKit, ProductType,
     RecoveryDeviceInfo, RecoveryUploadResult, RestoreBehavior, RestorePlan, RestoreRequest,
-    SepPolicy, TicketPolicy, Udid,
+    SepPolicy, ShshRequest, ShshSummary, TicketPolicy, Udid,
 };
 use tracing::level_filters::LevelFilter;
 
@@ -55,6 +55,10 @@ enum Command {
     Restore {
         #[command(subcommand)]
         command: RestoreCommand,
+    },
+    Shsh {
+        #[command(subcommand)]
+        command: ShshCommand,
     },
 }
 
@@ -200,6 +204,39 @@ enum RestoreCommand {
         #[arg(long, value_enum, default_value_t = ExploitArg::Auto)]
         exploit: ExploitArg,
     },
+}
+
+#[derive(Debug, Subcommand)]
+enum ShshCommand {
+    /// Request and save a signing ticket from Apple's TSS service.
+    Save {
+        #[arg(long)]
+        firmware: PathBuf,
+        #[arg(long)]
+        board: BoardConfig,
+        #[arg(long)]
+        ecid: Ecid,
+        #[arg(long, value_parser = parse_integer)]
+        cpid: u64,
+        #[arg(long, value_parser = parse_integer)]
+        bdid: u64,
+        #[arg(long, value_enum, default_value_t = RestoreBehaviorArg::Erase)]
+        behavior: RestoreBehaviorArg,
+        #[arg(long, value_enum, default_value_t = ImageFormatArg::Img4)]
+        image_format: ImageFormatArg,
+        #[arg(long, value_parser = parse_hex)]
+        ap_nonce: Option<Vec<u8>>,
+        #[arg(long, value_parser = parse_hex)]
+        sep_nonce: Option<Vec<u8>>,
+        #[arg(long)]
+        destination: PathBuf,
+    },
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
+enum ImageFormatArg {
+    Img3,
+    Img4,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
@@ -444,6 +481,67 @@ async fn main() -> Result<()> {
                 .context("failed to resolve restore plan")?;
             write_restore_plan(output, &plan)?;
         }
+        Command::Shsh {
+            command:
+                ShshCommand::Save {
+                    firmware,
+                    board,
+                    ecid,
+                    cpid,
+                    bdid,
+                    behavior,
+                    image_format,
+                    ap_nonce,
+                    sep_nonce,
+                    destination,
+                },
+        } => {
+            let mut request = ShshRequest::new(firmware, board, behavior.into(), ecid, bdid, cpid)
+                .with_img4_support(image_format == ImageFormatArg::Img4);
+            if let Some(nonce) = ap_nonce {
+                request = request.with_ap_nonce(nonce);
+            }
+            if let Some(nonce) = sep_nonce {
+                request = request.with_sep_nonce(nonce);
+            }
+            let summary = kit
+                .save_shsh(&request, destination)
+                .await
+                .context("failed to save signing ticket")?;
+            write_shsh(output, &summary)?;
+        }
+    }
+    Ok(())
+}
+
+fn parse_integer(value: &str) -> Result<u64, String> {
+    value
+        .strip_prefix("0x")
+        .map_or_else(|| value.parse(), |value| u64::from_str_radix(value, 16))
+        .map_err(|_| format!("invalid integer: {value}"))
+}
+
+fn parse_hex(value: &str) -> Result<Vec<u8>, String> {
+    hex::decode(value.strip_prefix("0x").unwrap_or(value))
+        .map_err(|_| format!("invalid hexadecimal data: {value}"))
+}
+
+fn write_shsh(format: OutputFormat, summary: &ShshSummary) -> Result<()> {
+    let stdout = io::stdout();
+    let mut output = stdout.lock();
+    match format {
+        OutputFormat::Json => {
+            serde_json::to_writer_pretty(&mut output, summary)?;
+            writeln!(output)?;
+        }
+        OutputFormat::Human => writeln!(
+            output,
+            "Saved {} {} ticket for {} to {}",
+            summary.product_version(),
+            summary.build_id(),
+            summary.board_config(),
+            summary.path().display()
+        )?,
     }
     Ok(())
 }

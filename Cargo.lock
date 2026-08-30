@@ -1021,6 +1021,7 @@ dependencies = [
  "anyhow",
  "clap",
  "directories",
+ "hex",
  "legacy-ios-kit",
  "serde",
  "serde_json",
