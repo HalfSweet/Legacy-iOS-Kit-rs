@@ -37,6 +37,7 @@ pub struct LegacyIosKit {
     devices: DeviceManager,
     recovery: RecoveryManager,
     leases: lease::DeviceLeaseRegistry,
+    tss: legacy_ios_firmware::TssClient,
 }
 
 impl LegacyIosKit {
@@ -50,6 +51,11 @@ impl LegacyIosKit {
 
     pub fn recovery(&self) -> &RecoveryManager {
         &self.recovery
+    }
+
+    pub fn with_tss_endpoint(mut self, endpoint: &str) -> Result<Self, KitError> {
+        self.tss = legacy_ios_firmware::TssClient::with_endpoint_str(endpoint)?;
+        Ok(self)
     }
 
     pub async fn lease_device(&self, device: &DeviceIdentity) -> Result<DeviceLease, KitError> {
@@ -97,6 +103,6 @@ impl LegacyIosKit {
         request: &ShshRequest,
         destination: impl AsRef<std::path::Path>,
     ) -> Result<ShshSummary, KitError> {
-        shsh::save(request, destination.as_ref()).await
+        shsh::save(&self.tss, request, destination.as_ref()).await
     }
 }

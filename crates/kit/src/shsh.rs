@@ -76,6 +76,7 @@ impl ShshSummary {
 }
 
 pub(crate) async fn save(
+    client: &TssClient,
     request: &ShshRequest,
     destination: &Path,
 ) -> Result<ShshSummary, KitError> {
@@ -83,7 +84,7 @@ pub(crate) async fn save(
     let manifest = archive.build_manifest()?;
     let identity = manifest.select_identity(&request.board_config, request.behavior)?;
     let tss_request = TssRequest::for_build_identity(identity, &request.parameters);
-    let response = TssClient::new().send(&tss_request).await?;
+    let response = client.send(&tss_request).await?;
     let mut data = Vec::new();
     plist::to_writer_xml(&mut data, response.dictionary())?;
     persist(destination, &data).await?;
