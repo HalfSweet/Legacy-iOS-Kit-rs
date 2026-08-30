@@ -6,8 +6,13 @@ rust-version.workspace = true
 publish = false
 
 [dependencies]
+futures-core.workspace = true
+futures-util = "0.3.31"
 legacy-ios-core = { path = "../core" }
+nusb = { version = "=0.2.7", features = ["tokio"] }
+serde.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
 
 [lints]
 workspace = true
-
