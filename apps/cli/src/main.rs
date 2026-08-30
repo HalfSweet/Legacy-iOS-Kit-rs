@@ -145,6 +145,14 @@ enum DeviceCommand {
         #[arg(long)]
         yes: bool,
     },
+    /// Run limera1n against an S5L8920, S5L8922, or A4 device in DFU mode.
+    PwnLimera1n {
+        payload: PathBuf,
+        #[arg(long)]
+        ecid: Option<Ecid>,
+        #[arg(long)]
+        yes: bool,
+    },
     /// Set auto-boot and reboot a Recovery-mode device to normal mode.
     ExitRecovery {
         #[arg(long)]
@@ -394,6 +402,16 @@ async fn main() -> Result<()> {
                 .upload_payload(&data)
                 .await?;
             write_status(output, "uploaded-payload")?;
+        }
+        Command::Device {
+            command: DeviceCommand::PwnLimera1n { payload, ecid, yes },
+        } => {
+            confirm("run limera1n", yes)?;
+            let payload = tokio::fs::read(payload)
+                .await
+                .context("failed to read limera1n payload")?;
+            let device = kit.recovery().open(ecid).await?.limera1n(payload).await?;
+            write_recovery_info(output, device.mode(), device.info())?;
         }
         Command::Device {
             command: DeviceCommand::ExitRecovery { ecid },
