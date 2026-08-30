@@ -85,6 +85,13 @@ enum AppCommand {
         #[arg(long)]
         yes: bool,
     },
+    /// Uninstall an application by bundle identifier.
+    Uninstall {
+        udid: Udid,
+        bundle_id: String,
+        #[arg(long)]
+        yes: bool,
+    },
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
@@ -330,6 +337,21 @@ async fn main() -> Result<()> {
                 .await
                 .context("failed to install IPA")?;
             write_message(output, "installed-ipa", &udid)?;
+        }
+        Command::App {
+            command:
+                AppCommand::Uninstall {
+                    udid,
+                    bundle_id,
+                    yes,
+                },
+        } => {
+            confirm(&format!("uninstall {bundle_id}"), yes)?;
+            kit.devices()
+                .uninstall_app(&udid, &bundle_id)
+                .await
+                .context("failed to uninstall application")?;
+            write_message(output, "uninstalled-app", &udid)?;
         }
         Command::Config {
             command: ConfigCommand::Show,
