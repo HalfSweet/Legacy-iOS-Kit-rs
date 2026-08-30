@@ -1,0 +1,534 @@
+schema_version = 1
+baseline_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+
+[[devices]]
+product_type = "iPhone1,1"
+name = "iPhone 2G"
+board_configs = ["m68"]
+soc = "s5l8900"
+has_baseband = true
+
+[[devices]]
+product_type = "iPhone1,2"
+name = "iPhone 3G"
+board_configs = ["n82"]
+soc = "s5l8900"
+has_baseband = true
+
+[[devices]]
+product_type = "iPhone2,1"
+name = "iPhone 3GS"
+board_configs = ["n88"]
+soc = "s5l8920"
+has_baseband = true
+
+[[devices]]
+product_type = "iPhone3,1"
+name = "iPhone 4 (GSM)"
+board_configs = ["n90"]
+soc = "a4"
+has_baseband = true
+
+[[devices]]
+product_type = "iPhone3,2"
+name = "iPhone 4 (GSM, Rev A)"
+board_configs = ["n90b"]
+soc = "a4"
+has_baseband = true
+
+[[devices]]
+product_type = "iPhone3,3"
+name = "iPhone 4 (CDMA)"
+board_configs = ["n92"]
+soc = "a4"
+has_baseband = true
+
+[[devices]]
+product_type = "iPhone4,1"
+name = "iPhone 4S"
+board_configs = ["n94"]
+soc = "a5"
+has_baseband = true
+
+[[devices]]
+product_type = "iPhone5,1"
+name = "iPhone 5 (GSM)"
+board_configs = ["n41"]
+soc = "a6"
+has_baseband = true
+
+[[devices]]
+product_type = "iPhone5,2"
+name = "iPhone 5 (Global)"
+board_configs = ["n42"]
+soc = "a6"
+has_baseband = true
+
+[[devices]]
+product_type = "iPhone5,3"
+name = "iPhone 5C (GSM)"
+board_configs = ["n48"]
+soc = "a6"
+has_baseband = true
+
+[[devices]]
+product_type = "iPhone5,4"
+name = "iPhone 5C (Global)"
+board_configs = ["n49"]
+soc = "a6"
+has_baseband = true
+
+[[devices]]
+product_type = "iPhone6,1"
+name = "iPhone 5S (GSM)"
+board_configs = ["n51"]
+soc = "a7"
+has_baseband = true
+
+[[devices]]
+product_type = "iPhone6,2"
+name = "iPhone 5S (Global)"
+board_configs = ["n53"]
+soc = "a7"
+has_baseband = true
+
+[[devices]]
+product_type = "iPhone7,1"
+name = "iPhone 6 Plus"
+board_configs = ["n56"]
+soc = "a8"
+has_baseband = true
+
+[[devices]]
+product_type = "iPhone7,2"
+name = "iPhone 6"
+board_configs = ["n61"]
+soc = "a8"
+has_baseband = true
+
+[[devices]]
+product_type = "iPhone8,1"
+name = "iPhone 6S"
+board_configs = ["n71", "n71m"]
+soc = "a9"
+has_baseband = true
+
+[[devices]]
+product_type = "iPhone8,2"
+name = "iPhone 6S Plus"
+board_configs = ["n66", "n66m"]
+soc = "a9"
+has_baseband = true
+
+[[devices]]
+product_type = "iPhone8,4"
+name = "iPhone SE 2016"
+board_configs = ["n69", "n69u"]
+soc = "a9"
+has_baseband = true
+
+[[devices]]
+product_type = "iPhone9,1"
+name = "iPhone 7 (Global)"
+board_configs = ["d10"]
+soc = "a10"
+has_baseband = true
+
+[[devices]]
+product_type = "iPhone9,2"
+name = "iPhone 7 Plus (Global)"
+board_configs = ["d11"]
+soc = "a10"
+has_baseband = true
+
+[[devices]]
+product_type = "iPhone9,3"
+name = "iPhone 7 (GSM)"
+board_configs = ["d101"]
+soc = "a10"
+has_baseband = true
+
+[[devices]]
+product_type = "iPhone9,4"
+name = "iPhone 7 Plus (GSM)"
+board_configs = ["d111"]
+soc = "a10"
+has_baseband = true
+
+[[devices]]
+product_type = "iPhone10,1"
+name = "iPhone 8 (Global)"
+board_configs = ["d20"]
+soc = "a11"
+has_baseband = true
+
+[[devices]]
+product_type = "iPhone10,2"
+name = "iPhone 8 Plus (Global)"
+board_configs = ["d21"]
+soc = "a11"
+has_baseband = true
+
+[[devices]]
+product_type = "iPhone10,3"
+name = "iPhone X (Global)"
+board_configs = ["d22"]
+soc = "a11"
+has_baseband = true
+
+[[devices]]
+product_type = "iPhone10,4"
+name = "iPhone 8 (GSM)"
+board_configs = ["d201"]
+soc = "a11"
+has_baseband = true
+
+[[devices]]
+product_type = "iPhone10,5"
+name = "iPhone 8 Plus (GSM)"
+board_configs = ["d211"]
+soc = "a11"
+has_baseband = true
+
+[[devices]]
+product_type = "iPhone10,6"
+name = "iPhone X (GSM)"
+board_configs = ["d221"]
+soc = "a11"
+has_baseband = true
+
+[[devices]]
+product_type = "iPad1,1"
+name = "iPad 1"
+board_configs = ["k48"]
+soc = "a4"
+has_baseband = false
+
+[[devices]]
+product_type = "iPad2,1"
+name = "iPad 2 (Wi-Fi)"
+board_configs = ["k93"]
+soc = "a5"
+has_baseband = false
+
+[[devices]]
+product_type = "iPad2,2"
+name = "iPad 2 (GSM)"
+board_configs = ["k94"]
+soc = "a5"
+has_baseband = true
+
+[[devices]]
+product_type = "iPad2,3"
+name = "iPad 2 (CDMA)"
+board_configs = ["k95"]
+soc = "a5"
+has_baseband = true
+
+[[devices]]
+product_type = "iPad2,4"
+name = "iPad 2 (Wi-Fi, Rev A)"
+board_configs = ["k93a"]
+soc = "a5"
+has_baseband = false
+
+[[devices]]
+product_type = "iPad2,5"
+name = "iPad mini 1 (Wi-Fi)"
+board_configs = ["p105"]
+soc = "a5"
+has_baseband = false
+
+[[devices]]
+product_type = "iPad2,6"
+name = "iPad mini 1 (GSM)"
+board_configs = ["p106"]
+soc = "a5"
+has_baseband = true
+
+[[devices]]
+product_type = "iPad2,7"
+name = "iPad mini 1 (Global)"
+board_configs = ["p107"]
+soc = "a5"
+has_baseband = true
+
+[[devices]]
+product_type = "iPad3,1"
+name = "iPad 3 (Wi-Fi)"
+board_configs = ["j1"]
+soc = "a5x"
+has_baseband = false
+
+[[devices]]
+product_type = "iPad3,2"
+name = "iPad 3 (CDMA)"
+board_configs = ["j2"]
+soc = "a5x"
+has_baseband = true
+
+[[devices]]
+product_type = "iPad3,3"
+name = "iPad 3 (GSM)"
+board_configs = ["j2a"]
+soc = "a5x"
+has_baseband = true
+
+[[devices]]
+product_type = "iPad3,4"
+name = "iPad 4 (Wi-Fi)"
+board_configs = ["p101"]
+soc = "a6x"
+has_baseband = false
+
+[[devices]]
+product_type = "iPad3,5"
+name = "iPad 4 (GSM)"
+board_configs = ["p102"]
+soc = "a6x"
+has_baseband = true
+
+[[devices]]
+product_type = "iPad3,6"
+name = "iPad 4 (Global)"
+board_configs = ["p103"]
+soc = "a6x"
+has_baseband = true
+
+[[devices]]
+product_type = "iPad4,1"
+name = "iPad Air 1 (Wi-Fi)"
+board_configs = ["j71"]
+soc = "a7"
+has_baseband = false
+
+[[devices]]
+product_type = "iPad4,2"
+name = "iPad Air 1 (Cellular)"
+board_configs = ["j72"]
+soc = "a7"
+has_baseband = true
+
+[[devices]]
+product_type = "iPad4,3"
+name = "iPad Air 1 (China)"
+board_configs = ["j73"]
+soc = "a7"
+has_baseband = true
+
+[[devices]]
+product_type = "iPad4,4"
+name = "iPad mini 2 (Wi-Fi)"
+board_configs = ["j85"]
+soc = "a7"
+has_baseband = false
+
+[[devices]]
+product_type = "iPad4,5"
+name = "iPad mini 2 (Cellular)"
+board_configs = ["j86"]
+soc = "a7"
+has_baseband = true
+
+[[devices]]
+product_type = "iPad4,6"
+name = "iPad mini 2 (China)"
+board_configs = ["j87"]
+soc = "a7"
+has_baseband = true
+
+[[devices]]
+product_type = "iPad4,7"
+name = "iPad mini 3 (Wi-Fi)"
+board_configs = ["j85m"]
+soc = "a7"
+has_baseband = false
+
+[[devices]]
+product_type = "iPad4,8"
+name = "iPad mini 3 (Cellular)"
+board_configs = ["j86m"]
+soc = "a7"
+has_baseband = true
+
+[[devices]]
+product_type = "iPad4,9"
+name = "iPad mini 3 (China)"
+board_configs = ["j87m"]
+soc = "a7"
+has_baseband = true
+
+[[devices]]
+product_type = "iPad5,1"
+name = "iPad mini 4 (Wi-Fi)"
+board_configs = ["j96"]
+soc = "a8"
+has_baseband = false
+
+[[devices]]
+product_type = "iPad5,2"
+name = "iPad mini 4 (Cellular)"
+board_configs = ["j97"]
+soc = "a8"
+has_baseband = true
+
+[[devices]]
+product_type = "iPad5,3"
+name = "iPad Air 2 (Wi-Fi)"
+board_configs = ["j81"]
+soc = "a8x"
+has_baseband = false
+
+[[devices]]
+product_type = "iPad5,4"
+name = "iPad Air 2 (Cellular)"
+board_configs = ["j82"]
+soc = "a8x"
+has_baseband = true
+
+[[devices]]
+product_type = "iPad6,3"
+name = 'iPad Pro 9.7" (Wi-Fi)'
+board_configs = ["j127"]
+soc = "a9x"
+has_baseband = false
+
+[[devices]]
+product_type = "iPad6,4"
+name = 'iPad Pro 9.7" (Cellular)'
+board_configs = ["j128"]
+soc = "a9x"
+has_baseband = true
+
+[[devices]]
+product_type = "iPad6,7"
+name = 'iPad Pro 12.9" (Wi-Fi)'
+board_configs = ["j98a"]
+soc = "a9x"
+has_baseband = false
+
+[[devices]]
+product_type = "iPad6,8"
+name = 'iPad Pro 12.9" (Cellular)'
+board_configs = ["j99a"]
+soc = "a9x"
+has_baseband = true
+
+[[devices]]
+product_type = "iPad6,11"
+name = "iPad 5 (Wi-Fi)"
+board_configs = ["j71s", "j71t"]
+soc = "a9"
+has_baseband = false
+
+[[devices]]
+product_type = "iPad6,12"
+name = "iPad 5 (Cellular)"
+board_configs = ["j72s", "j72t"]
+soc = "a9"
+has_baseband = true
+
+[[devices]]
+product_type = "iPad7,1"
+name = 'iPad Pro 12.9" (2nd gen, Wi-Fi)'
+board_configs = ["j120"]
+soc = "a10x"
+has_baseband = false
+
+[[devices]]
+product_type = "iPad7,2"
+name = 'iPad Pro 12.9" (2nd gen, Cellular)'
+board_configs = ["j121"]
+soc = "a10x"
+has_baseband = true
+
+[[devices]]
+product_type = "iPad7,3"
+name = 'iPad Pro 10.5" (Wi-Fi)'
+board_configs = ["j207"]
+soc = "a10x"
+has_baseband = false
+
+[[devices]]
+product_type = "iPad7,4"
+name = 'iPad Pro 10.5" (Cellular)'
+board_configs = ["j208"]
+soc = "a10x"
+has_baseband = true
+
+[[devices]]
+product_type = "iPad7,5"
+name = "iPad 6 (Wi-Fi)"
+board_configs = ["j71b"]
+soc = "a10"
+has_baseband = false
+
+[[devices]]
+product_type = "iPad7,6"
+name = "iPad 6 (Cellular)"
+board_configs = ["j72b"]
+soc = "a10"
+has_baseband = true
+
+[[devices]]
+product_type = "iPad7,11"
+name = "iPad 7 (Wi-Fi)"
+board_configs = ["j171"]
+soc = "a10"
+has_baseband = false
+
+[[devices]]
+product_type = "iPad7,12"
+name = "iPad 7 (Cellular)"
+board_configs = ["j172"]
+soc = "a10"
+has_baseband = true
+
+[[devices]]
+product_type = "iPod1,1"
+name = "iPod touch 1"
+board_configs = ["n45"]
+soc = "s5l8900"
+has_baseband = false
+
+[[devices]]
+product_type = "iPod2,1"
+name = "iPod touch 2"
+board_configs = ["n72"]
+soc = "s5l8720"
+has_baseband = false
+
+[[devices]]
+product_type = "iPod3,1"
+name = "iPod touch 3"
+board_configs = ["n18"]
+soc = "s5l8922"
+has_baseband = false
+
+[[devices]]
+product_type = "iPod4,1"
+name = "iPod touch 4"
+board_configs = ["n81"]
+soc = "a4"
+has_baseband = false
+
+[[devices]]
+product_type = "iPod5,1"
+name = "iPod touch 5"
+board_configs = ["n78"]
+soc = "a5"
+has_baseband = false
+
+[[devices]]
+product_type = "iPod7,1"
+name = "iPod touch 6"
+board_configs = ["n102"]
+soc = "a8"
+has_baseband = false
+
+[[devices]]
+product_type = "iPod9,1"
+name = "iPod touch 7"
+board_configs = ["n112"]
+soc = "a10"
+has_baseband = false
