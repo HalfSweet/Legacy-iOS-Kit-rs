@@ -148,6 +148,15 @@ impl DeviceManager {
         Ok(())
     }
 
+    pub async fn uninstall_app(&self, udid: &Udid, bundle_id: &str) -> Result<(), KitError> {
+        self.normal
+            .find_device(udid)
+            .await?
+            .uninstall_app(bundle_id)
+            .await?;
+        Ok(())
+    }
+
     pub async fn enter_recovery(&self, udid: &Udid) -> Result<(), KitError> {
         self.normal
             .find_device(udid)
