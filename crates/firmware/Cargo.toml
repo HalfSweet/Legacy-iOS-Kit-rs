@@ -8,7 +8,9 @@ publish = false
 [dependencies]
 legacy-ios-assets = { path = "../assets" }
 legacy-ios-core = { path = "../core" }
+plist = "=1.8.0"
+serde.workspace = true
+thiserror.workspace = true
 
 [lints]
 workspace = true
-
