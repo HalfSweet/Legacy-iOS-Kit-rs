@@ -6,6 +6,7 @@ mod device;
 mod error;
 mod firmware;
 mod operation;
+mod recovery;
 
 pub use device::{
     BackendFailure, DeviceDiagnostics, DeviceInventory, DeviceManager, DeviceSummary,
@@ -19,15 +20,18 @@ pub use legacy_ios_core::{
 };
 pub use legacy_ios_firmware::RestoreBehavior;
 pub use legacy_ios_services::{AppFilter, InstalledApp};
+pub use legacy_ios_transport::RecoveryDeviceInfo;
 pub use legacy_ios_workflows::{
     BasebandPolicy, DestructiveConsent, ExploitPolicy, PlanId, RestoreComponent, RestorePlan,
     RestorePlanError, RestoreRequest, RestoreStep, RestoreStepKind, SepPolicy, TicketPolicy,
 };
 pub use operation::OperationHandle;
+pub use recovery::{RecoveryDevice, RecoveryManager, RecoveryUploadResult};
 
 #[derive(Clone, Debug, Default)]
 pub struct LegacyIosKit {
     devices: DeviceManager,
+    recovery: RecoveryManager,
 }
 
 impl LegacyIosKit {
@@ -37,6 +41,10 @@ impl LegacyIosKit {
 
     pub fn devices(&self) -> &DeviceManager {
         &self.devices
+    }
+
+    pub fn recovery(&self) -> &RecoveryManager {
+        &self.recovery
     }
 
     pub fn inspect_firmware(
