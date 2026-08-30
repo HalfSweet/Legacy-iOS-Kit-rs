@@ -7,8 +7,40 @@ use tracing::{debug, warn};
 
 use crate::{
     DispatchAction, PreparedRestoreData, RestoreDispatchError, RestoreOptions, RestoredClient,
-    RestoredError, RestoredMessage,
+    RestoredConnectError, RestoredError, RestoredMessage, RestoredSession,
 };
+
+pub async fn run_restored_session<F, Fut, P>(
+    session: &mut RestoredSession,
+    options: &RestoreOptions,
+    prepared: &PreparedRestoreData,
+    send_system_image: F,
+    progress: P,
+) -> Result<RestoreOutcome, RestoreRunError>
+where
+    F: FnMut(Option<u16>) -> Fut,
+    Fut: Future<Output = Result<(), RestoreRunError>>,
+    P: FnMut(RestoreProgress),
+{
+    let protocol_version = session.protocol_version();
+    let data = session.data_connector();
+    run_restored_with_data_ports(
+        session.client_mut(),
+        options,
+        protocol_version,
+        prepared,
+        send_system_image,
+        move |port, response| {
+            let data = data.clone();
+            async move {
+                data.send(port, &response).await?;
+                Ok(())
+            }
+        },
+        progress,
+    )
+    .await
+}
 
 pub async fn run_restored<S, F, Fut, P>(
     client: &mut RestoredClient<S>,
@@ -136,6 +168,8 @@ pub enum RestoreRunError {
     Restored(#[from] RestoredError),
     #[error(transparent)]
     Dispatch(#[from] RestoreDispatchError),
+    #[error(transparent)]
+    Connect(#[from] RestoredConnectError),
     #[error("restore failed with AMR error {0}")]
     Amr(u64),
     #[error("restore failed with device status {0}")]
