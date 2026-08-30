@@ -1,5 +1,6 @@
 use legacy_ios_firmware::{BuildIdentity, FirmwareArchive, FirmwareError};
 use legacy_ios_image::{Img3, Img3Error, Img4Error, personalize_img4};
+use legacy_ios_restore::PreparedRestoreData;
 use plist::{Dictionary, Value};
 use thiserror::Error;
 
@@ -78,6 +79,38 @@ impl ComponentPersonalizer {
             }
         }
         Ok(response)
+    }
+
+    pub fn prepare_restore_data(
+        &self,
+        flash_version_1: bool,
+    ) -> Result<PreparedRestoreData, PersonalizationError> {
+        let mut prepared = PreparedRestoreData::default();
+        if let Some(ticket) = self.root_ticket() {
+            prepared = prepared.with_root_ticket(ticket.to_vec());
+        }
+        if self.identity.manifest().contains_key("KernelCache") {
+            prepared = prepared.with_kernel_cache(self.personalize("KernelCache")?);
+        }
+        if self.identity.manifest().contains_key("DeviceTree") {
+            prepared = prepared.with_device_tree(self.personalize("DeviceTree")?);
+        }
+        if self.identity.manifest().contains_key("SystemVolume") {
+            prepared = prepared.with_system_image_root_hash(self.personalize("SystemVolume")?);
+        }
+        if self
+            .identity
+            .manifest()
+            .contains_key("Ap,SystemVolumeCanonicalMetadata")
+        {
+            prepared = prepared.with_system_image_canonical_metadata(
+                self.personalize("Ap,SystemVolumeCanonicalMetadata")?,
+            );
+        }
+        if self.identity.manifest().contains_key("LLB") {
+            prepared = prepared.with_nor(self.nor_response(flash_version_1)?);
+        }
+        Ok(prepared)
     }
 
     fn component_path(&self, component: &str) -> Result<String, PersonalizationError> {
