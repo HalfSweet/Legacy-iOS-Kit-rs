@@ -44,6 +44,8 @@ string_id!(Udid);
 string_id!(ProductType);
 string_id!(BoardConfig);
 string_id!(ConnectionId);
+string_id!(BuildId);
+string_id!(IosVersion);
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
 #[serde(transparent)]
