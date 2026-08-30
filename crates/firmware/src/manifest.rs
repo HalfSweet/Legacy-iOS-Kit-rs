@@ -205,6 +205,14 @@ pub enum FirmwareError {
         size: u64,
         maximum: u64,
     },
+    #[error("firmware archive path is unsafe: {0}")]
+    UnsafeArchivePath(String),
+    #[error("firmware archive contains duplicate entry {0}")]
+    DuplicateArchiveEntry(String),
+    #[error("firmware archive contains {0} entries, exceeding the supported limit")]
+    TooManyArchiveEntries(usize),
+    #[error("firmware archive expands beyond the supported size")]
+    ArchiveExpandedTooLarge,
     #[error("failed to parse plist: {0}")]
     Plist(#[from] plist::Error),
     #[error("BuildManifest root is not a dictionary")]
