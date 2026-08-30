@@ -5,7 +5,9 @@
 mod archive;
 mod artifact;
 mod manifest;
+mod tss;
 
 pub use archive::FirmwareArchive;
 pub use artifact::{ArtifactError, ArtifactSpec, ArtifactStore, Digest};
 pub use manifest::{BuildIdentity, BuildManifest, FirmwareError, RestoreBehavior};
+pub use tss::{TssClient, TssError, TssRequest, TssResponse};
