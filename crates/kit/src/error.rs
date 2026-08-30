@@ -16,6 +16,8 @@ pub enum KitError {
     RestorePlan(#[from] legacy_ios_workflows::RestorePlanError),
     #[error("Recovery/DFU operation failed: {0}")]
     Recovery(#[from] legacy_ios_transport::RecoveryError),
+    #[error("bootrom exploit failed: {0}")]
+    Limera1n(#[from] legacy_ios_exploits::Limera1nError),
     #[error("host I/O failed: {0}")]
     Io(#[from] std::io::Error),
     #[error("unknown product type {0}")]

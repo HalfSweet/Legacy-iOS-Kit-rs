@@ -9,6 +9,7 @@ publish = false
 futures-util = "0.3.31"
 legacy-ios-assets = { path = "../assets" }
 legacy-ios-core = { path = "../core" }
+legacy-ios-exploits = { path = "../exploits" }
 legacy-ios-firmware = { path = "../firmware" }
 legacy-ios-services = { path = "../services" }
 legacy-ios-transport = { path = "../transport" }

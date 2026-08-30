@@ -1,4 +1,5 @@
 use legacy_ios_core::{DeviceMode, Ecid};
+use legacy_ios_exploits::Limera1n;
 use legacy_ios_transport::{IbootClient, RecoveryDeviceInfo, UploadResult};
 
 use crate::KitError;
@@ -56,6 +57,11 @@ impl RecoveryDevice {
     pub async fn reset(self) -> Result<(), KitError> {
         self.client.reset().await?;
         Ok(())
+    }
+
+    pub async fn limera1n(self, payload: Vec<u8>) -> Result<Self, KitError> {
+        let client = Limera1n::new(payload)?.exploit(self.client).await?;
+        Ok(Self { client })
     }
 }
 
