@@ -8,6 +8,7 @@ mod firmware;
 mod lease;
 mod operation;
 mod recovery;
+mod shsh;
 
 pub use device::{
     BackendFailure, DeviceDiagnostics, DeviceInventory, DeviceManager, DeviceSummary,
@@ -29,6 +30,7 @@ pub use legacy_ios_workflows::{
 };
 pub use operation::OperationHandle;
 pub use recovery::{RecoveryDevice, RecoveryManager, RecoveryUploadResult};
+pub use shsh::{ShshRequest, ShshSummary};
 
 #[derive(Clone, Debug, Default)]
 pub struct LegacyIosKit {
@@ -81,5 +83,13 @@ impl LegacyIosKit {
 
     pub fn plan_restore(&self, request: RestoreRequest) -> Result<RestorePlan, KitError> {
         Ok(RestorePlan::resolve(request)?)
+    }
+
+    pub async fn save_shsh(
+        &self,
+        request: &ShshRequest,
+        destination: impl AsRef<std::path::Path>,
+    ) -> Result<ShshSummary, KitError> {
+        shsh::save(request, destination.as_ref()).await
     }
 }

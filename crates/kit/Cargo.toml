@@ -15,8 +15,9 @@ legacy-ios-transport = { path = "../transport" }
 legacy-ios-workflows = { path = "../workflows" }
 plist = "=1.8.0"
 serde.workspace = true
+tempfile = "3.20.0"
 thiserror.workspace = true
-tokio.workspace = true
+tokio = { workspace = true, features = ["fs", "io-util"] }
 tokio-util = "0.7.19"
 tracing.workspace = true
 

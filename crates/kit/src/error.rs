@@ -8,6 +8,10 @@ pub enum KitError {
     Service(#[from] legacy_ios_services::ServiceError),
     #[error("firmware operation failed: {0}")]
     Firmware(#[from] legacy_ios_firmware::FirmwareError),
+    #[error("signing service operation failed: {0}")]
+    Signing(#[from] legacy_ios_firmware::TssError),
+    #[error("property list operation failed: {0}")]
+    Plist(#[from] plist::Error),
     #[error("restore planning failed: {0}")]
     RestorePlan(#[from] legacy_ios_workflows::RestorePlanError),
     #[error("Recovery/DFU operation failed: {0}")]
