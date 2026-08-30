@@ -1,0 +1,18 @@
+[package]
+name = "legacy-ios-kit-cli"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+
+[[bin]]
+name = "lik"
+path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true
+legacy-ios-kit = { path = "../../crates/kit" }
+
+[lints]
+workspace = true
+
