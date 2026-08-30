@@ -15,6 +15,10 @@ pub use legacy_ios_core::{
     Soc, Udid,
 };
 pub use legacy_ios_firmware::RestoreBehavior;
+pub use legacy_ios_workflows::{
+    BasebandPolicy, DestructiveConsent, ExploitPolicy, PlanId, RestoreComponent, RestorePlan,
+    RestorePlanError, RestoreRequest, RestoreStep, RestoreStepKind, SepPolicy, TicketPolicy,
+};
 
 #[derive(Clone, Debug, Default)]
 pub struct LegacyIosKit {
@@ -35,5 +39,26 @@ impl LegacyIosKit {
         path: impl Into<std::path::PathBuf>,
     ) -> Result<FirmwareSummary, KitError> {
         FirmwareSummary::inspect(path.into())
+    }
+
+    pub fn resolve_device_identity(
+        &self,
+        product_type: ProductType,
+        board_config: BoardConfig,
+    ) -> Result<DeviceIdentity, KitError> {
+        let profile = legacy_ios_assets::DeviceDatabase::bundled()
+            .find_product(&product_type)
+            .ok_or_else(|| KitError::UnknownProduct(product_type.clone()))?;
+        if !profile.board_configs().contains(&board_config) {
+            return Err(KitError::UnknownBoardConfig {
+                product_type,
+                board_config,
+            });
+        }
+        Ok(DeviceIdentity::new(product_type, profile.soc()).with_board_config(board_config))
+    }
+
+    pub fn plan_restore(&self, request: RestoreRequest) -> Result<RestorePlan, KitError> {
+        Ok(RestorePlan::resolve(request)?)
     }
 }
