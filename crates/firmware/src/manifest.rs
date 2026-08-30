@@ -138,6 +138,15 @@ impl BuildIdentity {
         required_string(info, "Path")
     }
 
+    pub fn component_paths(&self) -> impl Iterator<Item = (&str, &str)> {
+        self.manifest.iter().filter_map(|(name, value)| {
+            let component = value.as_dictionary()?;
+            let info = component.get("Info")?.as_dictionary()?;
+            let path = info.get("Path")?.as_string()?;
+            Some((name.as_str(), path))
+        })
+    }
+
     pub fn manifest(&self) -> &Dictionary {
         &self.manifest
     }
@@ -249,6 +258,10 @@ mod tests {
         assert_eq!(
             identity.component_path("RestoreRamDisk").unwrap(),
             "038-0123-001.dmg"
+        );
+        assert_eq!(
+            identity.component_paths().collect::<Vec<_>>(),
+            vec![("RestoreRamDisk", "038-0123-001.dmg")]
         );
     }
 }
