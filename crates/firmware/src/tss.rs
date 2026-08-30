@@ -246,6 +246,12 @@ impl TssClient {
         }
     }
 
+    pub fn with_endpoint_str(endpoint: &str) -> Result<Self, TssError> {
+        let endpoint =
+            Url::parse(endpoint).map_err(|_| TssError::InvalidEndpoint(endpoint.to_owned()))?;
+        Ok(Self::with_endpoint(endpoint))
+    }
+
     pub async fn send(&self, request: &TssRequest) -> Result<TssResponse, TssError> {
         let mut body = Vec::new();
         plist::to_writer_xml(&mut body, request.dictionary())?;
@@ -362,6 +368,8 @@ pub enum TssError {
     MissingPayload,
     #[error("TSS payload is not a dictionary")]
     PayloadNotDictionary,
+    #[error("invalid TSS endpoint: {0}")]
+    InvalidEndpoint(String),
     #[error("BuildIdentity has no BasebandFirmware manifest")]
     MissingBasebandManifest,
 }
