@@ -21,6 +21,8 @@ pub enum KitError {
         product_type: legacy_ios_core::ProductType,
         board_config: legacy_ios_core::BoardConfig,
     },
+    #[error("device identity has no ECID or UDID")]
+    MissingDeviceSelector,
     #[error("both device discovery backends failed (bootloader: {bootloader}; normal: {normal})")]
     DeviceDiscovery { bootloader: String, normal: String },
 }

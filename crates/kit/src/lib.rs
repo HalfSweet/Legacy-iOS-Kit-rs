@@ -5,6 +5,7 @@
 mod device;
 mod error;
 mod firmware;
+mod lease;
 mod operation;
 mod recovery;
 
@@ -13,6 +14,7 @@ pub use device::{
 };
 pub use error::KitError;
 pub use firmware::{FirmwareIdentitySummary, FirmwareSummary};
+pub use lease::DeviceLease;
 pub use legacy_ios_core::{
     BoardConfig, BuildId, Capability, CapabilitySet, ConnectionId, DeviceIdentity, DeviceMode,
     DeviceSelector, DeviceSnapshot, Ecid, IosVersion, OperationEvent, OperationId, ProductType,
@@ -32,6 +34,7 @@ pub use recovery::{RecoveryDevice, RecoveryManager, RecoveryUploadResult};
 pub struct LegacyIosKit {
     devices: DeviceManager,
     recovery: RecoveryManager,
+    leases: lease::DeviceLeaseRegistry,
 }
 
 impl LegacyIosKit {
@@ -45,6 +48,11 @@ impl LegacyIosKit {
 
     pub fn recovery(&self) -> &RecoveryManager {
         &self.recovery
+    }
+
+    pub async fn lease_device(&self, device: &DeviceIdentity) -> Result<DeviceLease, KitError> {
+        let selector = device.selector().ok_or(KitError::MissingDeviceSelector)?;
+        Ok(self.leases.acquire(selector).await)
     }
 
     pub fn inspect_firmware(
