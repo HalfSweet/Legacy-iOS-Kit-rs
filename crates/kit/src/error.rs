@@ -40,6 +40,12 @@ pub enum KitError {
     MissingSigningDeviceInfo(&'static str),
     #[error("restore planning failed: {0}")]
     RestorePlan(#[from] legacy_ios_workflows::RestorePlanError),
+    #[error("ramdisk boot planning failed: {0}")]
+    RamdiskBootPlan(#[from] legacy_ios_workflows::RamdiskBootPlanError),
+    #[error("ramdisk boot preparation failed: {0}")]
+    RamdiskPreparation(#[from] legacy_ios_workflows::RamdiskPreparationError),
+    #[error("ramdisk boot failed: {0}")]
+    RamdiskBoot(#[from] legacy_ios_workflows::RamdiskBootError),
     #[error("restore preparation failed: {0}")]
     RestorePreparation(#[from] legacy_ios_workflows::RestorePreparationError),
     #[error("restore execution failed: {0}")]
@@ -90,6 +96,7 @@ impl KitError {
             | Self::RemoteFirmware(_)
             | Self::CustomIpsw(_)
             | Self::RestorePlan(_)
+            | Self::RamdiskBootPlan(_)
             | Self::RestorePreparation(_)
             | Self::UnknownProduct(_)
             | Self::UnknownResource(_)
@@ -97,6 +104,8 @@ impl KitError {
             | Self::UnknownBoardConfig { .. }
             | Self::MissingDeviceSelector => OperationPhase::Planning,
             Self::EraseConsentMismatch => OperationPhase::Preflight,
+            Self::RamdiskPreparation(_) => OperationPhase::Preflight,
+            Self::RamdiskBoot(_) => OperationPhase::Booting,
             Self::Signing(_)
             | Self::Plist(_)
             | Self::OnboardTicket(_)
@@ -132,7 +141,9 @@ impl KitError {
                 Recoverability::ReconnectDevice
             }
             Self::Signing(_) | Self::Artifact(_) | Self::Io(_) => Recoverability::RetryImmediately,
-            Self::Recovery(_) | Self::Limera1n(_) => Recoverability::ReenterDfu,
+            Self::Recovery(_) | Self::Limera1n(_) | Self::RamdiskBoot(_) => {
+                Recoverability::ReenterDfu
+            }
             Self::PwnVerificationFailed | Self::ExternalExploitTimeout => {
                 Recoverability::ReenterDfu
             }
@@ -145,7 +156,9 @@ impl KitError {
             | Self::RemoteFirmware(_)
             | Self::CustomIpsw(_)
             | Self::RestorePlan(_)
+            | Self::RamdiskBootPlan(_)
             | Self::RestorePreparation(_)
+            | Self::RamdiskPreparation(_)
             | Self::AutomaticExploitUnsupported(_)
             | Self::MissingLimera1nPayload
             | Self::OnboardTicket(_)

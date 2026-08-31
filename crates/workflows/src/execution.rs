@@ -175,6 +175,13 @@ pub struct PreparedBootComponent {
 }
 
 impl PreparedBootComponent {
+    pub(crate) fn new(name: &str, data: Vec<u8>) -> Self {
+        Self {
+            name: name.to_owned(),
+            data,
+        }
+    }
+
     pub fn name(&self) -> &str {
         &self.name
     }

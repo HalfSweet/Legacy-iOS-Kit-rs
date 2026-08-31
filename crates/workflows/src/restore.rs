@@ -53,7 +53,7 @@ pub enum ExploitPolicy {
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 #[serde(transparent)]
-pub struct PlanId(String);
+pub struct PlanId(pub(crate) String);
 
 impl PlanId {
     pub fn as_str(&self) -> &str {
@@ -231,7 +231,7 @@ impl RestorePlan {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct DestructiveConsent {
-    plan_id: PlanId,
+    pub(crate) plan_id: PlanId,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]

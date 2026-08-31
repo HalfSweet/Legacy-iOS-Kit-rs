@@ -5,6 +5,7 @@
 mod device;
 mod erase;
 mod error;
+mod exploit;
 mod firmware;
 mod hfs;
 mod image_payload;
@@ -12,6 +13,7 @@ mod lease;
 mod operation;
 mod pairing;
 mod ramdisk;
+mod ramdisk_boot;
 mod recovery;
 mod restore_execution;
 mod shsh;
@@ -46,12 +48,15 @@ pub use legacy_ios_transport::{
     UsbHostDiagnostics,
 };
 pub use legacy_ios_workflows::{
-    BasebandPolicy, DestructiveConsent, ExploitPolicy, PlanId, RestoreComponent, RestorePlan,
-    RestorePlanError, RestoreRequest, RestoreStep, RestoreStepKind, SepPolicy, TicketPolicy,
+    BasebandPolicy, DestructiveConsent, ExploitPolicy, PlanId, RamdiskBootComponent,
+    RamdiskBootPlan, RamdiskBootPlanError, RamdiskBootPlanStep, RamdiskBootRequest,
+    RamdiskBootStepKind, RestoreComponent, RestorePlan, RestorePlanError, RestoreRequest,
+    RestoreStep, RestoreStepKind, SepPolicy, TicketPolicy,
 };
 pub use operation::OperationHandle;
 pub use pairing::PairingStore;
 pub use ramdisk::{RamdiskBuildRequest, RamdiskBuildSummary};
+pub use ramdisk_boot::RamdiskBootExecutionRequest;
 pub use recovery::{RecoveryDevice, RecoveryManager, RecoveryUploadResult};
 pub use restore_execution::RestoreExecutionRequest;
 pub use shsh::{ShshRequest, ShshSummary};
@@ -242,6 +247,17 @@ impl LegacyIosKit {
 
     pub fn plan_restore(&self, request: RestoreRequest) -> Result<RestorePlan, KitError> {
         Ok(RestorePlan::resolve(request)?)
+    }
+
+    pub fn plan_ramdisk_boot(
+        &self,
+        request: RamdiskBootRequest,
+    ) -> Result<RamdiskBootPlan, KitError> {
+        Ok(RamdiskBootPlan::resolve(request)?)
+    }
+
+    pub fn execute_ramdisk_boot(&self, request: RamdiskBootExecutionRequest) -> OperationHandle {
+        ramdisk_boot::spawn(self.leases.clone(), request)
     }
 
     pub fn execute_restore(&self, request: RestoreExecutionRequest) -> OperationHandle {

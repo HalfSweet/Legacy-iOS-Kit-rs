@@ -15,11 +15,11 @@ use legacy_ios_kit::{
     DeviceFileInfo, DeviceInventory, DeviceStorageInfo, DeviceSummary, DmgFirmwareKey, Ecid,
     ExploitPolicy, FirmwareSummary, HfsEntrySummary, HfsMutation, HfsStatSummary, HostKeyPolicy,
     ImageCipher, InstalledApp, LegacyIosKit, OperationEvent, OperationHandle, OperationOutcome,
-    ProductType, RamdiskBuildRequest, RamdiskBuildSummary, RamdiskSsh, RecoveryDeviceInfo,
-    RecoveryUploadResult, RemoteFirmwareSummary, ResourceId, RestoreBehavior,
-    RestoreExecutionRequest, RestorePlan, RestoreRequest, ScpPath, SepPolicy, ShshRequest,
-    ShshSummary, SigningTicket, SshCommandOutput, SshPassword, SshTarget, TicketPolicy, Udid,
-    UsbHostDiagnostics,
+    ProductType, RamdiskBootExecutionRequest, RamdiskBootRequest, RamdiskBuildRequest,
+    RamdiskBuildSummary, RamdiskSsh, RecoveryDeviceInfo, RecoveryUploadResult,
+    RemoteFirmwareSummary, ResourceId, RestoreBehavior, RestoreExecutionRequest, RestorePlan,
+    RestoreRequest, ScpPath, SepPolicy, ShshRequest, ShshSummary, SigningTicket, SshCommandOutput,
+    SshPassword, SshTarget, TicketPolicy, Udid, UsbHostDiagnostics,
 };
 use tracing::level_filters::LevelFilter;
 use tracing::{debug, info, warn};
@@ -80,6 +80,37 @@ enum Command {
 
 #[derive(Debug, Subcommand)]
 enum RamdiskCommand {
+    /// Boot an SSH ramdisk on a pwned DFU or Recovery mode device.
+    Boot {
+        #[arg(long)]
+        device: ProductType,
+        #[arg(long)]
+        board: BoardConfig,
+        #[arg(long)]
+        ecid: Ecid,
+        #[arg(long)]
+        ibss: PathBuf,
+        #[arg(long)]
+        ibec: Option<PathBuf>,
+        #[arg(long)]
+        ramdisk: PathBuf,
+        #[arg(long)]
+        device_tree: PathBuf,
+        #[arg(long)]
+        trust_cache: Option<PathBuf>,
+        #[arg(long)]
+        kernel: PathBuf,
+        #[arg(long)]
+        ticket: Option<PathBuf>,
+        #[arg(long)]
+        boot_args: Option<String>,
+        #[arg(long, value_enum, default_value_t = ExploitArg::AlreadyPwned)]
+        exploit: ExploitArg,
+        #[arg(long)]
+        limera1n_payload: Option<PathBuf>,
+        #[arg(long)]
+        yes: bool,
+    },
     /// Build a patched RestoreRamDisk component from an IPSW identity.
     Build {
         firmware: PathBuf,
@@ -1722,6 +1753,55 @@ async fn main() -> Result<()> {
                 );
             }
             consume_operation(output, kit.execute_restore(request)).await?;
+        }
+        Command::Ramdisk {
+            command:
+                RamdiskCommand::Boot {
+                    device,
+                    board,
+                    ecid,
+                    ibss,
+                    ibec,
+                    ramdisk,
+                    device_tree,
+                    trust_cache,
+                    kernel,
+                    ticket,
+                    boot_args,
+                    exploit,
+                    limera1n_payload,
+                    yes,
+                },
+        } => {
+            let device = kit.resolve_device_identity(device, board)?.with_ecid(ecid);
+            let plan = kit
+                .plan_ramdisk_boot(RamdiskBootRequest {
+                    device,
+                    ibss,
+                    ibec,
+                    ramdisk,
+                    device_tree,
+                    trust_cache,
+                    kernel,
+                    ticket,
+                    boot_args,
+                    exploit: exploit.into(),
+                })
+                .context("failed to resolve ramdisk boot plan")?;
+            confirm(
+                &format!("boot the ramdisk with plan {}", plan.id().as_str()),
+                yes,
+            )?;
+            let consent = plan.confirm_destructive();
+            let mut request = RamdiskBootExecutionRequest::new(plan, consent);
+            if let Some(path) = limera1n_payload {
+                request = request.with_limera1n_payload(
+                    tokio::fs::read(&path)
+                        .await
+                        .with_context(|| format!("failed to read {}", path.display()))?,
+                );
+            }
+            consume_operation(output, kit.execute_ramdisk_boot(request)).await?;
         }
         Command::Ramdisk {
             command:

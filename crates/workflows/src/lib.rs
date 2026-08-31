@@ -6,6 +6,8 @@ mod baseband;
 mod boot;
 mod execution;
 mod personalization;
+mod ramdisk;
+mod ramdisk_boot;
 mod restore;
 mod runner;
 
@@ -13,6 +15,15 @@ pub use baseband::{BasebandError, BasebandFirmware, BasebandRequestError, Baseba
 pub use boot::{RestoreBootError, RestoreBootOutcome, boot_restore};
 pub use execution::{PreparedBootComponent, RestorePreparation, RestorePreparationError};
 pub use personalization::{ComponentPersonalizer, PersonalizationError};
+pub use ramdisk::{
+    APTICKET, DEFAULT_BOOT_ARGS, DEVICE_TREE, IBEC, IBSS, KERNEL, RAMDISK, RamdiskBootComponent,
+    RamdiskBootPlan, RamdiskBootPlanError, RamdiskBootPlanStep, RamdiskBootRequest,
+    RamdiskBootStepKind, TRUST_CACHE,
+};
+pub use ramdisk_boot::{
+    RamdiskBootError, RamdiskBootOutcome, RamdiskBootPreparation, RamdiskBootProgress,
+    RamdiskPreparationError, boot_ramdisk,
+};
 pub use restore::{
     BasebandPolicy, DestructiveConsent, ExploitPolicy, PlanId, RestoreComponent, RestorePlan,
     RestorePlanError, RestoreRequest, RestoreStep, RestoreStepKind, SepPolicy, TicketPolicy,
