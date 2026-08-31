@@ -196,7 +196,7 @@ impl DeviceDatabase {
 
 #[derive(Debug, Error)]
 pub enum AssetError {
-    #[error("invalid device database: {0}")]
+    #[error("invalid asset TOML: {0}")]
     InvalidToml(#[from] toml::de::Error),
     #[error("unsupported device database schema {0}")]
     UnsupportedSchema(u32),
@@ -204,6 +204,10 @@ pub enum AssetError {
     DuplicateProduct(ProductType),
     #[error("duplicate board config {0}")]
     DuplicateBoardConfig(BoardConfig),
+    #[error("duplicate resource {0}")]
+    DuplicateResource(crate::ResourceId),
+    #[error("resource {0} has an invalid SHA-256 digest")]
+    InvalidDigest(String),
 }
 
 #[derive(Deserialize)]

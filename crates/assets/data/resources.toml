@@ -1,0 +1,47 @@
+schema_version = 1
+baseline_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+
+[[resources]]
+id = "ios4-scab-template"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/src/scab_template.img3"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "92d07866d76761c33baa5972ec39bd8d380ced606da9a2e82dd150f1243cbb4a"
+size = 64
+purpose = "IMG3 template used by the iOS 4 custom restore path"
+redistribution = "download-only"
+
+[[resources]]
+id = "ios4-reboot"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/src/reboot4"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "0d842211f425a62eeb6c26f3d6851b6215820ec82507c4d6e41a89b1175648e5"
+size = 50164
+purpose = "Device-side reboot payload for iOS 4 restore ramdisks"
+redistribution = "download-only"
+
+[[resources]]
+id = "ios4-reboot-nor"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/src/reboot4_nbr"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "ee357256045b090cea9d00c5229c3cdda0f462a8a4fc8f2eca9f4b597f206b61"
+size = 50164
+purpose = "Device-side no-baseband reboot payload for iOS 4 restore ramdisks"
+redistribution = "download-only"
+
+[[resources]]
+id = "legacy-restore-bin-tar"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/src/bin.tar"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "2295d5f6518eda89996d90df276a4b6463a3b73416bf6277fb8919cc1ff9c6c4"
+size = 3358720
+purpose = "Device-side binaries for legacy multistage restore ramdisks"
+redistribution = "download-only"
+
+[[resources]]
+id = "ios4-restore-bin-tar"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/src/bin4.tar"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "1249cdf73d1addc68090b688622e700bf175d2b12e7f07aa84d2648ab8f863f6"
+size = 194560
+purpose = "Device-side binaries for the iOS 4 restore ramdisk"
+redistribution = "download-only"
