@@ -253,6 +253,18 @@ enum AppCommand {
         #[arg(long)]
         yes: bool,
     },
+    /// Save an application's SpringBoard icon as PNG.
+    Icon {
+        udid: Udid,
+        bundle_id: String,
+        destination: PathBuf,
+    },
+    /// Read and write back the SpringBoard icon state.
+    RefreshIcons {
+        udid: Udid,
+        #[arg(long)]
+        yes: bool,
+    },
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
@@ -635,6 +647,27 @@ async fn main() -> Result<()> {
             };
             files.write(&destination, &data).await?;
             write_status(output, "pushed-app-file")?;
+        }
+        Command::App {
+            command:
+                AppCommand::Icon {
+                    udid,
+                    bundle_id,
+                    destination,
+                },
+        } => {
+            let icon = kit.devices().app_icon(&udid, &bundle_id).await?;
+            tokio::fs::write(&destination, icon)
+                .await
+                .with_context(|| format!("failed to write {}", destination.display()))?;
+            write_status(output, "saved-app-icon")?;
+        }
+        Command::App {
+            command: AppCommand::RefreshIcons { udid, yes },
+        } => {
+            confirm("write the SpringBoard icon state", yes)?;
+            kit.devices().refresh_icon_state(&udid).await?;
+            write_message(output, "refreshed-icons", &udid)?;
         }
         Command::Config {
             command: ConfigCommand::Show,
