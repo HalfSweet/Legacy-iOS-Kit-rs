@@ -300,6 +300,14 @@ enum DeviceCommand {
         #[arg(long)]
         yes: bool,
     },
+    /// Erase all content and settings through mobilebackup2.
+    Erase {
+        udid: Udid,
+        #[arg(long)]
+        work_dir: Option<PathBuf>,
+        #[arg(long)]
+        yes: bool,
+    },
     /// Ask lockdownd to reboot a normal-mode device into Recovery mode.
     EnterRecovery {
         udid: Udid,
@@ -855,6 +863,25 @@ async fn main() -> Result<()> {
             confirm("deactivate the device", yes)?;
             kit.devices().deactivate(&udid).await?;
             write_message(output, "deactivated", &udid)?;
+        }
+        Command::Device {
+            command:
+                DeviceCommand::Erase {
+                    udid,
+                    work_dir,
+                    yes,
+                },
+        } => {
+            let plan = kit.plan_erase(udid).await?;
+            confirm(
+                &format!("erase all content on the device with plan {}", plan.id()),
+                yes,
+            )?;
+            let consent = plan.confirm_destructive();
+            let work_directory = work_dir
+                .or_else(|| config.storage.work_dir.clone())
+                .unwrap_or_else(|| std::env::temp_dir().join("legacy-ios-kit-erase"));
+            consume_operation(output, kit.execute_erase(plan, consent, work_directory)).await?;
         }
         Command::Device {
             command: DeviceCommand::EnterRecovery { udid, yes },
