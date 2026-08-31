@@ -2,6 +2,7 @@
 
 //! Public facade for embedding Legacy iOS Kit workflows.
 
+mod bootstrap;
 mod device;
 mod erase;
 mod error;
@@ -21,6 +22,9 @@ mod restore_execution;
 mod shsh;
 mod trollstore;
 
+pub use bootstrap::{
+    BootstrapPackages, BootstrapSelection, bootstrap_selection, gunzip, select_untether7,
+};
 pub use device::{
     BackendFailure, DeviceDiagnostics, DeviceInventory, DeviceManager, DeviceSummary,
 };
@@ -302,6 +306,27 @@ impl LegacyIosKit {
     ) -> Result<(), KitError> {
         kdfu::enter_kdfu(ssh, kloader, pwned_ibss).await?;
         kdfu::await_kdfu(ecid).await
+    }
+
+    /// Install the Cydia bootstrap on a 64-bit iOS 7/8/9 device from an SSH
+    /// ramdisk session.
+    pub async fn install_bootstrap(
+        &self,
+        ssh: &RamdiskSsh,
+        version: &str,
+        packages: &BootstrapPackages,
+    ) -> Result<(), KitError> {
+        bootstrap::install_bootstrap(ssh, version, packages).await
+    }
+
+    /// Install an iOS 7 untether package from an SSH ramdisk session.
+    pub async fn install_untether7(
+        &self,
+        ssh: &RamdiskSsh,
+        untether: &[u8],
+        stash: bool,
+    ) -> Result<(), KitError> {
+        bootstrap::install_untether7(ssh, untether, stash).await
     }
 
     /// Install the TrollStore persistence helper into the Tips app from an

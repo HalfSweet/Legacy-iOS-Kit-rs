@@ -263,6 +263,37 @@ enum RamdiskCommand {
         #[arg(long)]
         yes: bool,
     },
+    /// Install the Cydia bootstrap on a 64-bit iOS 7/8/9 device.
+    Bootstrap {
+        #[arg(long)]
+        device_id: Option<u32>,
+        #[arg(long, default_value = "root")]
+        username: String,
+        #[arg(long)]
+        host_key: Option<String>,
+        /// Device iOS version; read from the mounted rootfs when omitted.
+        #[arg(long)]
+        ios_version: Option<String>,
+        #[arg(long)]
+        yes: bool,
+    },
+    /// Install the iOS 7 untether package matching the device version.
+    Untether7 {
+        #[arg(long)]
+        device_id: Option<u32>,
+        #[arg(long, default_value = "root")]
+        username: String,
+        #[arg(long)]
+        host_key: Option<String>,
+        /// Device iOS version; read from the mounted rootfs when omitted.
+        #[arg(long)]
+        ios_version: Option<String>,
+        /// Let Cydia stash components to the data partition on first run.
+        #[arg(long)]
+        stash: bool,
+        #[arg(long)]
+        yes: bool,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -2333,6 +2364,99 @@ async fn main() -> Result<()> {
             let ssh = connect_ramdisk_ssh(&kit, device_id, &username, host_key).await?;
             ssh.erase_ios78().await?;
             write_status(output, "erase-triggered")?;
+        }
+        Command::Ramdisk {
+            command:
+                RamdiskCommand::Bootstrap {
+                    device_id,
+                    username,
+                    host_key,
+                    ios_version,
+                    yes,
+                },
+        } => {
+            confirm("install the jailbreak bootstrap on the device", yes)?;
+            let ssh = connect_ramdisk_ssh(&kit, device_id, &username, host_key).await?;
+            let version = match ios_version {
+                Some(version) => version,
+                None => {
+                    ssh.execute("/sbin/mount_hfs /dev/disk0s1s1 /mnt1").await?;
+                    ssh.system_version()
+                        .await
+                        .context("failed to read the device iOS version")?
+                }
+            };
+            let selection = legacy_ios_kit::bootstrap_selection(&version)
+                .ok_or_else(|| anyhow!("bootstrap supports 64-bit iOS 7/8/9, found {version}"))?;
+            let cache = config.artifact_cache_dir()?;
+            let fetch = async |id: &str, gz: bool| -> Result<Vec<u8>> {
+                let path = kit.fetch_resource(&ResourceId::new(id), &cache).await?;
+                let data = tokio::fs::read(&path).await?;
+                Ok(if gz {
+                    legacy_ios_kit::gunzip(&data)?
+                } else {
+                    data
+                })
+            };
+            let packages = legacy_ios_kit::BootstrapPackages {
+                freeze: fetch("jailbreak-bootstrap-freeze", true).await?,
+                openssh: fetch("jailbreak-openssh", true).await?,
+                openssl: fetch("jailbreak-openssl", true).await?,
+                launchctl: if selection.needs_launchctl {
+                    Some(fetch("jailbreak-launchctl", false).await?)
+                } else {
+                    None
+                },
+                pangu_loader: if selection.needs_pangu_loader {
+                    Some(fetch("jailbreak-pangu93-loader", false).await?)
+                } else {
+                    None
+                },
+                nopatcyh: if selection.needs_nopatcyh {
+                    Some(fetch("jailbreak-nopatcyh", false).await?)
+                } else {
+                    None
+                },
+            };
+            kit.install_bootstrap(&ssh, &version, &packages)
+                .await
+                .context("bootstrap installation failed")?;
+            ssh.disconnect().await?;
+            write_status(output, "installed-bootstrap")?;
+        }
+        Command::Ramdisk {
+            command:
+                RamdiskCommand::Untether7 {
+                    device_id,
+                    username,
+                    host_key,
+                    ios_version,
+                    stash,
+                    yes,
+                },
+        } => {
+            confirm("install the iOS 7 untether on the device", yes)?;
+            let ssh = connect_ramdisk_ssh(&kit, device_id, &username, host_key).await?;
+            let version = match ios_version {
+                Some(version) => version,
+                None => {
+                    ssh.execute("/sbin/mount_hfs /dev/disk0s1s1 /mnt1").await?;
+                    ssh.system_version()
+                        .await
+                        .context("failed to read the device iOS version")?
+                }
+            };
+            let resource = legacy_ios_kit::select_untether7(&version)
+                .ok_or_else(|| anyhow!("no iOS 7 untether package for version {version}"))?;
+            let path = kit
+                .fetch_resource(&resource, config.artifact_cache_dir()?)
+                .await?;
+            let untether = tokio::fs::read(&path).await?;
+            kit.install_untether7(&ssh, &untether, stash)
+                .await
+                .context("untether installation failed")?;
+            ssh.disconnect().await?;
+            write_status(output, "installed-untether")?;
         }
         Command::Shsh {
             command:

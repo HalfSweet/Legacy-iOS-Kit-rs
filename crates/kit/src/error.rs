@@ -80,6 +80,10 @@ pub enum KitError {
     PwnageVerificationTimeout,
     #[error("timed out waiting for the device to enter kDFU mode")]
     KdfuTimeout,
+    #[error("bootstrap installation supports 64-bit iOS 7/8/9, found {0}")]
+    UnsupportedBootstrapVersion(String),
+    #[error("bootstrap package {0} was not provided")]
+    MissingBootstrapPackage(&'static str),
     #[error("restored device version mismatch: expected {expected}, got {actual}")]
     VersionMismatch { expected: String, actual: String },
     #[error("unknown product type {0}")]
@@ -116,6 +120,9 @@ impl KitError {
             | Self::UnknownBoardConfig { .. }
             | Self::MissingDeviceSelector => OperationPhase::Planning,
             Self::EraseConsentMismatch => OperationPhase::Preflight,
+            Self::UnsupportedBootstrapVersion(_) | Self::MissingBootstrapPackage(_) => {
+                OperationPhase::Planning
+            }
             Self::RamdiskPreparation(_) => OperationPhase::Preflight,
             Self::RamdiskBoot(_) => OperationPhase::Booting,
             Self::Signing(_)
@@ -195,7 +202,9 @@ impl KitError {
             | Self::MissingHfsPartition
             | Self::UnknownBoardConfig { .. }
             | Self::MissingDeviceSelector => Recoverability::NotRecoverable,
-            Self::EraseConsentMismatch => Recoverability::NotRecoverable,
+            Self::EraseConsentMismatch
+            | Self::UnsupportedBootstrapVersion(_)
+            | Self::MissingBootstrapPackage(_) => Recoverability::NotRecoverable,
         }
     }
 }

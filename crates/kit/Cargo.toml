@@ -6,6 +6,7 @@ rust-version.workspace = true
 publish = false
 
 [dependencies]
+flate2 = "=1.1.10"
 futures-util = "0.3.31"
 legacy-ios-assets = { path = "../assets" }
 legacy-ios-core = { path = "../core" }

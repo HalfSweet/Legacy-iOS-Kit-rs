@@ -144,3 +144,84 @@ sha256 = "f0915cb7a608522ef84a43c6617433037e030ff68f5db89a6bb982f8430a0cb9"
 size = 213635
 purpose = "TrollStore persistence helper binary swapped onto the Tips app executable"
 redistribution = "download-only"
+
+[[resources]]
+id = "jailbreak-bootstrap-freeze"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/jailbreak/freeze.tar.gz"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "15ed578226ffe74371ff7c3d2665a99f181c5597ed1aee5d95a9ef5da17a836f"
+size = 8225876
+purpose = "Cydia bootstrap payload for 64-bit iOS 7/8/9 installed from an SSH ramdisk"
+redistribution = "download-only"
+
+[[resources]]
+id = "jailbreak-launchctl"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/jailbreak/launchctl.tar"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "a44a0b324e00e5542621d9538d6dae7681fe12d58aabb9cd2cb7f7f06e6126a4"
+size = 348160
+purpose = "launchctl binaries installed on iOS 9 during bootstrap installation"
+redistribution = "download-only"
+
+[[resources]]
+id = "jailbreak-openssh"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/jailbreak/openssh.tar.gz"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "96d7ecd8b71cfafe3e722cebc5a635b0484544fa1d453cbda98c35a4f091b293"
+size = 2095350
+purpose = "OpenSSH package installed during bootstrap installation"
+redistribution = "download-only"
+
+[[resources]]
+id = "jailbreak-openssl"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/jailbreak/openssl.tar.gz"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "7b1c997fb9b320d7de401130e6fd37884807d5dcb6ceeca2b391c94b6a4e4d32"
+size = 1744120
+purpose = "OpenSSL package installed during bootstrap installation"
+redistribution = "download-only"
+
+[[resources]]
+id = "jailbreak-pangu93-loader"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/jailbreak/io.pangu93.loader.plist"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "7c59e0531f74e8b08313d7c058ef228a86f3e9825e58bce0dbaf72d7b3d5efc2"
+size = 113
+purpose = "Pangu 9.3 loader LaunchDaemon plist for iOS 9.2-9.3.3 bootstrap"
+redistribution = "download-only"
+
+[[resources]]
+id = "jailbreak-nopatcyh"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/jailbreak/nopatcyh.tar"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "838e9d7a22779840d00b87742fdcde9d8875aed909dbe1e8e46870d006c191d9"
+size = 30720
+purpose = "patcyh removal package for iOS 7.x/8.0-8.2 bootstrap"
+redistribution = "download-only"
+
+[[resources]]
+id = "jailbreak-untether-panguaxe"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/jailbreak/panguaxe.tar"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "4931fcc58f3d7b422c1464219ed66c90c7c49a57e491c88b579cf86e4e17f9f0"
+size = 463360
+purpose = "iOS 7.1.x untether package installed from an SSH ramdisk"
+redistribution = "download-only"
+
+[[resources]]
+id = "jailbreak-untether-evasi0n7-70"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/jailbreak/evasi0n7-untether-70.tar"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "b1e3b5aa86b74bb65073dba41e50aecc68890aa5aff03f7a298ddfca3381b06a"
+size = 706560
+purpose = "iOS 7.0 untether package installed from an SSH ramdisk"
+redistribution = "download-only"
+
+[[resources]]
+id = "jailbreak-untether-evasi0n7"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/jailbreak/evasi0n7-untether.tar"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "982ba636f195220cfe73bb5105095ee27df7fbf6edd3f7ca3314d724bef0a4be"
+size = 706560
+purpose = "iOS 7.0.x untether package installed from an SSH ramdisk"
+redistribution = "download-only"
