@@ -52,7 +52,7 @@ impl HfsImage {
     }
 
     pub fn chmod(&mut self, path: &str, mode: u16) -> Result<(), HfsError> {
-        let permissions = self.catalog_permissions_offset(path)?;
+        let permissions = self.catalog_record_offset(path)? + 32;
         let mode_offset = permissions + 10;
         let current = read_u16(&self.data, mode_offset)?;
         write_u16(
@@ -63,9 +63,75 @@ impl HfsImage {
     }
 
     pub fn chown(&mut self, path: &str, owner: u32, group: u32) -> Result<(), HfsError> {
-        let permissions = self.catalog_permissions_offset(path)?;
+        let permissions = self.catalog_record_offset(path)? + 32;
         write_u32(&mut self.data, permissions, owner)?;
         write_u32(&mut self.data, permissions + 4, group)
+    }
+
+    pub fn write_file(&mut self, path: &str, contents: &[u8]) -> Result<(), HfsError> {
+        let record = self.catalog_record_offset(path)?;
+        if read_u16(&self.data, record)? != 2 {
+            return Err(HfsError::NotAFile);
+        }
+        let fork = record + 88;
+        let block_size = usize::try_from(self.volume()?.volume_header().block_size)
+            .map_err(|_| HfsError::CatalogOffsetTooLarge)?;
+        let total_blocks = usize::try_from(read_u32(&self.data, fork + 12)?)
+            .map_err(|_| HfsError::CatalogOffsetTooLarge)?;
+        let capacity = total_blocks
+            .checked_mul(block_size)
+            .ok_or(HfsError::CatalogOffsetTooLarge)?;
+        if contents.len() > capacity {
+            return Err(HfsError::FileCapacityExceeded {
+                capacity,
+                requested: contents.len(),
+            });
+        }
+
+        let mut extents = Vec::new();
+        let mut described_blocks = 0_usize;
+        for index in 0..8 {
+            let extent = fork + 16 + index * 8;
+            let start_block = usize::try_from(read_u32(&self.data, extent)?)
+                .map_err(|_| HfsError::CatalogOffsetTooLarge)?;
+            let block_count = usize::try_from(read_u32(&self.data, extent + 4)?)
+                .map_err(|_| HfsError::CatalogOffsetTooLarge)?;
+            if block_count == 0 {
+                break;
+            }
+            let extent_size = block_count
+                .checked_mul(block_size)
+                .ok_or(HfsError::CatalogOffsetTooLarge)?;
+            let offset = start_block
+                .checked_mul(block_size)
+                .ok_or(HfsError::CatalogOffsetTooLarge)?;
+            let end = offset
+                .checked_add(extent_size)
+                .ok_or(HfsError::CatalogOffsetTooLarge)?;
+            if end > self.data.len() {
+                return Err(HfsError::InvalidCatalogRecord);
+            }
+            described_blocks = described_blocks
+                .checked_add(block_count)
+                .ok_or(HfsError::InvalidCatalogRecord)?;
+            if described_blocks > total_blocks {
+                return Err(HfsError::InvalidCatalogRecord);
+            }
+            extents.push((offset, end));
+        }
+        if described_blocks != total_blocks {
+            return Err(HfsError::ExtentsOverflowUnsupported);
+        }
+
+        let mut source = contents;
+        for (offset, end) in extents {
+            let destination = &mut self.data[offset..end];
+            let length = source.len().min(destination.len());
+            destination[..length].copy_from_slice(&source[..length]);
+            destination[length..].fill(0);
+            source = &source[length..];
+        }
+        write_u64(&mut self.data, fork, contents.len() as u64)
     }
 
     pub fn walk(&self) -> Result<Vec<HfsEntry>, HfsError> {
@@ -85,7 +151,7 @@ impl HfsImage {
         Ok(HfsVolume::open(Cursor::new(self.data.as_slice()))?)
     }
 
-    fn catalog_permissions_offset(&self, path: &str) -> Result<usize, HfsError> {
+    fn catalog_record_offset(&self, path: &str) -> Result<usize, HfsError> {
         let mut volume = self.volume()?;
         let cnid = volume.stat(path)?.cnid;
         let mut reader = Cursor::new(self.data.as_slice());
@@ -108,7 +174,7 @@ impl HfsImage {
                         .map_err(|_| HfsError::CatalogOffsetTooLarge)?;
                     return node_offset
                         .checked_add(usize::from(node.record_offsets[index]))
-                        .and_then(|offset| offset.checked_add(body + 32))
+                        .and_then(|offset| offset.checked_add(body))
                         .ok_or(HfsError::CatalogOffsetTooLarge);
                 }
             }
@@ -152,6 +218,13 @@ fn write_u16(data: &mut [u8], offset: usize, value: u16) -> Result<(), HfsError>
 
 fn write_u32(data: &mut [u8], offset: usize, value: u32) -> Result<(), HfsError> {
     data.get_mut(offset..offset + 4)
+        .ok_or(HfsError::InvalidCatalogRecord)?
+        .copy_from_slice(&value.to_be_bytes());
+    Ok(())
+}
+
+fn write_u64(data: &mut [u8], offset: usize, value: u64) -> Result<(), HfsError> {
+    data.get_mut(offset..offset + 8)
         .ok_or(HfsError::InvalidCatalogRecord)?
         .copy_from_slice(&value.to_be_bytes());
     Ok(())
@@ -241,6 +314,12 @@ pub enum HfsError {
     CatalogRecordNotFound,
     #[error("HFS+ catalog offset is too large for this host")]
     CatalogOffsetTooLarge,
+    #[error("HFS+ entry is not a file")]
+    NotAFile,
+    #[error("HFS+ file requires {requested} bytes but its extents hold {capacity} bytes")]
+    FileCapacityExceeded { capacity: usize, requested: usize },
+    #[error("HFS+ extents overflow updates are not implemented")]
+    ExtentsOverflowUnsupported,
 }
 
 #[cfg(test)]
@@ -262,5 +341,18 @@ mod tests {
         assert_eq!(stat.mode(), 0o100755);
         assert_eq!(stat.owner(), 501);
         assert_eq!(stat.group(), 20);
+    }
+
+    #[test]
+    fn replaces_file_within_existing_extents() {
+        let mut builder = HfsPlusImageBuilder::new();
+        builder.add_file("payload", b"old", 0o644);
+        let mut image = HfsImage::parse(builder.build()).unwrap();
+        let replacement = vec![0xa5; 3000];
+
+        image.write_file("/payload", &replacement).unwrap();
+
+        assert_eq!(image.stat("/payload").unwrap().size(), 3000);
+        assert_eq!(image.read("/payload").unwrap(), replacement);
     }
 }
