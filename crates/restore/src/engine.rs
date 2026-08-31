@@ -194,7 +194,12 @@ where
                     return Err(RestoreRunError::Amr(error));
                 }
                 match status.status() {
-                    Some(0) => return Ok(RestoreOutcome),
+                    Some(0) => {
+                        let mut acknowledgement = Dictionary::new();
+                        acknowledgement.insert("MsgType".into(), "ReceivedFinalStatusMsg".into());
+                        client.send(&acknowledgement).await?;
+                        return Ok(RestoreOutcome);
+                    }
                     Some(value @ (6 | 14 | 27 | 51 | 53 | 1015)) => {
                         return Err(RestoreRunError::DeviceStatus(value));
                     }
@@ -206,6 +211,45 @@ where
                 if status.message().get("Accepted").and_then(Value::as_boolean) == Some(false) {
                     return Err(RestoreRunError::BasebandRejected);
                 }
+            }
+            RestoredMessage::Checkpoint(checkpoint) => {
+                if let Some(error) = checkpoint.error() {
+                    warn!(
+                        checkpoint = checkpoint.identifier(),
+                        result = checkpoint.result(),
+                        error,
+                        "restore checkpoint reported an error"
+                    );
+                } else if let Some(warning) = checkpoint.warning() {
+                    warn!(
+                        checkpoint = checkpoint.identifier(),
+                        result = checkpoint.result(),
+                        warning,
+                        "restore checkpoint reported a warning"
+                    );
+                } else {
+                    debug!(
+                        checkpoint = checkpoint.identifier(),
+                        name = checkpoint.name(),
+                        complete = checkpoint.complete(),
+                        result = checkpoint.result(),
+                        "restore checkpoint updated"
+                    );
+                }
+            }
+            RestoredMessage::RestoreAttestation(_) => {
+                let mut response = Dictionary::new();
+                response.insert("RestoreShouldAttest".into(), false.into());
+                client.send(&response).await?;
+            }
+            RestoredMessage::RestoredCrash(message) => {
+                warn!(keys = message.len(), "restored reported a crash")
+            }
+            RestoredMessage::AsyncWait(message) => {
+                debug!(keys = message.len(), "restored requested an async wait")
+            }
+            RestoredMessage::RestoreProtocol(message) => {
+                debug!(keys = message.len(), "received restore protocol metadata")
             }
             RestoredMessage::PreviousRestoreLog(_) => {
                 warn!("device reported a previous restore log")
@@ -285,6 +329,17 @@ mod tests {
                 Some("StartRestore")
             );
 
+            let mut attestation = Dictionary::new();
+            attestation.insert("MsgType".into(), "RestoreAttestation".into());
+            framed.send(&attestation).await.unwrap();
+            let attestation = framed.receive().await.unwrap();
+            assert_eq!(
+                attestation
+                    .get("RestoreShouldAttest")
+                    .and_then(Value::as_boolean),
+                Some(false)
+            );
+
             let mut request = Dictionary::new();
             request.insert("MsgType".into(), "DataRequestMsg".into());
             request.insert("DataType".into(), "RootTicket".into());
@@ -296,6 +351,11 @@ mod tests {
             status.insert("MsgType".into(), "StatusMsg".into());
             status.insert("Status".into(), 0_u64.into());
             framed.send(&status).await.unwrap();
+            let acknowledgement = framed.receive().await.unwrap();
+            assert_eq!(
+                acknowledgement.get("MsgType").and_then(Value::as_string),
+                Some("ReceivedFinalStatusMsg")
+            );
         });
 
         let prepared = PreparedRestoreData::default().with_root_ticket(vec![1, 2, 3]);
@@ -329,6 +389,11 @@ mod tests {
             status.insert("MsgType".into(), "StatusMsg".into());
             status.insert("Status".into(), 0_u64.into());
             framed.send(&status).await.unwrap();
+            let acknowledgement = framed.receive().await.unwrap();
+            assert_eq!(
+                acknowledgement.get("MsgType").and_then(Value::as_string),
+                Some("ReceivedFinalStatusMsg")
+            );
         });
         let responses = Arc::new(Mutex::new(Vec::new()));
         let response_sink = responses.clone();

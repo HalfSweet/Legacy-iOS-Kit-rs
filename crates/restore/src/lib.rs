@@ -23,6 +23,6 @@ pub use engine::{
 pub use options::RestoreOptions;
 pub use plist_framed::{PlistFrameError, PlistFramed};
 pub use restored::{
-    BasebandStatus, DataRequest, DataType, ProgressMessage, RestoredClient, RestoredError,
-    RestoredMessage, RestoredType, StatusMessage,
+    BasebandStatus, CheckpointMessage, DataRequest, DataType, ProgressMessage, RestoredClient,
+    RestoredError, RestoredMessage, RestoredType, StatusMessage,
 };

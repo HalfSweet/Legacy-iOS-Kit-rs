@@ -216,6 +216,42 @@ pub struct BasebandStatus {
     message: Dictionary,
 }
 
+#[derive(Clone, Debug)]
+pub struct CheckpointMessage {
+    identifier: Option<u64>,
+    name: Option<String>,
+    result: Option<i64>,
+    complete: bool,
+    warning: Option<String>,
+    error: Option<String>,
+}
+
+impl CheckpointMessage {
+    pub const fn identifier(&self) -> Option<u64> {
+        self.identifier
+    }
+
+    pub fn name(&self) -> Option<&str> {
+        self.name.as_deref()
+    }
+
+    pub const fn result(&self) -> Option<i64> {
+        self.result
+    }
+
+    pub const fn complete(&self) -> bool {
+        self.complete
+    }
+
+    pub fn warning(&self) -> Option<&str> {
+        self.warning.as_deref()
+    }
+
+    pub fn error(&self) -> Option<&str> {
+        self.error.as_deref()
+    }
+}
+
 impl BasebandStatus {
     pub fn message(&self) -> &Dictionary {
         &self.message
@@ -228,6 +264,11 @@ pub enum RestoredMessage {
     Progress(ProgressMessage),
     Status(StatusMessage),
     BasebandStatus(BasebandStatus),
+    Checkpoint(CheckpointMessage),
+    AsyncWait(Dictionary),
+    RestoreAttestation(Dictionary),
+    RestoreProtocol(Dictionary),
+    RestoredCrash(Dictionary),
     PreviousRestoreLog(Dictionary),
     Unknown {
         message_type: Option<String>,
@@ -248,7 +289,7 @@ impl RestoredMessage {
         );
 
         match message_type.as_deref() {
-            Some("DataRequestMsg") => {
+            Some("DataRequestMsg" | "AsyncDataRequestMsg") => {
                 let data_type = message
                     .get("DataType")
                     .and_then(Value::as_string)
@@ -266,6 +307,21 @@ impl RestoredMessage {
                 message,
             }),
             Some("BBUpdateStatusMsg") => Self::BasebandStatus(BasebandStatus { message }),
+            Some("CheckpointMsg") => Self::Checkpoint(CheckpointMessage {
+                identifier: unsigned(&message, "CHECKPOINT_ID"),
+                name: owned_string(&message, "CHECKPOINT_NAME"),
+                result: signed(&message, "CHECKPOINT_RESULT"),
+                complete: message
+                    .get("CHECKPOINT_COMPLETE")
+                    .and_then(Value::as_boolean)
+                    .unwrap_or(false),
+                warning: owned_string(&message, "CHECKPOINT_WARNING"),
+                error: owned_string(&message, "CHECKPOINT_ERROR"),
+            }),
+            Some("AsyncWait") => Self::AsyncWait(message),
+            Some("RestoreAttestation") => Self::RestoreAttestation(message),
+            Some("RestoreProtocol") => Self::RestoreProtocol(message),
+            Some("RestoredCrash") => Self::RestoredCrash(message),
             Some("PreviousRestoreLogMsg") => Self::PreviousRestoreLog(message),
             _ => Self::Unknown {
                 message_type,
@@ -277,6 +333,17 @@ impl RestoredMessage {
 
 fn unsigned(dictionary: &Dictionary, key: &str) -> Option<u64> {
     dictionary.get(key).and_then(Value::as_unsigned_integer)
+}
+
+fn signed(dictionary: &Dictionary, key: &str) -> Option<i64> {
+    dictionary.get(key).and_then(Value::as_signed_integer)
+}
+
+fn owned_string(dictionary: &Dictionary, key: &str) -> Option<String> {
+    dictionary
+        .get(key)
+        .and_then(Value::as_string)
+        .map(ToOwned::to_owned)
 }
 
 fn string<'a>(dictionary: &'a Dictionary, key: &str) -> Result<&'a str, RestoredError> {
@@ -314,6 +381,18 @@ mod tests {
             panic!("expected data request");
         };
         assert_eq!(request.data_type(), &DataType::SystemImage);
+    }
+
+    #[test]
+    fn parses_async_data_request_type() {
+        let mut message = Dictionary::new();
+        message.insert("MsgType".into(), "AsyncDataRequestMsg".into());
+        message.insert("DataType".into(), "RootTicket".into());
+
+        let RestoredMessage::DataRequest(request) = RestoredMessage::parse(message) else {
+            panic!("expected data request");
+        };
+        assert_eq!(request.data_type(), &DataType::RootTicket);
     }
 
     #[tokio::test]
