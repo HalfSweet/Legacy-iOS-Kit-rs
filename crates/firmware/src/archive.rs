@@ -1,7 +1,7 @@
 use std::{
     collections::HashSet,
     fs::File,
-    io::{Cursor, Read},
+    io::{Cursor, Read, Write},
     path::{Path, PathBuf},
 };
 
@@ -63,6 +63,44 @@ impl FirmwareArchive {
         entry.read_to_end(&mut data)?;
         Ok(data)
     }
+
+    pub async fn extract_entry_to(
+        &self,
+        name: impl Into<String>,
+        destination: impl Into<PathBuf>,
+    ) -> Result<u64, FirmwareError> {
+        let archive_path = self.path.clone();
+        let name = name.into();
+        let destination = destination.into();
+        tokio::task::spawn_blocking(move || extract_entry(&archive_path, &name, &destination))
+            .await
+            .map_err(|error| FirmwareError::Task(error.to_string()))?
+    }
+}
+
+fn extract_entry(
+    archive_path: &Path,
+    name: &str,
+    destination: &Path,
+) -> Result<u64, FirmwareError> {
+    let parent = destination.parent().unwrap_or_else(|| Path::new("."));
+    std::fs::create_dir_all(parent)?;
+    let mut archive = ZipArchive::new(File::open(archive_path)?)?;
+    let mut entry = archive.by_name(name).map_err(|error| match error {
+        zip::result::ZipError::FileNotFound => FirmwareError::ArchiveEntryNotFound(name.to_owned()),
+        error => FirmwareError::Zip(error),
+    })?;
+    let mut temporary = tempfile::Builder::new()
+        .prefix("ipsw-entry-")
+        .tempfile_in(parent)?;
+    let copied = std::io::copy(&mut entry, &mut temporary)?;
+    temporary.flush()?;
+    temporary.as_file().sync_all()?;
+    temporary
+        .into_temp_path()
+        .persist(destination)
+        .map_err(|error| error.error)?;
+    Ok(copied)
 }
 
 fn validate_archive(archive: &mut ZipArchive<File>) -> Result<(), FirmwareError> {
@@ -115,6 +153,28 @@ mod tests {
             archive.read_entry("Firmware/test.bin").unwrap(),
             b"firmware"
         );
+    }
+
+    #[tokio::test]
+    async fn extracts_archive_entries_atomically() {
+        let file = NamedTempFile::new().unwrap();
+        let mut writer = ZipWriter::new(file.reopen().unwrap());
+        writer
+            .start_file("filesystem.dmg", SimpleFileOptions::default())
+            .unwrap();
+        writer.write_all(b"filesystem").unwrap();
+        writer.finish().unwrap();
+        let destination_root = tempfile::tempdir().unwrap();
+        let destination = destination_root.path().join("filesystem.dmg");
+
+        let copied = FirmwareArchive::open(file.path())
+            .unwrap()
+            .extract_entry_to("filesystem.dmg", &destination)
+            .await
+            .unwrap();
+
+        assert_eq!(copied, 10);
+        assert_eq!(std::fs::read(destination).unwrap(), b"filesystem");
     }
 
     #[test]

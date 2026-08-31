@@ -213,6 +213,8 @@ pub enum FirmwareError {
     TooManyArchiveEntries(usize),
     #[error("firmware archive expands beyond the supported size")]
     ArchiveExpandedTooLarge,
+    #[error("firmware worker task failed: {0}")]
+    Task(String),
     #[error("failed to parse plist: {0}")]
     Plist(#[from] plist::Error),
     #[error("BuildManifest root is not a dictionary")]
