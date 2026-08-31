@@ -182,6 +182,30 @@ impl DeviceManager {
         Ok(())
     }
 
+    pub async fn app_container(
+        &self,
+        udid: &Udid,
+        bundle_id: &str,
+    ) -> Result<DeviceFiles, KitError> {
+        Ok(self
+            .find_normal(udid)
+            .await?
+            .app_container(bundle_id)
+            .await?)
+    }
+
+    pub async fn app_documents(
+        &self,
+        udid: &Udid,
+        bundle_id: &str,
+    ) -> Result<DeviceFiles, KitError> {
+        Ok(self
+            .find_normal(udid)
+            .await?
+            .app_documents(bundle_id)
+            .await?)
+    }
+
     pub async fn enter_recovery(&self, udid: &Udid) -> Result<(), KitError> {
         self.find_normal(udid).await?.enter_recovery().await?;
         Ok(())
