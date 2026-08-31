@@ -27,6 +27,8 @@ pub enum TicketPolicy {
     Signed,
     Provided(PathBuf),
     Onboard,
+    /// Restore without a signing ticket; requires a pwned boot chain.
+    Skip,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -41,6 +43,8 @@ pub enum BasebandPolicy {
 #[serde(rename_all = "kebab-case", tag = "policy", content = "value")]
 pub enum SepPolicy {
     Auto,
+    /// Do not send RestoreSEP during boot or SEP data in the NOR response.
+    None,
     Provided(PathBuf),
 }
 
@@ -128,6 +132,9 @@ impl RestorePlan {
                         source,
                     })?;
             }
+        }
+        if matches!(request.ticket, TicketPolicy::Skip) && request.exploit == ExploitPolicy::None {
+            return Err(RestorePlanError::SkipTicketRequiresExploit);
         }
         if let BasebandPolicy::Provided(path) = &request.baseband
             && !path.is_file()
@@ -390,6 +397,8 @@ pub enum RestorePlanError {
     BasebandNotFound(PathBuf),
     #[error("provided SEP firmware does not exist: {}", .0.display())]
     SepNotFound(PathBuf),
+    #[error("skipping the signing ticket requires a pwned boot chain")]
+    SkipTicketRequiresExploit,
     #[error(transparent)]
     Firmware(#[from] FirmwareError),
 }
@@ -426,6 +435,27 @@ mod tests {
         assert!(plan.accepts(&consent));
         assert_eq!(plan.product_version(), "7.1.2");
         assert_eq!(plan.components()[0].name, "RestoreRamDisk");
+    }
+
+    #[test]
+    fn skip_ticket_requires_pwned_boot_chain() {
+        let file = firmware_fixture();
+        let request = |exploit| RestoreRequest {
+            device: DeviceIdentity::new(ProductType::from("iPhone3,1"), Soc::A4)
+                .with_board_config(BoardConfig::from("n90"))
+                .with_ecid(Ecid::new(42)),
+            firmware: file.path().to_owned(),
+            behavior: RestoreBehavior::Erase,
+            ticket: TicketPolicy::Skip,
+            baseband: BasebandPolicy::Auto,
+            sep: SepPolicy::Auto,
+            exploit,
+            nonce: NoncePolicy::Manual,
+        };
+
+        let error = RestorePlan::resolve(request(ExploitPolicy::None)).unwrap_err();
+        assert!(matches!(error, RestorePlanError::SkipTicketRequiresExploit));
+        RestorePlan::resolve(request(ExploitPolicy::AlreadyPwned)).unwrap();
     }
 
     fn firmware_fixture() -> NamedTempFile {

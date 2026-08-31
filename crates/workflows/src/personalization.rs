@@ -32,7 +32,11 @@ impl ComponentPersonalizer {
         self.personalize_path(component, &path)
     }
 
-    pub fn nor_response(&self, flash_version_1: bool) -> Result<Dictionary, PersonalizationError> {
+    pub fn nor_response(
+        &self,
+        flash_version_1: bool,
+        include_sep: bool,
+    ) -> Result<Dictionary, PersonalizationError> {
         let llb = self.personalize("LLB")?;
         let firmware = self.firmware_components()?;
         let mut images = firmware
@@ -69,13 +73,15 @@ impl ComponentPersonalizer {
                 ),
             );
         }
-        for (component, key) in [
-            ("RestoreSEP", "RestoreSEPImageData"),
-            ("SEP", "SEPImageData"),
-            ("SepStage1", "SEPPatchImageData"),
-        ] {
-            if self.identity.manifest().contains_key(component) {
-                response.insert(key.into(), Value::Data(self.personalize(component)?));
+        if include_sep {
+            for (component, key) in [
+                ("RestoreSEP", "RestoreSEPImageData"),
+                ("SEP", "SEPImageData"),
+                ("SepStage1", "SEPPatchImageData"),
+            ] {
+                if self.identity.manifest().contains_key(component) {
+                    response.insert(key.into(), Value::Data(self.personalize(component)?));
+                }
             }
         }
         Ok(response)
@@ -84,6 +90,7 @@ impl ComponentPersonalizer {
     pub fn prepare_restore_data(
         &self,
         flash_version_1: bool,
+        include_sep: bool,
     ) -> Result<PreparedRestoreData, PersonalizationError> {
         let mut prepared = PreparedRestoreData::default();
         if let Some(ticket) = self.root_ticket() {
@@ -108,7 +115,7 @@ impl ComponentPersonalizer {
             );
         }
         if self.identity.manifest().contains_key("LLB") {
-            prepared = prepared.with_nor(self.nor_response(flash_version_1)?);
+            prepared = prepared.with_nor(self.nor_response(flash_version_1, include_sep)?);
         }
         Ok(prepared)
     }
@@ -313,7 +320,7 @@ mod tests {
             .unwrap()
             .clone();
         let response = ComponentPersonalizer::new(archive, identity, Dictionary::new())
-            .nor_response(false)
+            .nor_response(false, true)
             .unwrap();
 
         assert_eq!(

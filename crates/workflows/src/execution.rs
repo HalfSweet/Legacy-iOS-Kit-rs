@@ -37,10 +37,31 @@ impl RestorePreparation {
         ticket: SigningTicket,
         flash_version_1: bool,
     ) -> Result<Self, RestorePreparationError> {
+        Self::prepare(plan, consent, Some(ticket), flash_version_1)
+    }
+
+    /// Prepare a restore without a signing ticket: components keep their raw
+    /// archive bytes and no ticket is sent to the device or `restored`.
+    pub fn without_ticket(
+        plan: &RestorePlan,
+        consent: &DestructiveConsent,
+        flash_version_1: bool,
+    ) -> Result<Self, RestorePreparationError> {
+        Self::prepare(plan, consent, None, flash_version_1)
+    }
+
+    fn prepare(
+        plan: &RestorePlan,
+        consent: &DestructiveConsent,
+        ticket: Option<SigningTicket>,
+        flash_version_1: bool,
+    ) -> Result<Self, RestorePreparationError> {
         if !plan.accepts(consent) {
             return Err(RestorePreparationError::ConsentMismatch);
         }
-        if let Some(ecid) = plan.device().ecid() {
+        if let Some(ticket) = &ticket
+            && let Some(ecid) = plan.device().ecid()
+        {
             ticket.verify_ecid(ecid)?;
         }
         let archive = FirmwareArchive::open(plan.firmware())?;
@@ -64,12 +85,17 @@ impl RestorePreparation {
             .map_err(|_| RestorePreparationError::InvalidBuildId)?;
         let filesystem_path = identity.component_path("OS")?.to_owned();
         let recovery_ticket = ticket
-            .dictionary()
-            .get("APTicket")
+            .as_ref()
+            .and_then(|ticket| ticket.dictionary().get("APTicket"))
             .and_then(Value::as_data)
             .map(ToOwned::to_owned);
-        let ticket_dictionary = ticket.dictionary().clone();
-        let boot_nonce = if plan.nonce_policy() == crate::NoncePolicy::Auto {
+        let ticket_dictionary = ticket
+            .as_ref()
+            .map(|ticket| ticket.dictionary().clone())
+            .unwrap_or_default();
+        let boot_nonce = if plan.nonce_policy() == crate::NoncePolicy::Auto
+            && let Some(ticket) = &ticket
+        {
             let generator = ticket
                 .generator()
                 .ok_or(RestorePreparationError::MissingGenerator)?;
@@ -84,8 +110,9 @@ impl RestorePreparation {
         };
         let personalizer =
             ComponentPersonalizer::new(archive, identity.clone(), ticket_dictionary.clone());
+        let include_sep = !matches!(plan.sep_policy(), SepPolicy::None);
         let sep = match plan.sep_policy() {
-            SepPolicy::Auto => None,
+            SepPolicy::Auto | SepPolicy::None => None,
             SepPolicy::Provided(path) => {
                 let archive = FirmwareArchive::open(path)?;
                 let manifest = archive.build_manifest()?;
@@ -103,7 +130,11 @@ impl RestorePreparation {
             .iter()
             .copied()
             .filter(|name| {
-                identity.manifest().contains_key(name) || name == &"RestoreSEP" && sep.is_some()
+                if name == &"RestoreSEP" {
+                    include_sep && (identity.manifest().contains_key(name) || sep.is_some())
+                } else {
+                    identity.manifest().contains_key(name)
+                }
             })
             .map(|name| {
                 let source = if name == "RestoreSEP" {
@@ -118,9 +149,9 @@ impl RestorePreparation {
                 })
             })
             .collect::<Result<Vec<_>, RestorePreparationError>>()?;
-        let mut restored_data = personalizer.prepare_restore_data(flash_version_1)?;
+        let mut restored_data = personalizer.prepare_restore_data(flash_version_1, include_sep)?;
         if let Some((sep, sep_identity)) = &sep {
-            let mut nor = personalizer.nor_response(flash_version_1)?;
+            let mut nor = personalizer.nor_response(flash_version_1, include_sep)?;
             for (component, key) in [
                 ("RestoreSEP", "RestoreSEPImageData"),
                 ("SEP", "SEPImageData"),
@@ -288,13 +319,17 @@ mod tests {
     }
 
     fn firmware_fixture() -> NamedTempFile {
+        firmware_fixture_with(MANIFEST, &["filesystem.dmg", "ibss.img3", "kernel.img3"])
+    }
+
+    fn firmware_fixture_with(manifest: &str, entries: &[&str]) -> NamedTempFile {
         let file = NamedTempFile::new().unwrap();
         let mut writer = ZipWriter::new(file.reopen().unwrap());
         writer
             .start_file("BuildManifest.plist", SimpleFileOptions::default())
             .unwrap();
-        writer.write_all(MANIFEST.as_bytes()).unwrap();
-        for path in ["filesystem.dmg", "ibss.img3", "kernel.img3"] {
+        writer.write_all(manifest.as_bytes()).unwrap();
+        for path in entries {
             writer
                 .start_file(path, SimpleFileOptions::default())
                 .unwrap();
@@ -304,6 +339,71 @@ mod tests {
         file
     }
 
+    #[test]
+    fn prepares_without_ticket_using_raw_components() {
+        let firmware = firmware_fixture();
+        let plan = RestorePlan::resolve(RestoreRequest {
+            device: DeviceIdentity::new(ProductType::from("iPhone3,1"), Soc::A4)
+                .with_board_config(BoardConfig::from("n90"))
+                .with_ecid(Ecid::new(42)),
+            firmware: firmware.path().to_owned(),
+            behavior: RestoreBehavior::Erase,
+            ticket: TicketPolicy::Skip,
+            baseband: BasebandPolicy::None,
+            sep: SepPolicy::Auto,
+            exploit: ExploitPolicy::AlreadyPwned,
+            nonce: crate::NoncePolicy::Manual,
+        })
+        .unwrap();
+        let consent = plan.confirm_destructive();
+
+        let prepared = RestorePreparation::without_ticket(&plan, &consent, false).unwrap();
+
+        assert!(prepared.recovery_ticket().is_none());
+        assert!(prepared.boot_nonce().is_none());
+        assert_eq!(prepared.boot_components()[0].name(), "iBSS");
+        assert_eq!(prepared.boot_components()[0].data(), b"ibss.img3");
+    }
+
+    #[test]
+    fn sep_policy_none_omits_restore_sep_boot_component() {
+        let firmware = firmware_fixture_with(
+            MANIFEST_WITH_SEP,
+            &["filesystem.dmg", "ibss.img3", "kernel.img3", "sep.img3"],
+        );
+        let request = |sep| RestoreRequest {
+            device: DeviceIdentity::new(ProductType::from("iPhone3,1"), Soc::A4)
+                .with_board_config(BoardConfig::from("n90"))
+                .with_ecid(Ecid::new(42)),
+            firmware: firmware.path().to_owned(),
+            behavior: RestoreBehavior::Erase,
+            ticket: TicketPolicy::Skip,
+            baseband: BasebandPolicy::None,
+            sep,
+            exploit: ExploitPolicy::AlreadyPwned,
+            nonce: crate::NoncePolicy::Manual,
+        };
+        let plan = RestorePlan::resolve(request(SepPolicy::Auto)).unwrap();
+        let prepared =
+            RestorePreparation::without_ticket(&plan, &plan.confirm_destructive(), false).unwrap();
+        assert!(
+            prepared
+                .boot_components()
+                .iter()
+                .any(|component| component.name() == "RestoreSEP")
+        );
+
+        let plan = RestorePlan::resolve(request(SepPolicy::None)).unwrap();
+        let prepared =
+            RestorePreparation::without_ticket(&plan, &plan.confirm_destructive(), false).unwrap();
+        assert!(
+            prepared
+                .boot_components()
+                .iter()
+                .all(|component| component.name() != "RestoreSEP")
+        );
+    }
+
     const MANIFEST: &str = r#"<?xml version="1.0"?><plist version="1.0"><dict>
 <key>ProductVersion</key><string>7.1.2</string><key>ProductBuildVersion</key><string>11D257</string>
 <key>SupportedProductTypes</key><array><string>iPhone3,1</string></array>
@@ -311,6 +411,17 @@ mod tests {
 <key>RestoreBehavior</key><string>Erase</string></dict><key>Manifest</key><dict>
 <key>OS</key><dict><key>Info</key><dict><key>Path</key><string>filesystem.dmg</string></dict></dict>
 <key>iBSS</key><dict><key>Info</key><dict><key>Path</key><string>ibss.img3</string></dict></dict>
+<key>RestoreKernelCache</key><dict><key>Info</key><dict><key>Path</key><string>kernel.img3</string></dict></dict>
+</dict></dict></array></dict></plist>"#;
+
+    const MANIFEST_WITH_SEP: &str = r#"<?xml version="1.0"?><plist version="1.0"><dict>
+<key>ProductVersion</key><string>7.1.2</string><key>ProductBuildVersion</key><string>11D257</string>
+<key>SupportedProductTypes</key><array><string>iPhone3,1</string></array>
+<key>BuildIdentities</key><array><dict><key>Info</key><dict><key>DeviceClass</key><string>n90ap</string>
+<key>RestoreBehavior</key><string>Erase</string></dict><key>Manifest</key><dict>
+<key>OS</key><dict><key>Info</key><dict><key>Path</key><string>filesystem.dmg</string></dict></dict>
+<key>iBSS</key><dict><key>Info</key><dict><key>Path</key><string>ibss.img3</string></dict></dict>
+<key>RestoreSEP</key><dict><key>Info</key><dict><key>Path</key><string>sep.img3</string></dict></dict>
 <key>RestoreKernelCache</key><dict><key>Info</key><dict><key>Path</key><string>kernel.img3</string></dict></dict>
 </dict></dict></array></dict></plist>"#;
 }

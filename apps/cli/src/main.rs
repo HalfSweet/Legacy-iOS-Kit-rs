@@ -932,12 +932,18 @@ enum RestoreCommand {
         ticket: Option<PathBuf>,
         #[arg(long)]
         onboard_ticket: bool,
+        /// Restore without a signing ticket on a pwned device.
+        #[arg(long, conflicts_with_all = ["ticket", "onboard_ticket"])]
+        skip_blob: bool,
         #[arg(long, conflicts_with = "no_baseband")]
         baseband: Option<PathBuf>,
         #[arg(long)]
         no_baseband: bool,
         #[arg(long)]
         sep: Option<PathBuf>,
+        /// Do not send Restore SEP firmware to the device.
+        #[arg(long, conflicts_with = "sep")]
+        no_sep: bool,
         #[arg(long, value_enum, default_value_t = ExploitArg::Auto)]
         exploit: ExploitArg,
         /// Write the ticket generator to the device boot nonce NVRAM variable.
@@ -956,6 +962,9 @@ enum RestoreCommand {
         firmware: PathBuf,
         #[arg(long)]
         ticket: Option<PathBuf>,
+        /// Restore without a signing ticket on a pwned device.
+        #[arg(long, conflicts_with = "ticket")]
+        skip_blob: bool,
         #[arg(long)]
         work_dir: Option<PathBuf>,
         #[arg(long, value_enum, default_value_t = RestoreBehaviorArg::Erase)]
@@ -970,6 +979,9 @@ enum RestoreCommand {
         no_baseband: bool,
         #[arg(long)]
         sep: Option<PathBuf>,
+        /// Do not send Restore SEP firmware to the device.
+        #[arg(long, conflicts_with = "sep")]
+        no_sep: bool,
         #[arg(long)]
         flash_version_1: bool,
         /// Write the ticket generator to the device boot nonce NVRAM variable.
@@ -2258,15 +2270,19 @@ async fn main() -> Result<()> {
                     behavior,
                     ticket,
                     onboard_ticket,
+                    skip_blob,
                     baseband,
                     no_baseband,
                     sep,
+                    no_sep,
                     exploit,
                     set_nonce,
                 },
         } => {
             let device = kit.resolve_device_identity(device, board)?.with_ecid(ecid);
-            let ticket = if onboard_ticket {
+            let ticket = if skip_blob {
+                TicketPolicy::Skip
+            } else if onboard_ticket {
                 TicketPolicy::Onboard
             } else if let Some(ticket) = ticket {
                 TicketPolicy::Provided(ticket)
@@ -2280,7 +2296,11 @@ async fn main() -> Result<()> {
             } else {
                 BasebandPolicy::Auto
             };
-            let sep = sep.map_or(SepPolicy::Auto, SepPolicy::Provided);
+            let sep = if no_sep {
+                SepPolicy::None
+            } else {
+                sep.map_or(SepPolicy::Auto, SepPolicy::Provided)
+            };
             let plan = kit
                 .plan_restore(RestoreRequest {
                     device,
@@ -2303,6 +2323,7 @@ async fn main() -> Result<()> {
                     ecid,
                     firmware,
                     ticket,
+                    skip_blob,
                     work_dir,
                     behavior,
                     exploit,
@@ -2310,6 +2331,7 @@ async fn main() -> Result<()> {
                     baseband,
                     no_baseband,
                     sep,
+                    no_sep,
                     flash_version_1,
                     set_nonce,
                     yes,
@@ -2320,9 +2342,13 @@ async fn main() -> Result<()> {
                 device,
                 firmware,
                 behavior: behavior.into(),
-                ticket: ticket
-                    .clone()
-                    .map_or(TicketPolicy::Signed, TicketPolicy::Provided),
+                ticket: if skip_blob {
+                    TicketPolicy::Skip
+                } else {
+                    ticket
+                        .clone()
+                        .map_or(TicketPolicy::Signed, TicketPolicy::Provided)
+                },
                 baseband: if no_baseband {
                     BasebandPolicy::None
                 } else if let Some(baseband) = baseband {
@@ -2330,7 +2356,11 @@ async fn main() -> Result<()> {
                 } else {
                     BasebandPolicy::Auto
                 },
-                sep: sep.map_or(SepPolicy::Auto, SepPolicy::Provided),
+                sep: if no_sep {
+                    SepPolicy::None
+                } else {
+                    sep.map_or(SepPolicy::Auto, SepPolicy::Provided)
+                },
                 exploit: exploit.into(),
                 nonce: nonce_policy(set_nonce),
             })?;
@@ -2345,7 +2375,9 @@ async fn main() -> Result<()> {
             let work_directory = work_dir
                 .or_else(|| config.storage.work_dir.clone())
                 .unwrap_or_else(|| std::env::temp_dir().join("legacy-ios-kit"));
-            let mut request = if let Some(ticket) = ticket {
+            let mut request = if skip_blob {
+                RestoreExecutionRequest::skip_blob(plan, consent, work_directory)
+            } else if let Some(ticket) = ticket {
                 RestoreExecutionRequest::new(
                     plan,
                     consent,

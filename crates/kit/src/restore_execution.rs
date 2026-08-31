@@ -66,6 +66,23 @@ impl RestoreExecutionRequest {
         }
     }
 
+    /// Execute without a signing ticket; the plan must use
+    /// `TicketPolicy::Skip` and a pwned boot chain.
+    pub fn skip_blob(
+        plan: RestorePlan,
+        consent: DestructiveConsent,
+        work_directory: impl Into<PathBuf>,
+    ) -> Self {
+        Self {
+            plan,
+            consent,
+            ticket: ExecutionTicket::Skip,
+            work_directory: work_directory.into(),
+            flash_version_1: false,
+            limera1n_payload: None,
+        }
+    }
+
     pub fn with_flash_version_1(mut self, enabled: bool) -> Self {
         self.flash_version_1 = enabled;
         self
@@ -80,6 +97,7 @@ impl RestoreExecutionRequest {
 enum ExecutionTicket {
     Provided(SigningTicket),
     Signed,
+    Skip,
 }
 
 pub(crate) fn spawn(
@@ -134,8 +152,16 @@ async fn execute(
         .await;
     let ticket = resolve_ticket(&plan, ticket_source, tss).await?;
     let plan_for_preparation = plan.clone();
-    let preparation = tokio::task::spawn_blocking(move || {
-        RestorePreparation::with_ticket(&plan_for_preparation, &consent, ticket, flash_version_1)
+    let preparation = tokio::task::spawn_blocking(move || match ticket {
+        Some(ticket) => RestorePreparation::with_ticket(
+            &plan_for_preparation,
+            &consent,
+            ticket,
+            flash_version_1,
+        ),
+        None => {
+            RestorePreparation::without_ticket(&plan_for_preparation, &consent, flash_version_1)
+        }
     })
     .await
     .map_err(|error| KitError::Task(error.to_string()))??;
@@ -250,13 +276,22 @@ async fn resolve_ticket(
     plan: &RestorePlan,
     source: ExecutionTicket,
     tss: &TssClient,
-) -> Result<SigningTicket, KitError> {
+) -> Result<Option<SigningTicket>, KitError> {
     match source {
         ExecutionTicket::Provided(ticket) => {
-            if matches!(plan.ticket_policy(), TicketPolicy::Signed) {
+            if matches!(
+                plan.ticket_policy(),
+                TicketPolicy::Signed | TicketPolicy::Skip
+            ) {
                 return Err(KitError::TicketPolicyMismatch);
             }
-            Ok(ticket)
+            Ok(Some(ticket))
+        }
+        ExecutionTicket::Skip => {
+            if !matches!(plan.ticket_policy(), TicketPolicy::Skip) {
+                return Err(KitError::TicketPolicyMismatch);
+            }
+            Ok(None)
         }
         ExecutionTicket::Signed => {
             if !matches!(plan.ticket_policy(), TicketPolicy::Signed) {
@@ -295,7 +330,9 @@ async fn resolve_ticket(
             let identity = manifest.select_identity(board, plan.behavior())?;
             let request = TssRequest::for_build_identity(identity, &parameters);
             let response = tss.send(&request).await?;
-            Ok(SigningTicket::from_dictionary(response.into_dictionary())?)
+            Ok(Some(SigningTicket::from_dictionary(
+                response.into_dictionary(),
+            )?))
         }
     }
 }
