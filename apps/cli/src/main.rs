@@ -319,6 +319,8 @@ enum RestoreCommand {
         behavior: RestoreBehaviorArg,
         #[arg(long, value_enum, default_value_t = ExploitArg::AlreadyPwned)]
         exploit: ExploitArg,
+        #[arg(long, conflicts_with = "no_baseband")]
+        baseband: Option<PathBuf>,
         #[arg(long)]
         no_baseband: bool,
         #[arg(long)]
@@ -813,6 +815,7 @@ async fn main() -> Result<()> {
                     work_dir,
                     behavior,
                     exploit,
+                    baseband,
                     no_baseband,
                     flash_version_1,
                     yes,
@@ -826,6 +829,8 @@ async fn main() -> Result<()> {
                 ticket: TicketPolicy::Provided(ticket.clone()),
                 baseband: if no_baseband {
                     BasebandPolicy::None
+                } else if let Some(baseband) = baseband {
+                    BasebandPolicy::Provided(baseband)
                 } else {
                     BasebandPolicy::Auto
                 },
