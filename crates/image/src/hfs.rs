@@ -1,4 +1,4 @@
-use std::io::Cursor;
+use std::{collections::BTreeSet, io::Cursor};
 
 use hfsplus::{
     EntryKind, HfsPlusError, HfsVolume, btree,
@@ -570,6 +570,118 @@ impl HfsImage {
         Ok(())
     }
 
+    pub fn remove_directory(&mut self, path: &str, recursive: bool) -> Result<(), HfsError> {
+        let mut volume = self.volume()?;
+        let stat = volume.stat(path)?;
+        if stat.kind != EntryKind::Directory {
+            return Err(HfsError::NotADirectory);
+        }
+        if stat.cnid == 2 {
+            return Err(HfsError::CannotRemoveRoot);
+        }
+        let header = volume.volume_header().clone();
+        let mut tree = CatalogTree::read(&self.data)?;
+        let target_record = tree
+            .records()
+            .iter()
+            .find(|record| {
+                let Ok(body) = record_body_offset(record) else {
+                    return false;
+                };
+                matches!(read_u16(record, body), Ok(1))
+                    && read_u32(record, body + 8).ok() == Some(stat.cnid)
+            })
+            .ok_or(HfsError::CatalogRecordNotFound)?;
+        let parent_id = read_u32(target_record, 2)?;
+        let mut folders = BTreeSet::from([stat.cnid]);
+        let mut files = BTreeSet::new();
+        collect_descendants(
+            tree.records(),
+            stat.cnid,
+            recursive,
+            &mut folders,
+            &mut files,
+        )?;
+
+        let mut blocks = Vec::new();
+        for record in tree.records() {
+            let body = record_body_offset(record)?;
+            if read_u16(record, body)? == 2 && files.contains(&read_u32(record, body + 8)?) {
+                blocks.extend(record_fork_blocks(record, body + 88)?);
+                blocks.extend(record_fork_blocks(record, body + 168)?);
+            }
+        }
+        let block_size =
+            usize::try_from(header.block_size).map_err(|_| HfsError::CatalogOffsetTooLarge)?;
+        for block in &blocks {
+            if !allocation_block_used(&self.data, &header.allocation_file, block_size, *block)? {
+                return Err(HfsError::InvalidCatalogRecord);
+            }
+        }
+        update_folder_valence(tree.records_mut(), parent_id, -1)?;
+        tree.records_mut().retain(|record| {
+            let Ok(body) = record_body_offset(record) else {
+                return true;
+            };
+            let Ok(record_type) = read_u16(record, body) else {
+                return true;
+            };
+            let key_parent = read_u32(record, 2).ok();
+            let record_id = read_u32(record, body + 8).ok();
+            match record_type {
+                1 => !record_id.is_some_and(|id| folders.contains(&id)),
+                2 => !record_id.is_some_and(|id| files.contains(&id)),
+                3 => !key_parent.is_some_and(|id| folders.contains(&id)),
+                4 => !key_parent.is_some_and(|id| files.contains(&id)),
+                _ => true,
+            }
+        });
+
+        let mut updated = self.data.clone();
+        for block in &blocks {
+            set_allocation_block(
+                &mut updated,
+                &header.allocation_file,
+                block_size,
+                *block,
+                false,
+            )?;
+        }
+        tree.write(&mut updated)?;
+        let primary = VOLUME_HEADER_OFFSET as usize;
+        write_u32(
+            &mut updated,
+            primary + 32,
+            header
+                .file_count
+                .checked_sub(u32::try_from(files.len()).map_err(|_| HfsError::VolumeTooLarge)?)
+                .ok_or(HfsError::InvalidCatalogRecord)?,
+        )?;
+        write_u32(
+            &mut updated,
+            primary + 36,
+            header
+                .folder_count
+                .checked_sub(u32::try_from(folders.len()).map_err(|_| HfsError::VolumeTooLarge)?)
+                .ok_or(HfsError::InvalidCatalogRecord)?,
+        )?;
+        write_u32(
+            &mut updated,
+            primary + FREE_BLOCKS_OFFSET,
+            header
+                .free_blocks
+                .checked_add(u32::try_from(blocks.len()).map_err(|_| HfsError::VolumeTooLarge)?)
+                .ok_or(HfsError::VolumeTooLarge)?,
+        )?;
+        sync_alternate_header(
+            &mut updated,
+            usize::try_from(header.total_blocks).map_err(|_| HfsError::CatalogOffsetTooLarge)?,
+            block_size,
+        )?;
+        self.data = updated;
+        Ok(())
+    }
+
     fn expand_file(
         &mut self,
         fork: usize,
@@ -756,6 +868,40 @@ fn catalog_thread_parent(records: &[Vec<u8>], cnid: u32) -> Result<u32, HfsError
                 .then(|| read_u32(record, body + 4))
         })
         .ok_or(HfsError::CatalogRecordNotFound)?
+}
+
+fn collect_descendants(
+    records: &[Vec<u8>],
+    folder_id: u32,
+    recursive: bool,
+    folders: &mut BTreeSet<u32>,
+    files: &mut BTreeSet<u32>,
+) -> Result<(), HfsError> {
+    let mut children = Vec::new();
+    for record in records {
+        if read_u32(record, 2)? != folder_id {
+            continue;
+        }
+        let body = record_body_offset(record)?;
+        let record_type = read_u16(record, body)?;
+        if matches!(record_type, 1 | 2) {
+            children.push((record_type, read_u32(record, body + 8)?));
+        }
+    }
+    if !recursive && !children.is_empty() {
+        return Err(HfsError::DirectoryNotEmpty);
+    }
+    for (record_type, cnid) in children {
+        if record_type == 1 {
+            if !folders.insert(cnid) {
+                return Err(HfsError::InvalidCatalogRecord);
+            }
+            collect_descendants(records, cnid, true, folders, files)?;
+        } else {
+            files.insert(cnid);
+        }
+    }
+    Ok(())
 }
 
 fn update_folder_valence(
@@ -1201,6 +1347,10 @@ pub enum HfsError {
     NotADirectory,
     #[error("HFS+ directory cannot be moved into its own descendant")]
     InvalidMove,
+    #[error("HFS+ directory is not empty")]
+    DirectoryNotEmpty,
+    #[error("HFS+ root directory cannot be removed")]
+    CannotRemoveRoot,
 }
 
 #[cfg(test)]
@@ -1364,5 +1514,22 @@ mod tests {
                 .all(|entry| entry.name != "payload")
         );
         assert_eq!(volume.read_file("/dir/renamed").unwrap(), b"data");
+    }
+
+    #[test]
+    fn removes_directory_tree_and_releases_file_blocks() {
+        const BLOCK_SIZE: usize = 4096;
+        let mut image = growable_image();
+        image.mkdir("/dir").unwrap();
+        image.move_entry("/payload", "/dir/payload").unwrap();
+
+        image.remove_directory("/dir", true).unwrap();
+
+        let mut volume = image.volume().unwrap();
+        assert!(volume.list_directory("/").unwrap().is_empty());
+        assert_eq!(volume.volume_header().file_count, 0);
+        assert_eq!(volume.volume_header().folder_count, 1);
+        assert_eq!(volume.volume_header().free_blocks, 2);
+        assert_eq!(image.data()[6 * BLOCK_SIZE], 0xf3);
     }
 }
