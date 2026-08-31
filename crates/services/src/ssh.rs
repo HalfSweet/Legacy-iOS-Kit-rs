@@ -338,6 +338,55 @@ impl RamdiskSsh {
         .await
     }
 
+    /// Clear all NVRAM variables on the device.
+    pub async fn clear_nvram(&self) -> Result<(), SshError> {
+        let result = self.execute("/usr/sbin/nvram -c").await?;
+        if !result.success() {
+            return Err(SshError::RemoteCommand(result.exit_status()));
+        }
+        Ok(())
+    }
+
+    /// Set the device clock from the host epoch time (seconds).
+    pub async fn fix_datetime(&self, epoch: u64) -> Result<(), SshError> {
+        let result = self.execute(&format!("date -s @{epoch}")).await?;
+        if !result.success() {
+            return Err(SshError::RemoteCommand(result.exit_status()));
+        }
+        Ok(())
+    }
+
+    /// Trigger "Erase All Content and Settings" on iOS 9+ by setting the
+    /// obliteration NVRAM marker. Takes effect on the next boot.
+    pub async fn erase_ios9(&self) -> Result<(), SshError> {
+        let result = self.execute("/usr/sbin/nvram oblit-inprogress=5").await?;
+        if !result.success() {
+            return Err(SshError::RemoteCommand(result.exit_status()));
+        }
+        Ok(())
+    }
+
+    /// Perform the iOS 7/8 "Erase All Content and Settings" procedure: swap in
+    /// a SpringBoard plist that wipes on failed passcode entry, then reboot.
+    /// The device drops the SSH connection during the final reboot.
+    pub async fn erase_ios78(&self) -> Result<(), SshError> {
+        for command in [
+            "/sbin/mount_hfs /dev/disk0s1s1 /mnt1; /sbin/mount_hfs /dev/disk0s1s2 /mnt2; cp /com.apple.springboard.plist /mnt1/",
+            "cd /mnt2/mobile/Library/Preferences; mv com.apple.springboard.plist com.apple.springboard.plist.bak; ln -s /com.apple.springboard.plist ./com.apple.springboard.plist",
+            "rm /mnt2/mobile/Library/SpringBoard/LockoutStateJournal.plist",
+        ] {
+            let result = self.execute(command).await?;
+            if !result.success() {
+                return Err(SshError::RemoteCommand(result.exit_status()));
+            }
+        }
+        // The reboot kills the SSH session; a lost reply is expected.
+        let _ = self
+            .execute("sync; cd /; /sbin/umount /mnt2; /sbin/umount /mnt1; sync; /sbin/reboot")
+            .await;
+        Ok(())
+    }
+
     /// Build and fetch the baseband firmware tar from the mounted root
     /// filesystem.
     pub async fn dump_baseband(&self) -> Result<Vec<u8>, SshError> {

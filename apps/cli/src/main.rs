@@ -221,6 +221,48 @@ enum RamdiskCommand {
         #[arg(long)]
         yes: bool,
     },
+    /// Clear all NVRAM variables on the device.
+    NvramClear {
+        #[arg(long)]
+        device_id: Option<u32>,
+        #[arg(long, default_value = "root")]
+        username: String,
+        #[arg(long)]
+        host_key: Option<String>,
+        #[arg(long)]
+        yes: bool,
+    },
+    /// Set the device clock to the host time.
+    FixDatetime {
+        #[arg(long)]
+        device_id: Option<u32>,
+        #[arg(long, default_value = "root")]
+        username: String,
+        #[arg(long)]
+        host_key: Option<String>,
+    },
+    /// Trigger erase-all-content-and-settings on an iOS 9+ device.
+    Erase9 {
+        #[arg(long)]
+        device_id: Option<u32>,
+        #[arg(long, default_value = "root")]
+        username: String,
+        #[arg(long)]
+        host_key: Option<String>,
+        #[arg(long)]
+        yes: bool,
+    },
+    /// Perform the erase-all-content-and-settings procedure on iOS 7/8.
+    Erase78 {
+        #[arg(long)]
+        device_id: Option<u32>,
+        #[arg(long, default_value = "root")]
+        username: String,
+        #[arg(long)]
+        host_key: Option<String>,
+        #[arg(long)]
+        yes: bool,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -2230,6 +2272,67 @@ async fn main() -> Result<()> {
                 .context("TrollStore installation failed")?;
             ssh.disconnect().await?;
             write_status(output, "installed-trollstore")?;
+        }
+        Command::Ramdisk {
+            command:
+                RamdiskCommand::NvramClear {
+                    device_id,
+                    username,
+                    host_key,
+                    yes,
+                },
+        } => {
+            confirm("clear the device NVRAM", yes)?;
+            let ssh = connect_ramdisk_ssh(&kit, device_id, &username, host_key).await?;
+            ssh.clear_nvram().await?;
+            ssh.disconnect().await?;
+            write_status(output, "cleared-nvram")?;
+        }
+        Command::Ramdisk {
+            command:
+                RamdiskCommand::FixDatetime {
+                    device_id,
+                    username,
+                    host_key,
+                },
+        } => {
+            let ssh = connect_ramdisk_ssh(&kit, device_id, &username, host_key).await?;
+            let epoch = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map_err(|error| anyhow!("system clock error: {error}"))?
+                .as_secs();
+            ssh.fix_datetime(epoch).await?;
+            ssh.disconnect().await?;
+            write_status(output, "fixed-datetime")?;
+        }
+        Command::Ramdisk {
+            command:
+                RamdiskCommand::Erase9 {
+                    device_id,
+                    username,
+                    host_key,
+                    yes,
+                },
+        } => {
+            confirm("mark the device for erase on next boot (iOS 9+)", yes)?;
+            let ssh = connect_ramdisk_ssh(&kit, device_id, &username, host_key).await?;
+            ssh.erase_ios9().await?;
+            ssh.disconnect().await?;
+            write_status(output, "erase-armed")?;
+        }
+        Command::Ramdisk {
+            command:
+                RamdiskCommand::Erase78 {
+                    device_id,
+                    username,
+                    host_key,
+                    yes,
+                },
+        } => {
+            confirm("erase all content and settings (iOS 7/8)", yes)?;
+            let ssh = connect_ramdisk_ssh(&kit, device_id, &username, host_key).await?;
+            ssh.erase_ios78().await?;
+            write_status(output, "erase-triggered")?;
         }
         Command::Shsh {
             command:
