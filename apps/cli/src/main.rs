@@ -319,6 +319,8 @@ enum RestoreCommand {
         behavior: RestoreBehaviorArg,
         #[arg(long, value_enum, default_value_t = ExploitArg::AlreadyPwned)]
         exploit: ExploitArg,
+        #[arg(long)]
+        limera1n_payload: Option<PathBuf>,
         #[arg(long, conflicts_with = "no_baseband")]
         baseband: Option<PathBuf>,
         #[arg(long)]
@@ -817,6 +819,7 @@ async fn main() -> Result<()> {
                     work_dir,
                     behavior,
                     exploit,
+                    limera1n_payload,
                     baseband,
                     no_baseband,
                     sep,
@@ -852,8 +855,15 @@ async fn main() -> Result<()> {
             let work_directory = work_dir
                 .or_else(|| config.storage.work_dir.clone())
                 .unwrap_or_else(|| std::env::temp_dir().join("legacy-ios-kit"));
-            let request = RestoreExecutionRequest::new(plan, consent, ticket, work_directory)
+            let mut request = RestoreExecutionRequest::new(plan, consent, ticket, work_directory)
                 .with_flash_version_1(flash_version_1);
+            if let Some(path) = limera1n_payload {
+                request = request.with_limera1n_payload(
+                    tokio::fs::read(&path)
+                        .await
+                        .with_context(|| format!("failed to read {}", path.display()))?,
+                );
+            }
             consume_operation(output, kit.execute_restore(request)).await?;
         }
         Command::Shsh {
