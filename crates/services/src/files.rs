@@ -1,4 +1,4 @@
-use std::{fmt, str::FromStr};
+use std::{fmt, io::SeekFrom, str::FromStr};
 
 use idevice::{
     IdeviceService,
@@ -6,6 +6,7 @@ use idevice::{
 };
 use serde::Serialize;
 use thiserror::Error;
+use tokio::io::AsyncSeekExt;
 
 use crate::{NormalDevice, ServiceError};
 
@@ -70,6 +71,7 @@ impl DeviceFiles {
             size: info.size as u64,
             kind: DeviceFileKind::from_afc(info.st_ifmt),
             link_target: info.st_link_target,
+            modified_unix: info.modified.and_utc().timestamp(),
         })
     }
 
@@ -91,6 +93,59 @@ impl DeviceFiles {
         let data = file.read_entire().await?;
         file.close().await?;
         Ok(data)
+    }
+
+    /// Read up to `len` bytes starting at `offset`, opening and closing the
+    /// device file around the transfer. Returns fewer bytes at end of file.
+    pub async fn read_at(
+        &mut self,
+        path: &AfcPath,
+        offset: u64,
+        len: usize,
+    ) -> Result<Vec<u8>, ServiceError> {
+        let mut file = self
+            .client
+            .open(path.as_str(), AfcFopenMode::RdOnly)
+            .await?;
+        let result = async {
+            file.seek(SeekFrom::Start(offset)).await?;
+            Ok::<Vec<u8>, ServiceError>(file.read_n(len).await?)
+        }
+        .await;
+        let close = file.close().await;
+        let data = result?;
+        close?;
+        Ok(data)
+    }
+
+    /// Write `data` starting at `offset` in an existing device file.
+    pub async fn write_at(
+        &mut self,
+        path: &AfcPath,
+        offset: u64,
+        data: &[u8],
+    ) -> Result<(), ServiceError> {
+        let mut file = self.client.open(path.as_str(), AfcFopenMode::Rw).await?;
+        let result = async {
+            file.seek(SeekFrom::Start(offset)).await?;
+            file.write_entire(data).await?;
+            Ok::<(), ServiceError>(())
+        }
+        .await;
+        let close = file.close().await;
+        result?;
+        close?;
+        Ok(())
+    }
+
+    /// Create an empty device file, truncating it when it already exists.
+    pub async fn create_file(&mut self, path: &AfcPath) -> Result<(), ServiceError> {
+        let file = self
+            .client
+            .open(path.as_str(), AfcFopenMode::WrOnly)
+            .await?;
+        file.close().await?;
+        Ok(())
     }
 
     pub async fn write(&mut self, path: &AfcPath, data: &[u8]) -> Result<(), ServiceError> {
@@ -140,6 +195,7 @@ pub struct DeviceFileInfo {
     size: u64,
     kind: DeviceFileKind,
     link_target: Option<String>,
+    modified_unix: i64,
 }
 
 impl DeviceFileInfo {
@@ -153,6 +209,26 @@ impl DeviceFileInfo {
 
     pub fn link_target(&self) -> Option<&str> {
         self.link_target.as_deref()
+    }
+
+    /// Last modification time as seconds since the Unix epoch.
+    pub const fn modified_unix(&self) -> i64 {
+        self.modified_unix
+    }
+
+    #[cfg(test)]
+    pub(crate) fn new_for_test(
+        size: u64,
+        kind: DeviceFileKind,
+        link_target: Option<String>,
+        modified_unix: i64,
+    ) -> Self {
+        Self {
+            size,
+            kind,
+            link_target,
+            modified_unix,
+        }
     }
 }
 

@@ -6,6 +6,7 @@ mod activation;
 mod app;
 mod backup;
 mod files;
+mod mount;
 mod normal;
 mod plist_service;
 mod ssh;
@@ -16,6 +17,7 @@ pub use backup::{BackupError, BackupOptions, BackupOutcome, BackupPassword, Back
 pub use files::{
     AfcPath, AfcPathError, DeviceFileInfo, DeviceFileKind, DeviceFiles, DeviceStorageInfo,
 };
+pub use mount::{MountError, MountGuard, MountOptions};
 pub use normal::{
     DeviceSyslog, DirectMux, MuxDevice, NormalBackend, NormalDevice, NormalDeviceInfo, NormalMux,
     PairingRecord, RawServiceConnection, ServiceError, SystemMux,

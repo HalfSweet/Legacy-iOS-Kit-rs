@@ -40,6 +40,7 @@ pub enum HostRequirementCode {
     UsbDeviceBusy,
     ReconnectDevice,
     UsbAccessUnavailable,
+    FuseDriver,
 }
 
 impl fmt::Display for HostRequirementCode {
@@ -50,6 +51,7 @@ impl fmt::Display for HostRequirementCode {
             Self::UsbDeviceBusy => "usb-device-busy",
             Self::ReconnectDevice => "reconnect-device",
             Self::UsbAccessUnavailable => "usb-access-unavailable",
+            Self::FuseDriver => "fuse-driver",
         };
         formatter.write_str(value)
     }
@@ -89,21 +91,47 @@ impl UsbHostDevice {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct HostRequirement {
     code: HostRequirementCode,
-    connection_id: ConnectionId,
-    mode: DeviceMode,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    connection_id: Option<ConnectionId>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    mode: Option<DeviceMode>,
     message: String,
 }
 
 impl HostRequirement {
+    /// Create a host-level requirement that is not tied to a specific device.
+    pub fn new(code: HostRequirementCode, message: impl Into<String>) -> Self {
+        Self {
+            code,
+            connection_id: None,
+            mode: None,
+            message: message.into(),
+        }
+    }
+
+    fn for_device(
+        code: HostRequirementCode,
+        connection_id: ConnectionId,
+        mode: DeviceMode,
+        message: impl Into<String>,
+    ) -> Self {
+        Self {
+            code,
+            connection_id: Some(connection_id),
+            mode: Some(mode),
+            message: message.into(),
+        }
+    }
+
     pub const fn code(&self) -> HostRequirementCode {
         self.code
     }
 
-    pub fn connection_id(&self) -> &ConnectionId {
-        &self.connection_id
+    pub fn connection_id(&self) -> Option<&ConnectionId> {
+        self.connection_id.as_ref()
     }
 
-    pub const fn mode(&self) -> DeviceMode {
+    pub const fn mode(&self) -> Option<DeviceMode> {
         self.mode
     }
 
@@ -219,12 +247,12 @@ fn requirement(
             "Direct USB access is unavailable on this host configuration.",
         ),
     };
-    Some(HostRequirement {
+    Some(HostRequirement::for_device(
         code,
         connection_id,
         mode,
-        message: message.to_owned(),
-    })
+        message,
+    ))
 }
 
 #[cfg(test)]

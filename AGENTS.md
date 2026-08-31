@@ -11,7 +11,11 @@ The public library is `legacy-ios-kit`; the reference CLI is `lik`.
 ## Non-Negotiable Constraints
 
 - Do not invoke host-side shells, command-line tools, or subprocess fallbacks.
-- Do not add C FFI compatibility layers or bundle host executables.
+- Do not add C FFI compatibility layers or bundle host executables. The sole
+  exception is the `fuser` crate, which wraps the system FUSE driver
+  (libfuse/macFUSE/WinFsp); those drivers are declared host preconditions.
+  Device mounting lives in `crates/services/src/mount/` with platform code
+  confined to `services::mount::platform`.
 - Device payloads and binary patches are data assets, not host tools. Every
   asset must record its source, source revision, digest, purpose, and
   redistribution status.

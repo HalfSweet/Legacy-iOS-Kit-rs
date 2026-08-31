@@ -21,5 +21,14 @@ tracing.workspace = true
 uuid = { version = "1.16.0", features = ["v4"] }
 zeroize = "=1.9.0"
 
+# FUSE mounting backend. On Linux/BSD, fuser 0.18 mounts through /dev/fuse in
+# pure Rust, so no system library is needed at build time; a missing driver is
+# reported at mount time as a host requirement. macOS would require macFUSE at
+# build time (pkg-config fuse), which hosts without the driver cannot satisfy,
+# so the dependency is excluded there and the stub backend reports the
+# requirement at runtime instead.
+[target.'cfg(all(unix, not(target_os = "macos")))'.dependencies]
+fuser = "=0.18.0"
+
 [lints]
 workspace = true

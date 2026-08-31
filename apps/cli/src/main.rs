@@ -14,13 +14,13 @@ use legacy_ios_kit::{
     BackupRestoreOptions, BasebandPolicy, BoardConfig, BootNonce, CustomRootfsRequest,
     DeviceDiagnostics, DeviceFileInfo, DeviceInventory, DeviceStorageInfo, DeviceSummary,
     DmgFirmwareKey, Ecid, ExploitPolicy, FirmwareSummary, HfsEntrySummary, HfsMutation,
-    HfsStatSummary, HostKeyPolicy, ImageCipher, InstalledApp, LegacyIosKit, NoncePolicy,
-    OperationEvent, OperationHandle, OperationOutcome, ProductType, RamdiskBootExecutionRequest,
-    RamdiskBootRequest, RamdiskBuildRequest, RamdiskBuildSummary, RamdiskSsh, RecoveryDeviceInfo,
-    RecoveryUploadResult, RemoteFirmwareSummary, ResourceId, RestoreBehavior,
-    RestoreExecutionRequest, RestorePlan, RestoreRequest, ScpPath, SepPolicy, ShshRequest,
-    ShshSummary, SigningTicket, SshCommandOutput, SshPassword, SshTarget, TicketPolicy, Udid,
-    UsbHostDiagnostics,
+    HfsStatSummary, HostKeyPolicy, ImageCipher, InstalledApp, LegacyIosKit, MountOptions,
+    NoncePolicy, OperationEvent, OperationHandle, OperationOutcome, ProductType,
+    RamdiskBootExecutionRequest, RamdiskBootRequest, RamdiskBuildRequest, RamdiskBuildSummary,
+    RamdiskSsh, RecoveryDeviceInfo, RecoveryUploadResult, RemoteFirmwareSummary, ResourceId,
+    RestoreBehavior, RestoreExecutionRequest, RestorePlan, RestoreRequest, ScpPath, SepPolicy,
+    ShshRequest, ShshSummary, SigningTicket, SshCommandOutput, SshPassword, SshTarget,
+    TicketPolicy, Udid, UsbHostDiagnostics,
 };
 use tracing::level_filters::LevelFilter;
 use tracing::{debug, info, warn};
@@ -395,6 +395,18 @@ enum DataCommand {
         destination: AfcPath,
         #[arg(long)]
         yes: bool,
+    },
+    /// Mount the device media directory over FUSE until Ctrl-C.
+    Mount {
+        udid: Udid,
+        /// Existing empty host directory to mount on.
+        mountpoint: PathBuf,
+        /// Mount this app's Documents container instead of the media directory.
+        #[arg(long)]
+        documents: Option<String>,
+        /// Mount read-only.
+        #[arg(long)]
+        read_only: bool,
     },
 }
 
@@ -1386,6 +1398,28 @@ async fn main() -> Result<()> {
                 .rename(&source, &destination)
                 .await?;
             write_status(output, "moved-path")?;
+        }
+        Command::Data {
+            command:
+                DataCommand::Mount {
+                    udid,
+                    mountpoint,
+                    documents,
+                    read_only,
+                },
+        } => {
+            let files = match &documents {
+                Some(bundle_id) => kit.devices().app_documents(&udid, bundle_id).await?,
+                None => kit.devices().files(&udid).await?,
+            };
+            let guard = files
+                .mount(&mountpoint, MountOptions::default().read_only(read_only))
+                .context("failed to mount device files")?;
+            write_status(output, "mounted")?;
+            info!(mountpoint = %mountpoint.display(), "mounted; press Ctrl-C to unmount");
+            tokio::signal::ctrl_c().await?;
+            guard.unmount().context("failed to unmount device files")?;
+            write_status(output, "unmounted")?;
         }
         Command::Device {
             command: DeviceCommand::List,
@@ -3592,13 +3626,22 @@ fn write_host_requirements(format: OutputFormat, diagnostics: &UsbHostDiagnostic
                 writeln!(output)?;
             }
             for requirement in diagnostics.requirements() {
-                writeln!(
-                    output,
-                    "Requirement [{}] {}: {}",
-                    requirement.code(),
-                    requirement.connection_id(),
-                    requirement.message()
-                )?;
+                if let Some(connection_id) = requirement.connection_id() {
+                    writeln!(
+                        output,
+                        "Requirement [{}] {}: {}",
+                        requirement.code(),
+                        connection_id,
+                        requirement.message()
+                    )?;
+                } else {
+                    writeln!(
+                        output,
+                        "Requirement [{}]: {}",
+                        requirement.code(),
+                        requirement.message()
+                    )?;
+                }
             }
         }
     }
