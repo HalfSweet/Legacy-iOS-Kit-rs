@@ -12,9 +12,11 @@ cbc = "=0.1.2"
 crc32fast = "=1.5.1"
 flate2 = { version = "=1.1.10", default-features = false, features = ["rust_backend"] }
 hfsplus = "=0.2.4"
+hmac = "=0.12.1"
 legacy-ios-core = { path = "../core" }
 lzfse_rust = "=0.2.1"
 plist = "=1.10.0"
+sha1 = "=0.10.6"
 thiserror.workspace = true
 
 [dev-dependencies]

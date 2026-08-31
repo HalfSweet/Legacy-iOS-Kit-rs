@@ -1654,9 +1654,11 @@ dependencies = [
  "flate2",
  "hex",
  "hfsplus",
+ "hmac 0.12.1",
  "legacy-ios-core",
  "lzfse_rust",
  "plist",
+ "sha1 0.10.6",
  "thiserror 2.0.20",
 ]
 

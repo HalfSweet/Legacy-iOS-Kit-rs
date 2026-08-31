@@ -13,7 +13,9 @@ mod onboard;
 mod patch;
 
 pub use crypto::{CryptoError, decrypt_cbc, encrypt_cbc};
-pub use dmg::{DmgError, DmgImage, DmgPartition, DmgPartitionInput};
+pub use dmg::{
+    DmgError, DmgFirmwareKey, DmgImage, DmgPartition, DmgPartitionInput, decrypt_firmware_image,
+};
 pub use fls::{FlsError, FlsFile};
 pub use hfs::{HfsEntry, HfsEntryKind, HfsError, HfsImage, HfsStat};
 pub use img3::{Img3, Img3Element, Img3Error, Img3Tag};

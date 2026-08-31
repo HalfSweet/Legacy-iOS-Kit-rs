@@ -1,9 +1,16 @@
-use std::io::{Cursor, Read, Write};
+use std::{
+    fmt,
+    io::{Cursor, Read, Write},
+};
 
 use bzip2_rs::DecoderReader;
 use flate2::{Compression, read::ZlibDecoder, write::ZlibEncoder};
+use hmac::{Hmac, Mac};
 use plist::{Dictionary, Value};
+use sha1::Sha1;
 use thiserror::Error;
+
+use crate::{CryptoError, decrypt_cbc};
 
 const SECTOR_SIZE: usize = 512;
 const KOLY_SIZE: usize = 512;
@@ -20,6 +27,10 @@ const CHUNK_ZLIB: u32 = 0x8000_0005;
 const CHUNK_BZLIB: u32 = 0x8000_0006;
 const CHUNK_LZFSE: u32 = 0x8000_0007;
 const CHUNK_TERM: u32 = 0xffff_ffff;
+const FILEVAULT_V2_SIGNATURE: &[u8; 8] = b"encrcdsa";
+const FILEVAULT_BLOCK_SIZE_OFFSET: usize = 52;
+const FILEVAULT_DATA_SIZE_OFFSET: usize = 56;
+const FILEVAULT_DATA_OFFSET_OFFSET: usize = 64;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct DmgImage {
@@ -142,6 +153,10 @@ impl DmgImage {
         Self::parse(data)
     }
 
+    pub fn parse_encrypted(data: Vec<u8>, key: &DmgFirmwareKey) -> Result<Self, DmgError> {
+        Self::parse(decrypt_firmware_image(&data, key)?)
+    }
+
     pub fn partitions(&self) -> &[DmgPartition] {
         &self.partitions
     }
@@ -225,6 +240,74 @@ impl DmgImage {
         }
         Ok(output)
     }
+}
+
+#[derive(Clone)]
+pub struct DmgFirmwareKey {
+    aes: [u8; 16],
+    hmac: [u8; 20],
+}
+
+impl DmgFirmwareKey {
+    pub fn from_hex(value: &str) -> Result<Self, DmgError> {
+        if value.len() != 72 {
+            return Err(DmgError::InvalidFirmwareKey);
+        }
+        let mut bytes = [0; 36];
+        for (index, byte) in bytes.iter_mut().enumerate() {
+            *byte = u8::from_str_radix(&value[index * 2..index * 2 + 2], 16)
+                .map_err(|_| DmgError::InvalidFirmwareKey)?;
+        }
+        let mut aes = [0; 16];
+        aes.copy_from_slice(&bytes[..16]);
+        let mut hmac = [0; 20];
+        hmac.copy_from_slice(&bytes[16..]);
+        Ok(Self { aes, hmac })
+    }
+}
+
+impl fmt::Debug for DmgFirmwareKey {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("DmgFirmwareKey")
+            .finish_non_exhaustive()
+    }
+}
+
+pub fn decrypt_firmware_image(data: &[u8], key: &DmgFirmwareKey) -> Result<Vec<u8>, DmgError> {
+    if data.get(..8) != Some(FILEVAULT_V2_SIGNATURE.as_slice()) {
+        return Err(DmgError::MissingFileVaultHeader);
+    }
+    let block_size = usize::try_from(read_u32(data, FILEVAULT_BLOCK_SIZE_OFFSET)?)
+        .map_err(|_| DmgError::EncryptedImageTooLarge)?;
+    if block_size == 0 || !block_size.is_multiple_of(16) {
+        return Err(DmgError::InvalidFileVaultBlockSize(block_size));
+    }
+    let data_size = usize::try_from(read_u64(data, FILEVAULT_DATA_SIZE_OFFSET)?)
+        .map_err(|_| DmgError::EncryptedImageTooLarge)?;
+    let data_offset = usize::try_from(read_u64(data, FILEVAULT_DATA_OFFSET_OFFSET)?)
+        .map_err(|_| DmgError::EncryptedImageTooLarge)?;
+    let encrypted_size = data_size
+        .div_ceil(block_size)
+        .checked_mul(block_size)
+        .ok_or(DmgError::EncryptedImageTooLarge)?;
+    let encrypted_end = data_offset
+        .checked_add(encrypted_size)
+        .ok_or(DmgError::EncryptedImageTooLarge)?;
+    let encrypted = data
+        .get(data_offset..encrypted_end)
+        .ok_or(DmgError::InvalidEncryptedDataRange)?;
+    let mut output = Vec::with_capacity(encrypted_size);
+    for (index, chunk) in encrypted.chunks_exact(block_size).enumerate() {
+        let index = u32::try_from(index).map_err(|_| DmgError::EncryptedImageTooLarge)?;
+        let mut hmac =
+            Hmac::<Sha1>::new_from_slice(&key.hmac).map_err(|_| DmgError::InvalidFirmwareKey)?;
+        hmac.update(&index.to_be_bytes());
+        let digest = hmac.finalize().into_bytes();
+        output.extend_from_slice(&decrypt_cbc(chunk, &key.aes, &digest[..16])?);
+    }
+    output.truncate(data_size);
+    Ok(output)
 }
 
 fn decode_adc(input: &[u8], expected_size: usize) -> Result<Vec<u8>, DmgError> {
@@ -528,6 +611,18 @@ pub enum DmgError {
     Io(#[from] std::io::Error),
     #[error("DMG plist failed: {0}")]
     Plist(#[from] plist::Error),
+    #[error("DMG firmware key must contain 72 hexadecimal characters")]
+    InvalidFirmwareKey,
+    #[error("DMG has no FileVault v2 header")]
+    MissingFileVaultHeader,
+    #[error("DMG FileVault block size {0} is invalid")]
+    InvalidFileVaultBlockSize(usize),
+    #[error("encrypted DMG is too large for this host")]
+    EncryptedImageTooLarge,
+    #[error("encrypted DMG data points outside the image")]
+    InvalidEncryptedDataRange,
+    #[error("encrypted DMG cryptography failed: {0}")]
+    Crypto(#[from] CryptoError),
 }
 
 #[cfg(test)]
@@ -659,5 +754,47 @@ mod tests {
         };
 
         assert_eq!(image.extract(0).unwrap(), expected);
+    }
+
+    #[test]
+    fn decrypts_filevault_firmware_image() {
+        use crate::encrypt_cbc;
+
+        let plain = DmgImage::build(vec![DmgPartitionInput::new(
+            "Apple_HFS",
+            vec![0x42; SECTOR_SIZE],
+        )])
+        .unwrap()
+        .into_bytes();
+        let key_hex = concat!(
+            "000102030405060708090a0b0c0d0e0f",
+            "101112131415161718191a1b1c1d1e1f20212223"
+        );
+        let key = DmgFirmwareKey::from_hex(key_hex).unwrap();
+        let block_size = 4096;
+        let data_offset = 4096;
+        let mut encrypted = vec![0; data_offset];
+        encrypted[..8].copy_from_slice(FILEVAULT_V2_SIGNATURE);
+        encrypted[FILEVAULT_BLOCK_SIZE_OFFSET..FILEVAULT_BLOCK_SIZE_OFFSET + 4]
+            .copy_from_slice(&(block_size as u32).to_be_bytes());
+        encrypted[FILEVAULT_DATA_SIZE_OFFSET..FILEVAULT_DATA_SIZE_OFFSET + 8]
+            .copy_from_slice(&(plain.len() as u64).to_be_bytes());
+        encrypted[FILEVAULT_DATA_OFFSET_OFFSET..FILEVAULT_DATA_OFFSET_OFFSET + 8]
+            .copy_from_slice(&(data_offset as u64).to_be_bytes());
+        let mut padded = plain.clone();
+        padded.resize(plain.len().next_multiple_of(block_size), 0);
+        for (index, chunk) in padded.chunks(block_size).enumerate() {
+            let mut hmac = Hmac::<Sha1>::new_from_slice(&key.hmac).unwrap();
+            hmac.update(&(index as u32).to_be_bytes());
+            let digest = hmac.finalize().into_bytes();
+            encrypted.extend_from_slice(
+                encrypt_cbc(chunk, &key.aes, &digest[..16])
+                    .unwrap()
+                    .as_slice(),
+            );
+        }
+
+        let image = DmgImage::parse_encrypted(encrypted, &key).unwrap();
+        assert_eq!(image.extract(0).unwrap(), vec![0x42; SECTOR_SIZE]);
     }
 }
