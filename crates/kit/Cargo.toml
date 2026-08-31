@@ -11,6 +11,7 @@ legacy-ios-assets = { path = "../assets" }
 legacy-ios-core = { path = "../core" }
 legacy-ios-exploits = { path = "../exploits" }
 legacy-ios-firmware = { path = "../firmware" }
+legacy-ios-image = { path = "../image" }
 legacy-ios-restore = { path = "../restore" }
 legacy-ios-services = { path = "../services" }
 legacy-ios-transport = { path = "../transport" }

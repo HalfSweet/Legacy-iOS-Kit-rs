@@ -83,6 +83,14 @@ impl LegacyIosKit {
         RemoteFirmwareSummary::inspect(url.into()).await
     }
 
+    pub fn convert_onboard_dump(&self, dump: &[u8]) -> Result<SigningTicket, KitError> {
+        let ticket = legacy_ios_image::OnboardTicket::parse(dump)?;
+        Ok(SigningTicket::from_img4_ticket(
+            ticket.im4m().to_vec(),
+            ticket.generator().map(ToOwned::to_owned),
+        )?)
+    }
+
     pub fn resolve_device_identity(
         &self,
         product_type: ProductType,

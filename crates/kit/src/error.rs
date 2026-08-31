@@ -20,6 +20,10 @@ pub enum KitError {
     Signing(#[from] legacy_ios_firmware::TssError),
     #[error("property list operation failed: {0}")]
     Plist(#[from] plist::Error),
+    #[error("onboard ticket conversion failed: {0}")]
+    OnboardTicket(#[from] legacy_ios_image::OnboardTicketError),
+    #[error("signing ticket operation failed: {0}")]
+    Ticket(#[from] legacy_ios_firmware::TicketError),
     #[error("restore planning failed: {0}")]
     RestorePlan(#[from] legacy_ios_workflows::RestorePlanError),
     #[error("restore preparation failed: {0}")]
@@ -69,7 +73,9 @@ impl KitError {
             | Self::UnknownProduct(_)
             | Self::UnknownBoardConfig { .. }
             | Self::MissingDeviceSelector => OperationPhase::Planning,
-            Self::Signing(_) | Self::Plist(_) => OperationPhase::Personalizing,
+            Self::Signing(_) | Self::Plist(_) | Self::OnboardTicket(_) | Self::Ticket(_) => {
+                OperationPhase::Personalizing
+            }
             Self::Transport(_)
             | Self::Service(_)
             | Self::Ssh(_)
@@ -110,6 +116,8 @@ impl KitError {
             | Self::RestorePreparation(_)
             | Self::AutomaticExploitUnsupported(_)
             | Self::MissingLimera1nPayload
+            | Self::OnboardTicket(_)
+            | Self::Ticket(_)
             | Self::UnknownProduct(_)
             | Self::UnknownBoardConfig { .. }
             | Self::MissingDeviceSelector => Recoverability::NotRecoverable,
