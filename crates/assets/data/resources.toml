@@ -1008,3 +1008,399 @@ sha256 = "77b47dd6476cbdfdf70cb132711b9a70640f8a21254717364a061b35f6362db2"
 size = 6996240
 purpose = "Smaller Cydia bootstrap payload for iPhone2,1 on iOS 4.3.x (upstream verifies by SHA-1 15c92613d4f7e6bbabd9bd3521db8e4baf032265)"
 redistribution = "download-only"
+[[resources]]
+id = "fourthree-patch-iPad2-1-4.3-LLB.k93ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/patch/fourthree/iPad2,1/4.3/LLB.k93ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "d3f45846a23cf40fb14194608ac98ed9a8384f933ae102e886af24432b8f4d67"
+size = 1616
+purpose = "bsdiff patch for the FourThree dualboot LLB on iPad2,1 iOS 4.3"
+redistribution = "download-only"
+
+[[resources]]
+id = "fourthree-patch-iPad2-1-4.3-kernelcache.release"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/patch/fourthree/iPad2,1/4.3/kernelcache.release.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "06f10dfed80ba016a749af1b2c7215184d91e2a48d076c180e47f49dd4f1e882"
+size = 433668
+purpose = "bsdiff patch for the FourThree dualboot kernelcache on iPad2,1 iOS 4.3"
+redistribution = "download-only"
+
+[[resources]]
+id = "fourthree-patch-iPad2-1-4.3.1-LLB.k93ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/patch/fourthree/iPad2,1/4.3.1/LLB.k93ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "d3f45846a23cf40fb14194608ac98ed9a8384f933ae102e886af24432b8f4d67"
+size = 1616
+purpose = "bsdiff patch for the FourThree dualboot LLB on iPad2,1 iOS 4.3.1"
+redistribution = "download-only"
+
+[[resources]]
+id = "fourthree-patch-iPad2-1-4.3.1-kernelcache.release"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/patch/fourthree/iPad2,1/4.3.1/kernelcache.release.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "d7d3f4c5450637bd64ff6fc3a5e6ac9add572737cd1abc1173bd7ef60ee75409"
+size = 430040
+purpose = "bsdiff patch for the FourThree dualboot kernelcache on iPad2,1 iOS 4.3.1"
+redistribution = "download-only"
+
+[[resources]]
+id = "fourthree-patch-iPad2-1-4.3.2-LLB.k93ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/patch/fourthree/iPad2,1/4.3.2/LLB.k93ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "1ae2c120f936a0fe30098d78e0347897da550d1657420c8b8a40b30b6e8b9db6"
+size = 222
+purpose = "bsdiff patch for the FourThree dualboot LLB on iPad2,1 iOS 4.3.2"
+redistribution = "download-only"
+
+[[resources]]
+id = "fourthree-patch-iPad2-1-4.3.2-kernelcache.release"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/patch/fourthree/iPad2,1/4.3.2/kernelcache.release.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "cf7b41ac5c4d18c940fe4a2125219d6d2a0646d0e870d8078830ae1a605f4c52"
+size = 96852
+purpose = "bsdiff patch for the FourThree dualboot kernelcache on iPad2,1 iOS 4.3.2"
+redistribution = "download-only"
+
+[[resources]]
+id = "fourthree-patch-iPad2-1-4.3.3-LLB.k93ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/patch/fourthree/iPad2,1/4.3.3/LLB.k93ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "1ae2c120f936a0fe30098d78e0347897da550d1657420c8b8a40b30b6e8b9db6"
+size = 222
+purpose = "bsdiff patch for the FourThree dualboot LLB on iPad2,1 iOS 4.3.3"
+redistribution = "download-only"
+
+[[resources]]
+id = "fourthree-patch-iPad2-1-4.3.3-kernelcache.release"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/patch/fourthree/iPad2,1/4.3.3/kernelcache.release.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "dcbe6e141e10641463b5bd103f4da1d6ab6bcf137535d2ce251cc1c51eb38b03"
+size = 87527
+purpose = "bsdiff patch for the FourThree dualboot kernelcache on iPad2,1 iOS 4.3.3"
+redistribution = "download-only"
+
+[[resources]]
+id = "fourthree-patch-iPad2-1-4.3.4-LLB.k93ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/patch/fourthree/iPad2,1/4.3.4/LLB.k93ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "e649aff22d810e69d5276407cbb5ab0c07d887296341d75dbcf98132c554b308"
+size = 215
+purpose = "bsdiff patch for the FourThree dualboot LLB on iPad2,1 iOS 4.3.4"
+redistribution = "download-only"
+
+[[resources]]
+id = "fourthree-patch-iPad2-1-4.3.4-kernelcache.release"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/patch/fourthree/iPad2,1/4.3.4/kernelcache.release.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "3848ed69d6d06b776f4f8abe4d49319b9bd6c4dbf0d2567c6b6cdcbc92eaa2ce"
+size = 508
+purpose = "bsdiff patch for the FourThree dualboot kernelcache on iPad2,1 iOS 4.3.4"
+redistribution = "download-only"
+
+[[resources]]
+id = "fourthree-patch-iPad2-1-4.3.5-LLB.k93ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/patch/fourthree/iPad2,1/4.3.5/LLB.k93ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "e649aff22d810e69d5276407cbb5ab0c07d887296341d75dbcf98132c554b308"
+size = 215
+purpose = "bsdiff patch for the FourThree dualboot LLB on iPad2,1 iOS 4.3.5"
+redistribution = "download-only"
+
+[[resources]]
+id = "fourthree-patch-iPad2-1-4.3.5-kernelcache.release"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/patch/fourthree/iPad2,1/4.3.5/kernelcache.release.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "85776ef807c14bc78d3e4b986c192224ef9993f2c0c72a9cdea9fdb9fc0a8982"
+size = 33475
+purpose = "bsdiff patch for the FourThree dualboot kernelcache on iPad2,1 iOS 4.3.5"
+redistribution = "download-only"
+
+[[resources]]
+id = "fourthree-patch-iPad2-1-6.1.3-RestoreDeviceTree"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/patch/fourthree/iPad2,1/6.1.3/RestoreDeviceTree.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "b980f599a08a2401a2917b2695607a4aac4ca1d5963254d8e8b1dd61ea0e6cad"
+size = 163
+purpose = "bsdiff patch for the FourThree step 1 custom IPSW RestoreDeviceTree on iPad2,1"
+redistribution = "download-only"
+
+[[resources]]
+id = "fourthree-patch-iPad2-1-6.1.3-iBoot.k93ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/patch/fourthree/iPad2,1/6.1.3/iBoot.k93ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "f334585cece502d9531244343f8b6f316b9ff7153aab9df6aa2b4d2554e1699d"
+size = 583
+purpose = "bsdiff patch for the FourThree step 1 custom IPSW iBoot on iPad2,1"
+redistribution = "download-only"
+
+[[resources]]
+id = "fourthree-patch-iPad2-2-4.3-LLB.k94ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/patch/fourthree/iPad2,2/4.3/LLB.k94ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "d3f45846a23cf40fb14194608ac98ed9a8384f933ae102e886af24432b8f4d67"
+size = 1616
+purpose = "bsdiff patch for the FourThree dualboot LLB on iPad2,2 iOS 4.3"
+redistribution = "download-only"
+
+[[resources]]
+id = "fourthree-patch-iPad2-2-4.3-kernelcache.release"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/patch/fourthree/iPad2,2/4.3/kernelcache.release.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "0b81edf34851d942bda7ffc083ad85f13448a69981c291bdc673902408fc5ac1"
+size = 440247
+purpose = "bsdiff patch for the FourThree dualboot kernelcache on iPad2,2 iOS 4.3"
+redistribution = "download-only"
+
+[[resources]]
+id = "fourthree-patch-iPad2-2-4.3.1-LLB.k94ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/patch/fourthree/iPad2,2/4.3.1/LLB.k94ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "d3f45846a23cf40fb14194608ac98ed9a8384f933ae102e886af24432b8f4d67"
+size = 1616
+purpose = "bsdiff patch for the FourThree dualboot LLB on iPad2,2 iOS 4.3.1"
+redistribution = "download-only"
+
+[[resources]]
+id = "fourthree-patch-iPad2-2-4.3.1-kernelcache.release"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/patch/fourthree/iPad2,2/4.3.1/kernelcache.release.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "8ad8249500fce45869467a93725c40bccbe54af9d95f365b79f16d687b544a54"
+size = 437991
+purpose = "bsdiff patch for the FourThree dualboot kernelcache on iPad2,2 iOS 4.3.1"
+redistribution = "download-only"
+
+[[resources]]
+id = "fourthree-patch-iPad2-2-4.3.2-LLB.k94ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/patch/fourthree/iPad2,2/4.3.2/LLB.k94ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "1ae2c120f936a0fe30098d78e0347897da550d1657420c8b8a40b30b6e8b9db6"
+size = 222
+purpose = "bsdiff patch for the FourThree dualboot LLB on iPad2,2 iOS 4.3.2"
+redistribution = "download-only"
+
+[[resources]]
+id = "fourthree-patch-iPad2-2-4.3.2-kernelcache.release"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/patch/fourthree/iPad2,2/4.3.2/kernelcache.release.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "9b13342a82b7e1c4c28573a5abc5ddd15ef7d3bc61a1b8a435400a16f67e675f"
+size = 97902
+purpose = "bsdiff patch for the FourThree dualboot kernelcache on iPad2,2 iOS 4.3.2"
+redistribution = "download-only"
+
+[[resources]]
+id = "fourthree-patch-iPad2-2-4.3.3-LLB.k94ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/patch/fourthree/iPad2,2/4.3.3/LLB.k94ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "1ae2c120f936a0fe30098d78e0347897da550d1657420c8b8a40b30b6e8b9db6"
+size = 222
+purpose = "bsdiff patch for the FourThree dualboot LLB on iPad2,2 iOS 4.3.3"
+redistribution = "download-only"
+
+[[resources]]
+id = "fourthree-patch-iPad2-2-4.3.3-kernelcache.release"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/patch/fourthree/iPad2,2/4.3.3/kernelcache.release.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "9d4a29e3780ff49cc3d886ad30c91e1a39b17e84f4c239ce29a77df3bac2ce49"
+size = 88287
+purpose = "bsdiff patch for the FourThree dualboot kernelcache on iPad2,2 iOS 4.3.3"
+redistribution = "download-only"
+
+[[resources]]
+id = "fourthree-patch-iPad2-2-4.3.4-LLB.k94ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/patch/fourthree/iPad2,2/4.3.4/LLB.k94ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "e649aff22d810e69d5276407cbb5ab0c07d887296341d75dbcf98132c554b308"
+size = 215
+purpose = "bsdiff patch for the FourThree dualboot LLB on iPad2,2 iOS 4.3.4"
+redistribution = "download-only"
+
+[[resources]]
+id = "fourthree-patch-iPad2-2-4.3.4-kernelcache.release"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/patch/fourthree/iPad2,2/4.3.4/kernelcache.release.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "ba81bdf5146c0848768e44498eab5b2f27fb989dbd2a3d100d441de022d4efaf"
+size = 506
+purpose = "bsdiff patch for the FourThree dualboot kernelcache on iPad2,2 iOS 4.3.4"
+redistribution = "download-only"
+
+[[resources]]
+id = "fourthree-patch-iPad2-2-4.3.5-LLB.k94ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/patch/fourthree/iPad2,2/4.3.5/LLB.k94ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "e649aff22d810e69d5276407cbb5ab0c07d887296341d75dbcf98132c554b308"
+size = 215
+purpose = "bsdiff patch for the FourThree dualboot LLB on iPad2,2 iOS 4.3.5"
+redistribution = "download-only"
+
+[[resources]]
+id = "fourthree-patch-iPad2-2-4.3.5-kernelcache.release"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/patch/fourthree/iPad2,2/4.3.5/kernelcache.release.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "fa8c026f4684b9f43441a4ef0e26f1db73dfe0ced4d0281d6107eec888f699fa"
+size = 34809
+purpose = "bsdiff patch for the FourThree dualboot kernelcache on iPad2,2 iOS 4.3.5"
+redistribution = "download-only"
+
+[[resources]]
+id = "fourthree-patch-iPad2-2-6.1.3-RestoreDeviceTree"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/patch/fourthree/iPad2,2/6.1.3/RestoreDeviceTree.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "d553599011e47698c7706a71e742139b63dad417800d76a16335f9b54e243f99"
+size = 164
+purpose = "bsdiff patch for the FourThree step 1 custom IPSW RestoreDeviceTree on iPad2,2"
+redistribution = "download-only"
+
+[[resources]]
+id = "fourthree-patch-iPad2-2-6.1.3-iBoot.k94ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/patch/fourthree/iPad2,2/6.1.3/iBoot.k94ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "4d56b2e1b2564a715765fe73d36c292e161ba9120e8a1738bb65e77f14cff749"
+size = 317
+purpose = "bsdiff patch for the FourThree step 1 custom IPSW iBoot on iPad2,2"
+redistribution = "download-only"
+
+[[resources]]
+id = "fourthree-patch-iPad2-3-4.3-LLB.k95ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/patch/fourthree/iPad2,3/4.3/LLB.k95ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "d3f45846a23cf40fb14194608ac98ed9a8384f933ae102e886af24432b8f4d67"
+size = 1616
+purpose = "bsdiff patch for the FourThree dualboot LLB on iPad2,3 iOS 4.3"
+redistribution = "download-only"
+
+[[resources]]
+id = "fourthree-patch-iPad2-3-4.3-kernelcache.release"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/patch/fourthree/iPad2,3/4.3/kernelcache.release.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "28740d0a11737e94b5c82751fad3c00a084c5125e47a1e0f36d235bf56cc2f9b"
+size = 440391
+purpose = "bsdiff patch for the FourThree dualboot kernelcache on iPad2,3 iOS 4.3"
+redistribution = "download-only"
+
+[[resources]]
+id = "fourthree-patch-iPad2-3-4.3.1-LLB.k95ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/patch/fourthree/iPad2,3/4.3.1/LLB.k95ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "d3f45846a23cf40fb14194608ac98ed9a8384f933ae102e886af24432b8f4d67"
+size = 1616
+purpose = "bsdiff patch for the FourThree dualboot LLB on iPad2,3 iOS 4.3.1"
+redistribution = "download-only"
+
+[[resources]]
+id = "fourthree-patch-iPad2-3-4.3.1-kernelcache.release"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/patch/fourthree/iPad2,3/4.3.1/kernelcache.release.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "6a65c8bada33f08768d8d793dffadf38206fb06ceaa99fc6796fc2902144508b"
+size = 438025
+purpose = "bsdiff patch for the FourThree dualboot kernelcache on iPad2,3 iOS 4.3.1"
+redistribution = "download-only"
+
+[[resources]]
+id = "fourthree-patch-iPad2-3-4.3.2-LLB.k95ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/patch/fourthree/iPad2,3/4.3.2/LLB.k95ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "1ae2c120f936a0fe30098d78e0347897da550d1657420c8b8a40b30b6e8b9db6"
+size = 222
+purpose = "bsdiff patch for the FourThree dualboot LLB on iPad2,3 iOS 4.3.2"
+redistribution = "download-only"
+
+[[resources]]
+id = "fourthree-patch-iPad2-3-4.3.2-kernelcache.release"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/patch/fourthree/iPad2,3/4.3.2/kernelcache.release.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "1a4e116df788dccb4a9d23085eab5f34010c5707507bcf5acd1c0c5c8c5a91e0"
+size = 98261
+purpose = "bsdiff patch for the FourThree dualboot kernelcache on iPad2,3 iOS 4.3.2"
+redistribution = "download-only"
+
+[[resources]]
+id = "fourthree-patch-iPad2-3-4.3.3-LLB.k95ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/patch/fourthree/iPad2,3/4.3.3/LLB.k95ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "1ae2c120f936a0fe30098d78e0347897da550d1657420c8b8a40b30b6e8b9db6"
+size = 222
+purpose = "bsdiff patch for the FourThree dualboot LLB on iPad2,3 iOS 4.3.3"
+redistribution = "download-only"
+
+[[resources]]
+id = "fourthree-patch-iPad2-3-4.3.3-kernelcache.release"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/patch/fourthree/iPad2,3/4.3.3/kernelcache.release.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "01153dcd690071076b6a8a6d0ba5e82ae3f8e62f1d03a164ec9d2b53ff7d870e"
+size = 88477
+purpose = "bsdiff patch for the FourThree dualboot kernelcache on iPad2,3 iOS 4.3.3"
+redistribution = "download-only"
+
+[[resources]]
+id = "fourthree-patch-iPad2-3-4.3.4-LLB.k95ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/patch/fourthree/iPad2,3/4.3.4/LLB.k95ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "e649aff22d810e69d5276407cbb5ab0c07d887296341d75dbcf98132c554b308"
+size = 215
+purpose = "bsdiff patch for the FourThree dualboot LLB on iPad2,3 iOS 4.3.4"
+redistribution = "download-only"
+
+[[resources]]
+id = "fourthree-patch-iPad2-3-4.3.4-kernelcache.release"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/patch/fourthree/iPad2,3/4.3.4/kernelcache.release.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "ba81bdf5146c0848768e44498eab5b2f27fb989dbd2a3d100d441de022d4efaf"
+size = 506
+purpose = "bsdiff patch for the FourThree dualboot kernelcache on iPad2,3 iOS 4.3.4"
+redistribution = "download-only"
+
+[[resources]]
+id = "fourthree-patch-iPad2-3-4.3.5-LLB.k95ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/patch/fourthree/iPad2,3/4.3.5/LLB.k95ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "e649aff22d810e69d5276407cbb5ab0c07d887296341d75dbcf98132c554b308"
+size = 215
+purpose = "bsdiff patch for the FourThree dualboot LLB on iPad2,3 iOS 4.3.5"
+redistribution = "download-only"
+
+[[resources]]
+id = "fourthree-patch-iPad2-3-4.3.5-kernelcache.release"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/patch/fourthree/iPad2,3/4.3.5/kernelcache.release.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "b6b8f79818ede4736892b12fcedbffb6f05e8eaf32ed851a5d27cd153fea44f3"
+size = 34807
+purpose = "bsdiff patch for the FourThree dualboot kernelcache on iPad2,3 iOS 4.3.5"
+redistribution = "download-only"
+
+[[resources]]
+id = "fourthree-patch-iPad2-3-6.1.3-RestoreDeviceTree"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/patch/fourthree/iPad2,3/6.1.3/RestoreDeviceTree.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "b33150d733c7d5dc061ff8c89360797aad42e7bc5c38f67e1891066cb1633830"
+size = 162
+purpose = "bsdiff patch for the FourThree step 1 custom IPSW RestoreDeviceTree on iPad2,3"
+redistribution = "download-only"
+
+[[resources]]
+id = "fourthree-patch-iPad2-3-6.1.3-iBoot.k95ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/patch/fourthree/iPad2,3/6.1.3/iBoot.k95ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "4d56b2e1b2564a715765fe73d36c292e161ba9120e8a1738bb65e77f14cff749"
+size = 317
+purpose = "bsdiff patch for the FourThree step 1 custom IPSW iBoot on iPad2,3"
+redistribution = "download-only"
+
+[[resources]]
+id = "jailbreak-dualbootstuff"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/jailbreak/dualbootstuff.tar"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "c2cfec79af2eaf477cd40b4aa062f6b0449a99f2823953e0278e8abdc3f82fa4"
+size = 2078720
+purpose = "FourThree step 2 device-side packages (TwistedMind2 partitioner)"
+redistribution = "download-only"
+
+[[resources]]
+id = "jailbreak-fourthree-app"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/jailbreak/fourthree.tar"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "020d1d7d23cca6a068c48d0c34ba77698c9dbc5f645fb3adef6f1cb125922a2c"
+size = 100352
+purpose = "FourThree dualboot companion app installed on iOS 8.4.1"
+redistribution = "download-only"
+

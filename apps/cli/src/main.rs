@@ -604,6 +604,81 @@ enum DeviceCommand {
         #[arg(long)]
         yes: bool,
     },
+    /// FourThree dualboot: query the highest completed step on the device.
+    #[command(name = "fourthree-check")]
+    FourThreeCheck {
+        #[arg(long, default_value = "root")]
+        username: String,
+        #[arg(long)]
+        host_key: Option<String>,
+    },
+    /// FourThree step 2: partition a jailbroken iOS 8.4.1 iPad 2 over SSH.
+    #[command(name = "fourthree-step2")]
+    FourThreeStep2 {
+        /// GB to leave for the iOS 6.1.3 data partition (the rest goes to 4.3.x).
+        #[arg(long)]
+        size_gb: u32,
+        /// Directory to write the generated TwistedMind2 files to.
+        #[arg(long, default_value = ".")]
+        output_dir: PathBuf,
+        #[arg(long, default_value = "root")]
+        username: String,
+        #[arg(long)]
+        host_key: Option<String>,
+        #[arg(long)]
+        yes: bool,
+    },
+    /// FourThree step 3: install the 4.3.x dualboot system over SSH.
+    #[command(name = "fourthree-step3")]
+    FourThreeStep3 {
+        /// Device product type: iPad2,1, iPad2,2, or iPad2,3.
+        #[arg(long)]
+        device: ProductType,
+        /// Base (dualbooted) iOS version, one of 4.3-4.3.5.
+        #[arg(long)]
+        base_version: String,
+        /// Base iOS build, e.g. 8J2 for 4.3.3.
+        #[arg(long)]
+        base_build: String,
+        /// Rebuilt 4.3.x RootFS.dmg.
+        #[arg(long)]
+        rootfs: PathBuf,
+        /// Patched decrypted 4.3.x kernelcache.
+        #[arg(long)]
+        kernelcache: PathBuf,
+        /// Patched 4.3.x LLB payload.
+        #[arg(long)]
+        llb: PathBuf,
+        /// Also install OpenSSH into the 4.3.x system.
+        #[arg(long)]
+        openssh: bool,
+        #[arg(long, default_value = "root")]
+        username: String,
+        #[arg(long)]
+        host_key: Option<String>,
+        #[arg(long)]
+        yes: bool,
+    },
+    /// Install the FourThree companion app on the 8.4.1 system.
+    #[command(name = "fourthree-app")]
+    FourThreeApp {
+        #[arg(long, default_value = "root")]
+        username: String,
+        #[arg(long)]
+        host_key: Option<String>,
+        #[arg(long)]
+        yes: bool,
+    },
+    /// Boot the 4.3.x system through the FourThree app (drops the SSH session).
+    #[command(name = "fourthree-boot")]
+    FourThreeBoot {
+        #[arg(long, default_value = "root")]
+        username: String,
+        #[arg(long)]
+        host_key: Option<String>,
+        #[arg(long)]
+        yes: bool,
+    },
     /// Write the boot nonce generator to NVRAM on a Recovery-mode device.
     SetNonce {
         #[arg(long)]
@@ -1565,6 +1640,147 @@ async fn main() -> Result<()> {
                 .await
                 .context("reverting hacktivation failed")?;
             write_status(output, "reverted-hacktivation")?;
+        }
+        Command::Device {
+            command: DeviceCommand::FourThreeCheck { username, host_key },
+        } => {
+            let ssh = connect_ramdisk_ssh(&kit, None, &username, host_key).await?;
+            let step = kit
+                .fourthree_check(&ssh)
+                .await
+                .context("FourThree check failed")?;
+            write_status(output, &format!("fourthree-{}", step.as_str()))?;
+        }
+        Command::Device {
+            command:
+                DeviceCommand::FourThreeStep2 {
+                    size_gb,
+                    output_dir,
+                    username,
+                    host_key,
+                    yes,
+                },
+        } => {
+            confirm("partition the device for the FourThree dualboot", yes)?;
+            let path = kit
+                .fetch_resource(
+                    &ResourceId::new("jailbreak-dualbootstuff"),
+                    config.artifact_cache_dir()?,
+                )
+                .await?;
+            let dualbootstuff = tokio::fs::read(&path).await?;
+            let ssh = connect_ramdisk_ssh(&kit, None, &username, host_key).await?;
+            let outputs = kit
+                .fourthree_step2(&ssh, &dualbootstuff, size_gb)
+                .await
+                .context("FourThree step 2 (partition) failed")?;
+            tokio::fs::create_dir_all(&output_dir).await?;
+            for file in &outputs {
+                tokio::fs::write(output_dir.join(file.name()), file.data()).await?;
+            }
+            write_status(output, "fourthree-partitioned")?;
+        }
+        Command::Device {
+            command:
+                DeviceCommand::FourThreeStep3 {
+                    device,
+                    base_version,
+                    base_build,
+                    rootfs,
+                    kernelcache,
+                    llb,
+                    openssh,
+                    username,
+                    host_key,
+                    yes,
+                },
+        } => {
+            let product_type = device.as_str();
+            if legacy_ios_kit::fourthree_board_config(product_type).is_none() {
+                return Err(anyhow!(
+                    "FourThree supports iPad2,1/iPad2,2/iPad2,3, found {product_type}"
+                ));
+            }
+            confirm(
+                "install the FourThree 4.3.x dualboot system on the device",
+                yes,
+            )?;
+            let cache = config.artifact_cache_dir()?;
+            let fetch = async |id: &ResourceId, gz: bool| -> Result<Vec<u8>> {
+                let path = kit.fetch_resource(id, &cache).await?;
+                let data = tokio::fs::read(&path).await?;
+                Ok(if gz {
+                    legacy_ios_kit::gunzip(&data)?
+                } else {
+                    data
+                })
+            };
+            let lockdownd_patch = if product_type == "iPad2,1" {
+                None
+            } else {
+                let id = legacy_ios_kit::fourthree_lockdownd_patch_id(&base_version, &base_build);
+                Some(fetch(&id, false).await?)
+            };
+            let openssh_packages = if openssh {
+                Some(legacy_ios_kit::FourThreeOpenSsh {
+                    sshdeb: fetch(&ResourceId::new("jailbreak-sshdeb"), false).await?,
+                    openssh: fetch(&ResourceId::new("jailbreak-openssh"), true).await?,
+                    openssl: fetch(&ResourceId::new("jailbreak-openssl"), true).await?,
+                })
+            } else {
+                None
+            };
+            let packages = legacy_ios_kit::FourThreeStep3Packages {
+                rootfs_dmg: tokio::fs::read(&rootfs).await?,
+                kernelcache: tokio::fs::read(&kernelcache).await?,
+                llb: tokio::fs::read(&llb).await?,
+                freeze: fetch(&ResourceId::new("jailbreak-bootstrap-freeze"), true).await?,
+                app: fetch(&ResourceId::new("jailbreak-fourthree-app"), false).await?,
+                lockdownd_patch,
+                openssh: openssh_packages,
+            };
+            let ssh = connect_ramdisk_ssh(&kit, None, &username, host_key).await?;
+            kit.fourthree_step3(&ssh, product_type, &packages)
+                .await
+                .context("FourThree step 3 failed")?;
+            write_status(output, "fourthree-installed")?;
+        }
+        Command::Device {
+            command:
+                DeviceCommand::FourThreeApp {
+                    username,
+                    host_key,
+                    yes,
+                },
+        } => {
+            confirm("install the FourThree app on the device", yes)?;
+            let path = kit
+                .fetch_resource(
+                    &ResourceId::new("jailbreak-fourthree-app"),
+                    config.artifact_cache_dir()?,
+                )
+                .await?;
+            let app = tokio::fs::read(&path).await?;
+            let ssh = connect_ramdisk_ssh(&kit, None, &username, host_key).await?;
+            kit.fourthree_install_app(&ssh, &app)
+                .await
+                .context("FourThree app installation failed")?;
+            write_status(output, "fourthree-app-installed")?;
+        }
+        Command::Device {
+            command:
+                DeviceCommand::FourThreeBoot {
+                    username,
+                    host_key,
+                    yes,
+                },
+        } => {
+            confirm("boot the 4.3.x dualboot system", yes)?;
+            let ssh = connect_ramdisk_ssh(&kit, None, &username, host_key).await?;
+            kit.fourthree_boot(&ssh)
+                .await
+                .context("FourThree boot failed")?;
+            write_status(output, "fourthree-booted")?;
         }
         Command::Device {
             command:

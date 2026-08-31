@@ -94,6 +94,22 @@ pub enum KitError {
     MissingHacktivationPatch,
     #[error("no original lockdownd on the device; provide one with a file")]
     MissingOriginalLockdownd,
+    #[error("FourThree step 1 (restore to iOS 8.4.1) is not complete on the device")]
+    FourThreeRestoreIncomplete,
+    #[error("FourThree step 2 (partitioning) is not complete on the device")]
+    FourThreePartitionIncomplete,
+    #[error("FourThree step 3 (kernelcache/LLB install) is not complete on the device")]
+    FourThreeInstallIncomplete,
+    #[error("FourThree {0} has already been completed")]
+    FourThreeStepAlreadyDone(&'static str),
+    #[error("invalid FourThree iOS 6.1.3 data partition size {0} GB")]
+    InvalidFourThreePartitionSize(u32),
+    #[error("no lockdownd patch was provided for the FourThree base system")]
+    MissingFourThreeLockdowndPatch,
+    #[error("TwistedMind2 did not produce any output files on the device")]
+    FourThreePartitionerFailed,
+    #[error("FourThree does not support {0}")]
+    FourThreeUnsupportedDevice(String),
     #[error("restored device version mismatch: expected {expected}, got {actual}")]
     VersionMismatch { expected: String, actual: String },
     #[error("unknown product type {0}")]
@@ -136,7 +152,15 @@ impl KitError {
             | Self::MissingJailbreakPackage(_)
             | Self::AlreadyHacktivated
             | Self::MissingHacktivationPatch
-            | Self::MissingOriginalLockdownd => OperationPhase::Planning,
+            | Self::MissingOriginalLockdownd
+            | Self::FourThreeRestoreIncomplete
+            | Self::FourThreePartitionIncomplete
+            | Self::FourThreeInstallIncomplete
+            | Self::FourThreeStepAlreadyDone(_)
+            | Self::InvalidFourThreePartitionSize(_)
+            | Self::MissingFourThreeLockdowndPatch
+            | Self::FourThreePartitionerFailed
+            | Self::FourThreeUnsupportedDevice(_) => OperationPhase::Planning,
             Self::RamdiskPreparation(_) => OperationPhase::Preflight,
             Self::RamdiskBoot(_) => OperationPhase::Booting,
             Self::Signing(_)
@@ -223,7 +247,15 @@ impl KitError {
             | Self::MissingJailbreakPackage(_)
             | Self::AlreadyHacktivated
             | Self::MissingHacktivationPatch
-            | Self::MissingOriginalLockdownd => Recoverability::NotRecoverable,
+            | Self::MissingOriginalLockdownd
+            | Self::FourThreeRestoreIncomplete
+            | Self::FourThreePartitionIncomplete
+            | Self::FourThreeInstallIncomplete
+            | Self::FourThreeStepAlreadyDone(_)
+            | Self::InvalidFourThreePartitionSize(_)
+            | Self::MissingFourThreeLockdowndPatch
+            | Self::FourThreePartitionerFailed
+            | Self::FourThreeUnsupportedDevice(_) => Recoverability::NotRecoverable,
         }
     }
 }

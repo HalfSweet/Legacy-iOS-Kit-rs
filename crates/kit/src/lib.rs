@@ -8,6 +8,7 @@ mod erase;
 mod error;
 mod exploit;
 mod firmware;
+mod fourthree;
 mod hacktivate;
 mod hfs;
 mod image_payload;
@@ -34,6 +35,11 @@ pub use erase::{EraseConsent, ErasePlan};
 pub use error::KitError;
 pub use firmware::{
     CustomRootfsRequest, FirmwareIdentitySummary, FirmwareSummary, RemoteFirmwareSummary,
+};
+pub use fourthree::{
+    FOURTHREE_BASE_VERSIONS, FOURTHREE_TARGET_VERSION, FourThreeOpenSsh, FourThreePatch,
+    FourThreeStep, FourThreeStep3Packages, TwistedMind2Output, fourthree_board_config,
+    fourthree_data_partition_bytes, fourthree_lockdownd_patch_id, fourthree_patch_id,
 };
 pub use hacktivate::{HacktivateMethod, hacktivate_method};
 pub use hfs::{HfsEntrySummary, HfsKind, HfsMutation, HfsStatSummary};
@@ -329,6 +335,48 @@ impl LegacyIosKit {
         original: Option<&[u8]>,
     ) -> Result<(), KitError> {
         hacktivate::revert_hacktivate(ssh, original).await
+    }
+
+    /// Query the highest completed FourThree step on the device.
+    pub async fn fourthree_check(&self, ssh: &RamdiskSsh) -> Result<FourThreeStep, KitError> {
+        fourthree::check(ssh).await
+    }
+
+    /// FourThree step 2: install the dualboot packages and partition the
+    /// device with TwistedMind2. Returns the generated /TwistedMind2* files.
+    pub async fn fourthree_step2(
+        &self,
+        ssh: &RamdiskSsh,
+        dualbootstuff: &[u8],
+        size_gb: u32,
+    ) -> Result<Vec<TwistedMind2Output>, KitError> {
+        fourthree::step2(ssh, dualbootstuff, size_gb).await
+    }
+
+    /// FourThree step 3: create the 4.3.x filesystems, restore the rootfs,
+    /// jailbreak it, and install the dualboot kernelcache and LLB.
+    pub async fn fourthree_step3(
+        &self,
+        ssh: &RamdiskSsh,
+        product_type: &str,
+        packages: &FourThreeStep3Packages,
+    ) -> Result<(), KitError> {
+        fourthree::step3(ssh, product_type, packages).await
+    }
+
+    /// Install the FourThree companion app on the 8.4.1 system.
+    pub async fn fourthree_install_app(
+        &self,
+        ssh: &RamdiskSsh,
+        app: &[u8],
+    ) -> Result<(), KitError> {
+        fourthree::install_app(ssh, app).await
+    }
+
+    /// Boot the 4.3.x system through the FourThree app. The kloader drops the
+    /// SSH session.
+    pub async fn fourthree_boot(&self, ssh: &RamdiskSsh) -> Result<(), KitError> {
+        fourthree::boot(ssh).await
     }
 
     /// Install the Cydia bootstrap on a 64-bit iOS 7/8/9 device from an SSH
