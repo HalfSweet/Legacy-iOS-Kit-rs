@@ -84,6 +84,26 @@ impl LegacyIosKit {
         RemoteFirmwareSummary::inspect(url.into()).await
     }
 
+    pub async fn build_custom_ipsw(
+        &self,
+        source: impl Into<std::path::PathBuf>,
+        destination: impl Into<std::path::PathBuf>,
+        replacements: Vec<(String, Vec<u8>)>,
+        removals: Vec<String>,
+    ) -> Result<FirmwareSummary, KitError> {
+        let source = legacy_ios_firmware::FirmwareArchive::open(source.into())?;
+        let mut builder = legacy_ios_firmware::CustomIpswBuilder::new(source);
+        for (name, data) in replacements {
+            builder = builder.replace(name, data)?;
+        }
+        for name in removals {
+            builder = builder.remove(name)?;
+        }
+        let destination = destination.into();
+        builder.build(&destination).await?;
+        FirmwareSummary::inspect(destination)
+    }
+
     pub fn convert_onboard_dump(&self, dump: &[u8]) -> Result<SigningTicket, KitError> {
         let ticket = legacy_ios_image::OnboardTicket::parse(dump)?;
         Ok(SigningTicket::from_img4_ticket(

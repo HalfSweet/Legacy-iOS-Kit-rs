@@ -16,6 +16,8 @@ pub enum KitError {
     Firmware(#[from] legacy_ios_firmware::FirmwareError),
     #[error("remote firmware operation failed: {0}")]
     RemoteFirmware(#[from] legacy_ios_firmware::RemoteFirmwareError),
+    #[error("custom IPSW operation failed: {0}")]
+    CustomIpsw(#[from] legacy_ios_firmware::CustomIpswError),
     #[error("signing service operation failed: {0}")]
     Signing(#[from] legacy_ios_firmware::TssError),
     #[error("property list operation failed: {0}")]
@@ -68,6 +70,7 @@ impl KitError {
         match self {
             Self::Firmware(_)
             | Self::RemoteFirmware(_)
+            | Self::CustomIpsw(_)
             | Self::RestorePlan(_)
             | Self::RestorePreparation(_)
             | Self::UnknownProduct(_)
@@ -112,6 +115,7 @@ impl KitError {
             Self::VersionMismatch { .. } => Recoverability::ManualRecoveryRequired,
             Self::Firmware(_)
             | Self::RemoteFirmware(_)
+            | Self::CustomIpsw(_)
             | Self::RestorePlan(_)
             | Self::RestorePreparation(_)
             | Self::AutomaticExploitUnsupported(_)
