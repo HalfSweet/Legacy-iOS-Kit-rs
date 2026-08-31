@@ -16,4 +16,6 @@ pub enum Recoverability {
 pub enum CoreError {
     #[error("invalid ECID: {0}")]
     InvalidEcid(String),
+    #[error("invalid boot nonce generator (expected 0x followed by up to 16 hex digits): {0}")]
+    InvalidBootNonce(String),
 }

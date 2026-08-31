@@ -7,8 +7,8 @@ mod error;
 mod operation;
 
 pub use device::{
-    BoardConfig, BuildId, Capability, CapabilitySet, ConnectionId, DeviceIdentity, DeviceMode,
-    DeviceSelector, DeviceSnapshot, Ecid, IosVersion, ProductType, Soc, Udid,
+    BoardConfig, BootNonce, BuildId, Capability, CapabilitySet, ConnectionId, DeviceIdentity,
+    DeviceMode, DeviceSelector, DeviceSnapshot, Ecid, IosVersion, ProductType, Soc, Udid,
 };
 pub use error::{CoreError, Recoverability};
 pub use operation::{

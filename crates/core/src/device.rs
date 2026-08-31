@@ -59,6 +59,39 @@ string_id!(IosVersion);
 #[serde(transparent)]
 pub struct Ecid(u64);
 
+/// Boot nonce generator written to `com.apple.System.boot-nonce` in NVRAM.
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct BootNonce(u64);
+
+impl BootNonce {
+    pub const fn new(value: u64) -> Self {
+        Self(value)
+    }
+
+    pub const fn get(self) -> u64 {
+        self.0
+    }
+}
+
+impl fmt::Display for BootNonce {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "{:#018x}", self.0)
+    }
+}
+
+impl FromStr for BootNonce {
+    type Err = CoreError;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        value
+            .strip_prefix("0x")
+            .and_then(|hex| u64::from_str_radix(hex, 16).ok())
+            .map(Self)
+            .ok_or_else(|| CoreError::InvalidBootNonce(value.to_owned()))
+    }
+}
+
 impl Ecid {
     pub const fn new(value: u64) -> Self {
         Self(value)
