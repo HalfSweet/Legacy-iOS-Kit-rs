@@ -1,6 +1,6 @@
 use std::{fs::File, io::Read, path::Path};
 
-use legacy_ios_core::Ecid;
+use legacy_ios_core::{BootNonce, Ecid};
 use plist::{Dictionary, Value};
 use thiserror::Error;
 
@@ -121,6 +121,20 @@ impl SigningTicket {
     }
 }
 
+/// Derive the ApNonce a device generates for a boot nonce generator, matching
+/// futurerestore: SHA-1 for 20-byte nonces and truncated SHA-384 for 32-byte
+/// nonces, both over the little-endian generator value.
+pub fn derive_ap_nonce(generator: BootNonce, size: usize) -> Option<Vec<u8>> {
+    use sha1::Digest as _;
+
+    let seed = generator.get().to_le_bytes();
+    match size {
+        20 => Some(sha1::Sha1::digest(seed).to_vec()),
+        32 => Some(sha2::Sha384::digest(seed)[..32].to_vec()),
+        _ => None,
+    }
+}
+
 fn save_dictionary(dictionary: &Dictionary, path: &Path) -> Result<(), TicketError> {
     use std::io::Write as _;
 
@@ -183,5 +197,21 @@ mod tests {
         assert_eq!(ticket.root_ticket(), [1, 2, 3]);
         assert_eq!(ticket.ecid(), Some(Ecid::new(42)));
         assert_eq!(ticket.generator(), Some("0x1111111111111111"));
+    }
+
+    #[test]
+    fn derives_ap_nonce_from_generator() {
+        let generator = BootNonce::new(0x1111_1111_1111_1111);
+
+        assert_eq!(
+            derive_ap_nonce(generator, 20).unwrap(),
+            hex::decode("3a88b7c3802f2f0510abc432104a15ebd8bd7154").unwrap()
+        );
+        assert_eq!(
+            derive_ap_nonce(generator, 32).unwrap(),
+            hex::decode("27325c8258be46e69d9ee57fa9a8fbc28b873df434e5e702a8b27999551138ae")
+                .unwrap()
+        );
+        assert!(derive_ap_nonce(generator, 24).is_none());
     }
 }
