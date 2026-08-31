@@ -20,6 +20,7 @@ use legacy_ios_kit::{
 };
 use tracing::level_filters::LevelFilter;
 use tracing::{debug, info, warn};
+use tracing_subscriber::EnvFilter;
 
 use config::AppConfig;
 
@@ -1619,8 +1620,12 @@ fn init_tracing(cli: &Cli, config: &AppConfig) -> Result<()> {
             _ => LevelFilter::TRACE,
         }
     };
+    let filter = EnvFilter::builder()
+        .with_default_directive(level.into())
+        .parse("device_reader=off,device_writer=off")
+        .context("failed to build tracing filter")?;
     tracing_subscriber::fmt()
-        .with_max_level(level)
+        .with_env_filter(filter)
         .with_target(false)
         .with_writer(io::stderr)
         .try_init()
