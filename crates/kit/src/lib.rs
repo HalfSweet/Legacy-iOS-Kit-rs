@@ -11,6 +11,7 @@ mod firmware;
 mod hacktivate;
 mod hfs;
 mod image_payload;
+mod jailbreak;
 mod kdfu;
 mod lease;
 mod operation;
@@ -37,6 +38,7 @@ pub use firmware::{
 pub use hacktivate::{HacktivateMethod, hacktivate_method};
 pub use hfs::{HfsEntrySummary, HfsKind, HfsMutation, HfsStatSummary};
 pub use image_payload::{ImageCipher, ImageCipherError};
+pub use jailbreak::{FstabReplacement, JailbreakPackages, JailbreakPlan, UntetherPackage};
 pub use kdfu::{prepare_pwned_ibss, select_kloader};
 pub use lease::DeviceLease;
 pub use legacy_ios_assets::{Redistribution, ResourceId, ResourceRecord};
@@ -348,6 +350,17 @@ impl LegacyIosKit {
         stash: bool,
     ) -> Result<(), KitError> {
         bootstrap::install_untether7(ssh, untether, stash).await
+    }
+
+    /// Install the 32-bit jailbreak from an SSH ramdisk session, mirroring
+    /// upstream's `device_ramdisk jailbreak` flow.
+    pub async fn install_jailbreak(
+        &self,
+        ssh: &RamdiskSsh,
+        plan: &JailbreakPlan,
+        packages: &JailbreakPackages,
+    ) -> Result<(), KitError> {
+        jailbreak::install_jailbreak(ssh, plan, packages).await
     }
 
     /// Install the TrollStore persistence helper into the Tips app from an

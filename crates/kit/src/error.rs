@@ -84,6 +84,10 @@ pub enum KitError {
     UnsupportedBootstrapVersion(String),
     #[error("bootstrap package {0} was not provided")]
     MissingBootstrapPackage(&'static str),
+    #[error("the device already has /mnt1/bin/bash; it appears to be already jailbroken")]
+    AlreadyJailbroken,
+    #[error("jailbreak package {0} was not provided")]
+    MissingJailbreakPackage(&'static str),
     #[error("the device is already hacktivated")]
     AlreadyHacktivated,
     #[error("no lockdownd patch was provided for the hacktivation method")]
@@ -128,6 +132,8 @@ impl KitError {
             Self::EraseConsentMismatch => OperationPhase::Preflight,
             Self::UnsupportedBootstrapVersion(_)
             | Self::MissingBootstrapPackage(_)
+            | Self::AlreadyJailbroken
+            | Self::MissingJailbreakPackage(_)
             | Self::AlreadyHacktivated
             | Self::MissingHacktivationPatch
             | Self::MissingOriginalLockdownd => OperationPhase::Planning,
@@ -213,6 +219,8 @@ impl KitError {
             Self::EraseConsentMismatch
             | Self::UnsupportedBootstrapVersion(_)
             | Self::MissingBootstrapPackage(_)
+            | Self::AlreadyJailbroken
+            | Self::MissingJailbreakPackage(_)
             | Self::AlreadyHacktivated
             | Self::MissingHacktivationPatch
             | Self::MissingOriginalLockdownd => Recoverability::NotRecoverable,

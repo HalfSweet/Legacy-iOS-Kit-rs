@@ -504,3 +504,507 @@ sha256 = "303fce8c01ea8959447a732d099da979b715a4737abed8f13882802acde82454"
 size = 204
 purpose = "bsdiff patch for hacktivating lockdownd on iPhone2,1 6.1 10B141" 
 redistribution = "download-only"
+
+[[resources]]
+id = "jailbreak-aquila-4"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/jailbreak/aquila_4.tar"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "f471c4e023f3635afb98fd6a0b92a2307d12ce87b1505ad9dfd94f0f4c03715a"
+size = 112640
+purpose = "iOS 4.3.x untether package for the 32-bit SSH ramdisk jailbreak"
+redistribution = "download-only"
+
+[[resources]]
+id = "jailbreak-aquila-5"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/jailbreak/aquila_5.tar"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "6f18eaca6f6f6ea35c6abc2a481fd95d02c2c483b7db6adc4abca25bd4cdaa60"
+size = 112640
+purpose = "iOS 5.x untether package for the 32-bit SSH ramdisk jailbreak"
+redistribution = "download-only"
+
+[[resources]]
+id = "jailbreak-aquila-6"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/jailbreak/aquila_6.tar"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "35d3a1a0494dace968f51ba6f0eb447ad666750e303186b8382a36c8461d1763"
+size = 102400
+purpose = "iOS 6.x untether package for the 32-bit SSH ramdisk jailbreak"
+redistribution = "download-only"
+
+[[resources]]
+id = "jailbreak-aquila-7"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/jailbreak/aquila_7.tar"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "42468b72b324896438a4a2504b44cdfbd07337d2586fb51ebe014d703682ad10"
+size = 122880
+purpose = "iOS 7.x untether package for the 32-bit SSH ramdisk jailbreak"
+redistribution = "download-only"
+
+[[resources]]
+id = "jailbreak-everuntether"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/jailbreak/everuntether.tar"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "f700e084909a9c17b05f069f815bcd921b8803c7f34021f6e87fec099d2ee9e3"
+size = 454144
+purpose = "iOS 9.x (and A5/A5X 8.0-8.2) untether package for the 32-bit SSH ramdisk jailbreak"
+redistribution = "download-only"
+
+[[resources]]
+id = "jailbreak-daibutsu-untether"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/jailbreak/daibutsu/untether.tar"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "ca82a09ee56a7987e2a8a043130e80443851f2eceffce5384a314319466eac76"
+size = 192000
+purpose = "iOS 8.x daibutsu untether package for the 32-bit SSH ramdisk jailbreak"
+redistribution = "download-only"
+
+[[resources]]
+id = "jailbreak-daibutsu-move"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/jailbreak/daibutsu/move.sh"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "81637aaf5d80f7a1c5dfb2942619378a2f995efe660e5594bc92e25701b7f23c"
+size = 1497
+purpose = "iOS 7.x/8.x daibutsu file-layout script for the 32-bit SSH ramdisk jailbreak"
+redistribution = "download-only"
+
+[[resources]]
+id = "jailbreak-fstab-7"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/jailbreak/fstab7.tar"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "edc92ee6609a8ce26a58a556bf828625a52cb8179dd3b0cc72d786d92c847fe9"
+size = 10240
+purpose = "fstab replacement tar for iOS 7.x in the 32-bit SSH ramdisk jailbreak"
+redistribution = "download-only"
+
+[[resources]]
+id = "jailbreak-fstab-8"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/jailbreak/fstab8.tar"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "bcc76a6701c1e3023663d4f3d342ea1a472590cc9e10aaf4bce489c89e0e3721"
+size = 10240
+purpose = "fstab replacement tar for iOS 8.x in the 32-bit SSH ramdisk jailbreak"
+redistribution = "download-only"
+
+[[resources]]
+id = "jailbreak-fstab-rw"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/jailbreak/fstab_rw.tar"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "67432a76e5520a33dd0326b39674171b9ac8df6b30b1306d17a9428d423bc988"
+size = 2048
+purpose = "read-write fstab replacement tar for iOS 6.x in the 32-bit SSH ramdisk jailbreak"
+redistribution = "download-only"
+
+[[resources]]
+id = "jailbreak-fstab-new"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/jailbreak/fstab_new"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "9cf3eb9c2d8a2b5c3dfdf787487dfe696b0d957a526a567c8872b81f65a6de5a"
+size = 78
+purpose = "fstab replacement (disk0s2s1 data) for iOS 3/4.x in the 32-bit SSH ramdisk jailbreak"
+redistribution = "download-only"
+
+[[resources]]
+id = "jailbreak-fstab-old"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/jailbreak/fstab_old"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "8c84d661b3e73b89d8cd7bb94e120ae5755d90ad7fc3e860fb2dc814cae3a5d4"
+size = 76
+purpose = "fstab replacement (disk0s2 data) for S5L8900 and iPod2,1 in the 32-bit SSH ramdisk jailbreak"
+redistribution = "download-only"
+
+[[resources]]
+id = "jailbreak-cydiasubstrate"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/jailbreak/cydiasubstrate.tar"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "b9e438729cbb3a8ceb8d885545facaff908c1e4f5ff463488e5b6cab198a854f"
+size = 133120
+purpose = "Cydia Substrate package for iOS 3/4/5.x in the 32-bit SSH ramdisk jailbreak"
+redistribution = "download-only"
+
+[[resources]]
+id = "jailbreak-zebra"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/jailbreak/zebra.tar"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "b3d47e6ed282c6afe4f3e63f4da952d02c4db2eddae4778d115edff70235ebd6"
+size = 8468480
+purpose = "Zebra package manager for iOS 9.x in the 32-bit SSH ramdisk jailbreak"
+redistribution = "download-only"
+
+[[resources]]
+id = "jailbreak-cydiahttpatch"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/jailbreak/cydiahttpatch.tar"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "3c48cebc8ed46022a43466ae1ed7062f816440adc3dc3755ca7af2f56b5d0831"
+size = 122880
+purpose = "Cydia HTTP patch for iOS 3.x in the 32-bit SSH ramdisk jailbreak"
+redistribution = "download-only"
+
+[[resources]]
+id = "jailbreak-lukezgd"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/jailbreak/LukeZGD.tar"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "8736fd016efb55c85a419e964dfb6a756606fab6673c79ac6be53882c7bc284c"
+size = 10240
+purpose = "LukeZGD package installed on iOS 5+ in the 32-bit SSH ramdisk jailbreak"
+redistribution = "download-only"
+
+[[resources]]
+id = "jailbreak-sshdeb"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/jailbreak/sshdeb.tar"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "6db1586eb39a43c2fbb0065ae68ecbf928721a4cda9ed4fe86eb46bcef544441"
+size = 1628160
+purpose = "SSH deb bundle for the optional OpenSSH extra in the 32-bit SSH ramdisk jailbreak"
+redistribution = "download-only"
+
+[[resources]]
+id = "greenpois0n-iPad1-1-7B367"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/jailbreak/greenpois0n/iPad1,1_7B367.tar"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "e68ea0f04a6070b8f4384e54017db07d3082ef2a972a63f6d53b564372517c36"
+size = 30720
+purpose = "greenpois0n untether package for iPad1,1 build 7B367 in the 32-bit SSH ramdisk jailbreak"
+redistribution = "download-only"
+
+[[resources]]
+id = "greenpois0n-iPad1-1-7B405"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/jailbreak/greenpois0n/iPad1,1_7B405.tar"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "805f8c84eb06b821ea54e4244db29a48e639db45c649fea848701e34da4442ce"
+size = 30720
+purpose = "greenpois0n untether package for iPad1,1 build 7B405 in the 32-bit SSH ramdisk jailbreak"
+redistribution = "download-only"
+
+[[resources]]
+id = "greenpois0n-iPad1-1-7B500"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/jailbreak/greenpois0n/iPad1,1_7B500.tar"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "0f32eb9d29580d919d2385fee0dca7ce74d935d262e59f02fabd0f640c0aea95"
+size = 30720
+purpose = "greenpois0n untether package for iPad1,1 build 7B500 in the 32-bit SSH ramdisk jailbreak"
+redistribution = "download-only"
+
+[[resources]]
+id = "greenpois0n-iPad1-1-8C148"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/jailbreak/greenpois0n/iPad1,1_8C148.tar"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "8b9613b440145b9807a12c6118336d7687ad295d30a36bebb9bec700e63f6e00"
+size = 61440
+purpose = "greenpois0n untether package for iPad1,1 build 8C148 in the 32-bit SSH ramdisk jailbreak"
+redistribution = "download-only"
+
+[[resources]]
+id = "greenpois0n-iPhone1-1-7E18"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/jailbreak/greenpois0n/iPhone1,1_7E18.tar"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "e505ffa45bbc9f9772b98df1c3786ee74bea05c9164ef763a138b4c0e855f7e9"
+size = 20480
+purpose = "greenpois0n untether package for iPhone1,1 build 7E18 in the 32-bit SSH ramdisk jailbreak"
+redistribution = "download-only"
+
+[[resources]]
+id = "greenpois0n-iPhone1-2-7E18"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/jailbreak/greenpois0n/iPhone1,2_7E18.tar"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "275e71a329d0428a60612e20ea79b32b7a17b6b69e2c86b961925ca38ecc4259"
+size = 20480
+purpose = "greenpois0n untether package for iPhone1,2 build 7E18 in the 32-bit SSH ramdisk jailbreak"
+redistribution = "download-only"
+
+[[resources]]
+id = "greenpois0n-iPhone1-2-8A293"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/jailbreak/greenpois0n/iPhone1,2_8A293.tar"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "5bc4577b0c4c6541db36ac5bad307aa006b57d4a9069d8e99fd5c4125317122f"
+size = 30720
+purpose = "greenpois0n untether package for iPhone1,2 build 8A293 in the 32-bit SSH ramdisk jailbreak"
+redistribution = "download-only"
+
+[[resources]]
+id = "greenpois0n-iPhone1-2-8A306"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/jailbreak/greenpois0n/iPhone1,2_8A306.tar"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "3f009bdf9490a66775c4f54faf2a1f0cb7f83202b0bb6771e94fd8e15922a520"
+size = 30720
+purpose = "greenpois0n untether package for iPhone1,2 build 8A306 in the 32-bit SSH ramdisk jailbreak"
+redistribution = "download-only"
+
+[[resources]]
+id = "greenpois0n-iPhone1-2-8A400"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/jailbreak/greenpois0n/iPhone1,2_8A400.tar"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "c2a4b2077279ce660ba49cc441c7a652ae925d36e1ad6868402f9e40861c947b"
+size = 30720
+purpose = "greenpois0n untether package for iPhone1,2 build 8A400 in the 32-bit SSH ramdisk jailbreak"
+redistribution = "download-only"
+
+[[resources]]
+id = "greenpois0n-iPhone1-2-8B117"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/jailbreak/greenpois0n/iPhone1,2_8B117.tar"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "906e70164c4573278011e9e7bed1be73bf3ee51c14a977231c7b5f07a1c5a90b"
+size = 30720
+purpose = "greenpois0n untether package for iPhone1,2 build 8B117 in the 32-bit SSH ramdisk jailbreak"
+redistribution = "download-only"
+
+[[resources]]
+id = "greenpois0n-iPhone2-1-7E18"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/jailbreak/greenpois0n/iPhone2,1_7E18.tar"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "bc7d157c0136df6f8646fd206cd35e83d5dbce9c35cd427b1522a7cade725bc0"
+size = 20480
+purpose = "greenpois0n untether package for iPhone2,1 build 7E18 in the 32-bit SSH ramdisk jailbreak"
+redistribution = "download-only"
+
+[[resources]]
+id = "greenpois0n-iPhone2-1-8A293"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/jailbreak/greenpois0n/iPhone2,1_8A293.tar"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "75ddb4627bf4f7d8bcaf457fac956c32da4a97a98856b1a768fb3ec463cb91ce"
+size = 30720
+purpose = "greenpois0n untether package for iPhone2,1 build 8A293 in the 32-bit SSH ramdisk jailbreak"
+redistribution = "download-only"
+
+[[resources]]
+id = "greenpois0n-iPhone2-1-8A306"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/jailbreak/greenpois0n/iPhone2,1_8A306.tar"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "d75bfb719304caae36378ed56ff41cf55d5b2f4dc855ff3848a9aaa55104d27a"
+size = 30720
+purpose = "greenpois0n untether package for iPhone2,1 build 8A306 in the 32-bit SSH ramdisk jailbreak"
+redistribution = "download-only"
+
+[[resources]]
+id = "greenpois0n-iPhone2-1-8A400"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/jailbreak/greenpois0n/iPhone2,1_8A400.tar"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "a17bc0ca8b71562c2a03554e2aa314daa66edd6c4cea3893394eb67d54c8f08f"
+size = 30720
+purpose = "greenpois0n untether package for iPhone2,1 build 8A400 in the 32-bit SSH ramdisk jailbreak"
+redistribution = "download-only"
+
+[[resources]]
+id = "greenpois0n-iPhone2-1-8B117"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/jailbreak/greenpois0n/iPhone2,1_8B117.tar"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "9a6a670b0ab5dd3e9c4373743d609db77db3b71a8a40c1472ffadbbe6819b7f8"
+size = 30720
+purpose = "greenpois0n untether package for iPhone2,1 build 8B117 in the 32-bit SSH ramdisk jailbreak"
+redistribution = "download-only"
+
+[[resources]]
+id = "greenpois0n-iPhone2-1-8C148a"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/jailbreak/greenpois0n/iPhone2,1_8C148a.tar"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "076c26681b7af9be48f82ac1a0085b3373162480d9b7bc594eb7c789c7c57dec"
+size = 61440
+purpose = "greenpois0n untether package for iPhone2,1 build 8C148a in the 32-bit SSH ramdisk jailbreak"
+redistribution = "download-only"
+
+[[resources]]
+id = "greenpois0n-iPhone3-1-8A293"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/jailbreak/greenpois0n/iPhone3,1_8A293.tar"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "2f4f3dd4837ddef008a8a6327db5b737b5f040fcda9a1fb1b0dd8838e1073d18"
+size = 30720
+purpose = "greenpois0n untether package for iPhone3,1 build 8A293 in the 32-bit SSH ramdisk jailbreak"
+redistribution = "download-only"
+
+[[resources]]
+id = "greenpois0n-iPhone3-1-8A306"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/jailbreak/greenpois0n/iPhone3,1_8A306.tar"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "1799d2a01a964c8786e63b2760c2bc4ef590a77bad8c08c1795363bbcd747fbf"
+size = 30720
+purpose = "greenpois0n untether package for iPhone3,1 build 8A306 in the 32-bit SSH ramdisk jailbreak"
+redistribution = "download-only"
+
+[[resources]]
+id = "greenpois0n-iPhone3-1-8A400"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/jailbreak/greenpois0n/iPhone3,1_8A400.tar"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "a0adccb2132b84521751e965c2016c4b484bb3c71dccdbf7a9aa897317bea91a"
+size = 30720
+purpose = "greenpois0n untether package for iPhone3,1 build 8A400 in the 32-bit SSH ramdisk jailbreak"
+redistribution = "download-only"
+
+[[resources]]
+id = "greenpois0n-iPhone3-1-8B117"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/jailbreak/greenpois0n/iPhone3,1_8B117.tar"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "c8c4f6983b8a606deb1cd4f68d05981f56bc5e92d49a27a79871ec7afb58552b"
+size = 30720
+purpose = "greenpois0n untether package for iPhone3,1 build 8B117 in the 32-bit SSH ramdisk jailbreak"
+redistribution = "download-only"
+
+[[resources]]
+id = "greenpois0n-iPhone3-1-8C148"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/jailbreak/greenpois0n/iPhone3,1_8C148.tar"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "90b261e50d5070d8165e1dc900a06a357e761dc951cabba43203559c790830e8"
+size = 61440
+purpose = "greenpois0n untether package for iPhone3,1 build 8C148 in the 32-bit SSH ramdisk jailbreak"
+redistribution = "download-only"
+
+[[resources]]
+id = "greenpois0n-iPhone3-3-8E200"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/jailbreak/greenpois0n/iPhone3,3_8E200.tar"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "c7200ca87164202aca7e2fe362bbddf372edd5e1ded30e497fef5826bfdc4035"
+size = 61440
+purpose = "greenpois0n untether package for iPhone3,3 build 8E200 in the 32-bit SSH ramdisk jailbreak"
+redistribution = "download-only"
+
+[[resources]]
+id = "greenpois0n-iPhone3-3-8E303"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/jailbreak/greenpois0n/iPhone3,3_8E303.tar"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "f1841d708850813d9923639fc12825f1eefa4b031c22efada887d7a9635452a3"
+size = 61440
+purpose = "greenpois0n untether package for iPhone3,3 build 8E303 in the 32-bit SSH ramdisk jailbreak"
+redistribution = "download-only"
+
+[[resources]]
+id = "greenpois0n-iPhone3-3-8E401"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/jailbreak/greenpois0n/iPhone3,3_8E401.tar"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "9ef78d1225be0db15649e0db4979b6b35d3e4bcdea938ca987fc84337ae17577"
+size = 61440
+purpose = "greenpois0n untether package for iPhone3,3 build 8E401 in the 32-bit SSH ramdisk jailbreak"
+redistribution = "download-only"
+
+[[resources]]
+id = "greenpois0n-iPod1-1-7E18"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/jailbreak/greenpois0n/iPod1,1_7E18.tar"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "2844d97b417b937b730e4eac1094cca8b2c1efcfac79e716ba80809a276b03b6"
+size = 20480
+purpose = "greenpois0n untether package for iPod1,1 build 7E18 in the 32-bit SSH ramdisk jailbreak"
+redistribution = "download-only"
+
+[[resources]]
+id = "greenpois0n-iPod2-1-7E18"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/jailbreak/greenpois0n/iPod2,1_7E18.tar"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "00cf7d7324d964284007c724faebce45edce5e86be009f9546861f1a27c21955"
+size = 20480
+purpose = "greenpois0n untether package for iPod2,1 build 7E18 in the 32-bit SSH ramdisk jailbreak"
+redistribution = "download-only"
+
+[[resources]]
+id = "greenpois0n-iPod2-1-8A293"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/jailbreak/greenpois0n/iPod2,1_8A293.tar"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "61ff0e1d1c63fd7db0634678afbbba22913f7f0bb8b94f01541bb7dfd70fcb1a"
+size = 30720
+purpose = "greenpois0n untether package for iPod2,1 build 8A293 in the 32-bit SSH ramdisk jailbreak"
+redistribution = "download-only"
+
+[[resources]]
+id = "greenpois0n-iPod2-1-8A400"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/jailbreak/greenpois0n/iPod2,1_8A400.tar"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "7a7c7130e19dbd6ca8fbd7002a160dcb3beb3c0f5217c922b9ac87bdfe1e1895"
+size = 30720
+purpose = "greenpois0n untether package for iPod2,1 build 8A400 in the 32-bit SSH ramdisk jailbreak"
+redistribution = "download-only"
+
+[[resources]]
+id = "greenpois0n-iPod2-1-8B117"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/jailbreak/greenpois0n/iPod2,1_8B117.tar"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "7bc9a5e10dd27804a43773678a0995f7a12f1613c95ced980ff91b0cf0bc42a0"
+size = 30720
+purpose = "greenpois0n untether package for iPod2,1 build 8B117 in the 32-bit SSH ramdisk jailbreak"
+redistribution = "download-only"
+
+[[resources]]
+id = "greenpois0n-iPod2-1-8C148"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/jailbreak/greenpois0n/iPod2,1_8C148.tar"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "c82dd8ee66fcd6266f506bb3edf04b90cb36bd1fa6ac309aef226b6c48e1ccfa"
+size = 61440
+purpose = "greenpois0n untether package for iPod2,1 build 8C148 in the 32-bit SSH ramdisk jailbreak"
+redistribution = "download-only"
+
+[[resources]]
+id = "greenpois0n-iPod3-1-7E18"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/jailbreak/greenpois0n/iPod3,1_7E18.tar"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "9c2593e317b970d50e959ff459121373b2b601bb93d9aec45d01dd4020129fd6"
+size = 20480
+purpose = "greenpois0n untether package for iPod3,1 build 7E18 in the 32-bit SSH ramdisk jailbreak"
+redistribution = "download-only"
+
+[[resources]]
+id = "greenpois0n-iPod3-1-8A293"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/jailbreak/greenpois0n/iPod3,1_8A293.tar"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "20c70a52fefebc68a4885c2aa1f61ac8ffe08d9f3a2aeeee4099f80fbb572246"
+size = 30720
+purpose = "greenpois0n untether package for iPod3,1 build 8A293 in the 32-bit SSH ramdisk jailbreak"
+redistribution = "download-only"
+
+[[resources]]
+id = "greenpois0n-iPod3-1-8A400"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/jailbreak/greenpois0n/iPod3,1_8A400.tar"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "56737040f63374e0c057728226e5f968d56b7ba1cb5a6874e2b64d1f22894258"
+size = 30720
+purpose = "greenpois0n untether package for iPod3,1 build 8A400 in the 32-bit SSH ramdisk jailbreak"
+redistribution = "download-only"
+
+[[resources]]
+id = "greenpois0n-iPod3-1-8B117"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/jailbreak/greenpois0n/iPod3,1_8B117.tar"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "6ca1ffd79c3f5e3264a0b94751b3bf6a488f426ca2a6f347976d0db5a6087d19"
+size = 30720
+purpose = "greenpois0n untether package for iPod3,1 build 8B117 in the 32-bit SSH ramdisk jailbreak"
+redistribution = "download-only"
+
+[[resources]]
+id = "greenpois0n-iPod3-1-8C148"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/jailbreak/greenpois0n/iPod3,1_8C148.tar"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "19ffa45682d2b323d4f2258edf376f97d25c01b8c3bf07def3383e197fc2003f"
+size = 61440
+purpose = "greenpois0n untether package for iPod3,1 build 8C148 in the 32-bit SSH ramdisk jailbreak"
+redistribution = "download-only"
+
+[[resources]]
+id = "greenpois0n-iPod4-1-8B117"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/jailbreak/greenpois0n/iPod4,1_8B117.tar"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "7fdc1cf2ec84883da5a705fd064718ed391bc4c6ad534a327f38c27943dfcf5f"
+size = 30720
+purpose = "greenpois0n untether package for iPod4,1 build 8B117 in the 32-bit SSH ramdisk jailbreak"
+redistribution = "download-only"
+
+[[resources]]
+id = "greenpois0n-iPod4-1-8B118"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/jailbreak/greenpois0n/iPod4,1_8B118.tar"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "fcd10ce498ffe1c7cec51ee88469cbacefcdfe5415bdd770577cd75abd90ec21"
+size = 30720
+purpose = "greenpois0n untether package for iPod4,1 build 8B118 in the 32-bit SSH ramdisk jailbreak"
+redistribution = "download-only"
+
+[[resources]]
+id = "greenpois0n-iPod4-1-8C148"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/jailbreak/greenpois0n/iPod4,1_8C148.tar"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "937006494941f7864fe8163eec6b3af9f0d8fa5e39380112a4af8d1011559f65"
+size = 61440
+purpose = "greenpois0n untether package for iPod4,1 build 8C148 in the 32-bit SSH ramdisk jailbreak"
+redistribution = "download-only"
+
+[[resources]]
+id = "jailbreak-bootstrap-freeze5"
+source_url = "https://github.com/LukeZGD/Legacy-iOS-Kit-Keys/releases/download/a/freeze5.tar.gz"
+source_commit = "a"
+sha256 = "77b47dd6476cbdfdf70cb132711b9a70640f8a21254717364a061b35f6362db2"
+size = 6996240
+purpose = "Smaller Cydia bootstrap payload for iPhone2,1 on iOS 4.3.x (upstream verifies by SHA-1 15c92613d4f7e6bbabd9bd3521db8e4baf032265)"
+redistribution = "download-only"

@@ -294,6 +294,26 @@ enum RamdiskCommand {
         #[arg(long)]
         yes: bool,
     },
+    /// Jailbreak a 32-bit device from an SSH ramdisk.
+    Jailbreak {
+        #[arg(long)]
+        device_id: Option<u32>,
+        #[arg(long, default_value = "root")]
+        username: String,
+        #[arg(long)]
+        host_key: Option<String>,
+        /// Device product type, e.g. iPhone3,1.
+        #[arg(long)]
+        device: ProductType,
+        /// Device iOS version; read from the mounted rootfs when omitted.
+        #[arg(long)]
+        ios_version: Option<String>,
+        /// Device iOS build; read from the mounted rootfs when omitted.
+        #[arg(long)]
+        build: Option<String>,
+        #[arg(long)]
+        yes: bool,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -2545,6 +2565,91 @@ async fn main() -> Result<()> {
                 .context("untether installation failed")?;
             ssh.disconnect().await?;
             write_status(output, "installed-untether")?;
+        }
+        Command::Ramdisk {
+            command:
+                RamdiskCommand::Jailbreak {
+                    device_id,
+                    username,
+                    host_key,
+                    device,
+                    ios_version,
+                    build,
+                    yes,
+                },
+        } => {
+            confirm("jailbreak the device", yes)?;
+            let ssh = connect_ramdisk_ssh(&kit, device_id, &username, host_key).await?;
+            ssh.mount_filesystems(true)
+                .await
+                .context("failed to mount the device root filesystem")?;
+            let version = match ios_version {
+                Some(version) => version,
+                None => ssh
+                    .system_version()
+                    .await
+                    .context("failed to read the device iOS version")?,
+            };
+            let build = match build {
+                Some(build) => build,
+                None => ssh
+                    .system_build()
+                    .await
+                    .context("failed to read the device iOS build")?,
+            };
+            let product_type = device.as_str();
+            let plan = legacy_ios_kit::JailbreakPlan::for_device(product_type, &version, &build)
+                .ok_or_else(|| {
+                    anyhow!(
+                        "iOS {version} ({build}) on {product_type} is not supported for the SSH ramdisk jailbreak"
+                    )
+                })?;
+            info!(%product_type, %version, %build, "resolved jailbreak plan");
+            let cache = config.artifact_cache_dir()?;
+            let fetch = async |id: &ResourceId, gz: bool| -> Result<Vec<u8>> {
+                let path = kit.fetch_resource(id, &cache).await?;
+                let data = tokio::fs::read(&path).await?;
+                Ok(if gz {
+                    legacy_ios_kit::gunzip(&data)?
+                } else {
+                    data
+                })
+            };
+            let fetch_opt = async |id: &str, needed: bool| -> Result<Option<Vec<u8>>> {
+                if needed {
+                    Ok(Some(fetch(&ResourceId::new(id), false).await?))
+                } else {
+                    Ok(None)
+                }
+            };
+            let packages = legacy_ios_kit::JailbreakPackages {
+                freeze: fetch(&plan.freeze_resource(), true).await?,
+                untether: match plan.untether() {
+                    Some(untether) => Some(fetch(&untether.resource_id(), false).await?),
+                    None => None,
+                },
+                daibutsu_move: fetch_opt("jailbreak-daibutsu-move", plan.needs_daibutsu_move())
+                    .await?,
+                fstab: fetch(&plan.fstab().resource_id(), false).await?,
+                cydia_substrate: fetch_opt(
+                    "jailbreak-cydiasubstrate",
+                    plan.needs_cydia_substrate(),
+                )
+                .await?,
+                launchctl: fetch_opt("jailbreak-launchctl", plan.needs_launchctl_zebra()).await?,
+                zebra: fetch_opt("jailbreak-zebra", plan.needs_launchctl_zebra()).await?,
+                cydia_http_patch: fetch_opt(
+                    "jailbreak-cydiahttpatch",
+                    plan.needs_cydia_http_patch(),
+                )
+                .await?,
+                lukezgd: fetch_opt("jailbreak-lukezgd", plan.needs_lukezgd()).await?,
+                nopatcyh: fetch_opt("jailbreak-nopatcyh", plan.removes_patcyh()).await?,
+            };
+            kit.install_jailbreak(&ssh, &plan, &packages)
+                .await
+                .context("jailbreak installation failed")?;
+            write_status(output, "jailbroken")?;
         }
         Command::Shsh {
             command:

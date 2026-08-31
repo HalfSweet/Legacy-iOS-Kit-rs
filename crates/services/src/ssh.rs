@@ -273,8 +273,26 @@ impl RamdiskSsh {
         Ok(())
     }
 
+    /// Mount the device data partition from the ramdisk (`mount.sh pv`).
+    pub async fn mount_data_partition(&self) -> Result<(), SshError> {
+        let result = self.execute("mount.sh pv").await?;
+        if !result.success() {
+            return Err(SshError::RemoteCommand(result.exit_status));
+        }
+        Ok(())
+    }
+
     /// Read the device's iOS product version from the mounted root filesystem.
     pub async fn system_version(&self) -> Result<String, SshError> {
+        self.system_version_value("ProductVersion").await
+    }
+
+    /// Read the device's iOS build version from the mounted root filesystem.
+    pub async fn system_build(&self) -> Result<String, SshError> {
+        self.system_version_value("ProductBuildVersion").await
+    }
+
+    async fn system_version_value(&self, key: &str) -> Result<String, SshError> {
         let plist = self
             .download(
                 &ScpPath::new("/mnt1/System/Library/CoreServices/SystemVersion.plist")
@@ -286,10 +304,10 @@ impl RamdiskSsh {
             plist::from_bytes(&plist).map_err(|error| SshError::Scp(error.to_string()))?;
         value
             .as_dictionary()
-            .and_then(|dictionary| dictionary.get("ProductVersion"))
+            .and_then(|dictionary| dictionary.get(key))
             .and_then(plist::Value::as_string)
             .map(str::to_owned)
-            .ok_or_else(|| SshError::Scp("SystemVersion.plist has no ProductVersion".into()))
+            .ok_or_else(|| SshError::Scp(format!("SystemVersion.plist has no {key}")))
     }
 
     /// Build and fetch the activation record tar from the mounted data
