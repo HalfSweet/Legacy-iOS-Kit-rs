@@ -8,16 +8,15 @@ use std::{
 };
 
 use legacy_ios_core::{
-    ActionId, ActionKind, CancellationSafety, OperationEvent, OperationKind, OperationOutcome,
-    OperationPhase, Progress, ProgressUnit, Soc,
+    CancellationSafety, OperationEvent, OperationKind, OperationOutcome, OperationPhase, Progress,
+    ProgressUnit, Soc,
 };
-use legacy_ios_exploits::{ExploitError, ExternalA5Pwn, Limera1n};
 use legacy_ios_firmware::{ApParameters, FirmwareArchive, SigningTicket, TssClient, TssRequest};
 use legacy_ios_restore::RestoreOptions;
-use legacy_ios_transport::{IbootClient, RecoveryError};
+use legacy_ios_transport::IbootClient;
 use legacy_ios_workflows::{
-    BasebandPolicy, DestructiveConsent, ExploitPolicy, RestoreExecutionProgress, RestorePlan,
-    RestorePreparation, TicketPolicy, run_restore,
+    BasebandPolicy, DestructiveConsent, RestoreExecutionProgress, RestorePlan, RestorePreparation,
+    TicketPolicy, run_restore,
 };
 use tracing::debug;
 
@@ -144,7 +143,14 @@ async fn execute(
         return Ok(None);
     }
 
-    if !resolve_exploit(&plan, limera1n_payload, emitter).await? {
+    if !crate::exploit::ensure_pwned(
+        plan.device(),
+        plan.exploit_policy(),
+        limera1n_payload,
+        emitter,
+    )
+    .await?
+    {
         drop(lease);
         return Ok(None);
     }
@@ -291,69 +297,6 @@ async fn resolve_ticket(
             let response = tss.send(&request).await?;
             Ok(SigningTicket::from_dictionary(response.into_dictionary())?)
         }
-    }
-}
-
-async fn resolve_exploit(
-    plan: &RestorePlan,
-    limera1n_payload: Option<Vec<u8>>,
-    emitter: &OperationEmitter,
-) -> Result<bool, KitError> {
-    if plan.exploit_policy() != ExploitPolicy::Auto {
-        return Ok(true);
-    }
-    emitter
-        .emit(phase(
-            OperationPhase::Exploiting,
-            CancellationSafety::AtCheckpoint,
-        ))
-        .await;
-    let ecid = plan
-        .device()
-        .ecid()
-        .ok_or(KitError::MissingDeviceSelector)?;
-    match plan.device().soc() {
-        Soc::S5l8920 | Soc::S5l8922 | Soc::A4 => {
-            let payload = limera1n_payload.ok_or(KitError::MissingLimera1nPayload)?;
-            let client = IbootClient::open(Some(ecid)).await?;
-            let client = Limera1n::new(payload)?.exploit(client).await?;
-            if client.device_info().pwned().is_none() {
-                return Err(KitError::PwnVerificationFailed);
-            }
-            Ok(true)
-        }
-        soc @ (Soc::A5 | Soc::A5x) => {
-            emitter
-                .emit(OperationEvent::ActionRequired {
-                    id: ActionId::new(1),
-                    action: ActionKind::UseExternalPwnHardware {
-                        family: "A5/A5X checkm8".into(),
-                    },
-                })
-                .await;
-            let deadline = tokio::time::Instant::now() + Duration::from_secs(300);
-            loop {
-                if emitter.is_cancelled() {
-                    return Ok(false);
-                }
-                match IbootClient::open(Some(ecid)).await {
-                    Ok(client) => match ExternalA5Pwn::verify(&client, soc) {
-                        Ok(_) => return Ok(true),
-                        Err(ExploitError::NotPwned) => {}
-                        Err(ExploitError::UnsupportedSoc(_)) => {
-                            return Err(KitError::AutomaticExploitUnsupported(soc));
-                        }
-                    },
-                    Err(RecoveryError::NoDevice) => {}
-                    Err(error) => return Err(error.into()),
-                }
-                if tokio::time::Instant::now() >= deadline {
-                    return Err(KitError::ExternalExploitTimeout);
-                }
-                tokio::time::sleep(Duration::from_secs(1)).await;
-            }
-        }
-        soc => Err(KitError::AutomaticExploitUnsupported(soc)),
     }
 }
 
