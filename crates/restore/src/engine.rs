@@ -6,8 +6,8 @@ use tokio::io::{AsyncRead, AsyncWrite};
 use tracing::{debug, warn};
 
 use crate::{
-    DispatchAction, PreparedRestoreData, RestoreDispatchError, RestoreOptions, RestoredClient,
-    RestoredConnectError, RestoredError, RestoredMessage, RestoredSession,
+    AsrError, DispatchAction, PreparedRestoreData, RestoreDispatchError, RestoreOptions,
+    RestoredClient, RestoredConnectError, RestoredError, RestoredMessage, RestoredSession,
 };
 
 pub async fn run_restored_session<F, Fut, P>(
@@ -170,6 +170,8 @@ pub enum RestoreRunError {
     Dispatch(#[from] RestoreDispatchError),
     #[error(transparent)]
     Connect(#[from] RestoredConnectError),
+    #[error(transparent)]
+    Asr(#[from] AsrError),
     #[error("restore failed with AMR error {0}")]
     Amr(u64),
     #[error("restore failed with device status {0}")]
