@@ -15,9 +15,9 @@ use legacy_ios_kit::{
     DeviceInventory, DeviceStorageInfo, DeviceSummary, DmgFirmwareKey, Ecid, ExploitPolicy,
     FirmwareSummary, HostKeyPolicy, InstalledApp, LegacyIosKit, OperationEvent, OperationHandle,
     OperationOutcome, ProductType, RamdiskSsh, RecoveryDeviceInfo, RecoveryUploadResult,
-    RemoteFirmwareSummary, RestoreBehavior, RestoreExecutionRequest, RestorePlan, RestoreRequest,
-    ScpPath, SepPolicy, ShshRequest, ShshSummary, SigningTicket, SshCommandOutput, SshPassword,
-    SshTarget, TicketPolicy, Udid,
+    RemoteFirmwareSummary, ResourceId, RestoreBehavior, RestoreExecutionRequest, RestorePlan,
+    RestoreRequest, ScpPath, SepPolicy, ShshRequest, ShshSummary, SigningTicket, SshCommandOutput,
+    SshPassword, SshTarget, TicketPolicy, Udid,
 };
 use tracing::level_filters::LevelFilter;
 use tracing::{debug, info, warn};
@@ -403,6 +403,12 @@ enum FirmwareCommand {
     Inspect { path: PathBuf },
     /// Inspect a remote IPSW by fetching only its ZIP directory and BuildManifest.
     InspectRemote { url: String },
+    /// Download and verify a resource from the provenance catalog.
+    FetchResource {
+        id: String,
+        #[arg(long)]
+        cache_dir: Option<PathBuf>,
+    },
     /// Decrypt a FileVault v2 root filesystem DMG with its firmware key.
     DecryptDmg {
         source: PathBuf,
@@ -698,7 +704,7 @@ async fn main() -> Result<()> {
         } => write_config(output, &config)?,
         Command::Config {
             command: ConfigCommand::Path,
-        } => write_config_path(output, &config.path)?,
+        } => write_path(output, &config.path)?,
         Command::Data {
             command:
                 DataCommand::Backup {
@@ -1071,6 +1077,21 @@ async fn main() -> Result<()> {
                 .await
                 .context("failed to inspect remote firmware")?;
             write_remote_firmware(output, &summary)?;
+        }
+        Command::Firmware {
+            command: FirmwareCommand::FetchResource { id, cache_dir },
+        } => {
+            let path = kit
+                .fetch_resource(
+                    &ResourceId::new(id),
+                    match cache_dir {
+                        Some(path) => path,
+                        None => config.artifact_cache_dir()?,
+                    },
+                )
+                .await
+                .context("failed to fetch resource")?;
+            write_path(output, &path)?;
         }
         Command::Firmware {
             command:
@@ -1571,7 +1592,7 @@ fn write_storage_info(format: OutputFormat, info: &DeviceStorageInfo) -> Result<
     Ok(())
 }
 
-fn write_config_path(format: OutputFormat, path: &std::path::Path) -> Result<()> {
+fn write_path(format: OutputFormat, path: &std::path::Path) -> Result<()> {
     let stdout = io::stdout();
     let mut output = stdout.lock();
     match format {

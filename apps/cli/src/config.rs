@@ -118,6 +118,14 @@ impl AppConfig {
         };
         Ok(root.join("pairing"))
     }
+
+    pub(crate) fn artifact_cache_dir(&self) -> Result<PathBuf> {
+        let root = match &self.storage.cache_dir {
+            Some(path) => path.clone(),
+            None => project_dirs()?.cache_dir().to_owned(),
+        };
+        Ok(root.join("artifacts"))
+    }
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
