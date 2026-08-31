@@ -206,6 +206,24 @@ impl DeviceManager {
             .await?)
     }
 
+    pub async fn app_icon(&self, udid: &Udid, bundle_id: &str) -> Result<Vec<u8>, KitError> {
+        Ok(self.find_normal(udid).await?.app_icon(bundle_id).await?)
+    }
+
+    pub async fn icon_state(&self, udid: &Udid) -> Result<plist::Value, KitError> {
+        Ok(self.find_normal(udid).await?.icon_state().await?)
+    }
+
+    pub async fn set_icon_state(&self, udid: &Udid, state: plist::Value) -> Result<(), KitError> {
+        self.find_normal(udid).await?.set_icon_state(state).await?;
+        Ok(())
+    }
+
+    pub async fn refresh_icon_state(&self, udid: &Udid) -> Result<(), KitError> {
+        self.find_normal(udid).await?.refresh_icon_state().await?;
+        Ok(())
+    }
+
     pub async fn enter_recovery(&self, udid: &Udid) -> Result<(), KitError> {
         self.find_normal(udid).await?.enter_recovery().await?;
         Ok(())
