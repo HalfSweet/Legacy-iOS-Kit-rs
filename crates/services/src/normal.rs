@@ -28,7 +28,7 @@ use tokio::{
     io::{AsyncRead, AsyncWrite, ReadBuf},
     sync::RwLock,
 };
-use tracing::{debug, info};
+use tracing::{debug, info, warn};
 
 use crate::plist_service::PropertyListService;
 
@@ -100,6 +100,82 @@ impl SystemMux {
             provider: Arc::new(provider),
             pairing: PairingBackend::System(self.address.clone()),
         })
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum NormalBackend {
+    #[default]
+    Auto,
+    System,
+    Direct,
+}
+
+#[derive(Clone, Debug)]
+pub struct NormalMux {
+    backend: NormalBackend,
+    system: SystemMux,
+    direct: DirectMux,
+}
+
+impl NormalMux {
+    pub fn new(backend: NormalBackend) -> Self {
+        Self {
+            backend,
+            system: SystemMux::default(),
+            direct: DirectMux::default(),
+        }
+    }
+
+    pub const fn backend(&self) -> NormalBackend {
+        self.backend
+    }
+
+    pub async fn list_devices(&self) -> Result<Vec<NormalDevice>, ServiceError> {
+        match self.backend {
+            NormalBackend::System => self.system.list_devices().await,
+            NormalBackend::Direct => self.direct.list_devices().await,
+            NormalBackend::Auto => match self.system.list_devices().await {
+                Ok(devices) => Ok(devices),
+                Err(error) => {
+                    warn!(%error, "system mux unavailable; using direct USB backend");
+                    self.direct.list_devices().await
+                }
+            },
+        }
+    }
+
+    pub async fn find_device(&self, udid: &Udid) -> Result<NormalDevice, ServiceError> {
+        match self.backend {
+            NormalBackend::System => self.system.find_device(udid).await,
+            NormalBackend::Direct => self.direct.find_device(udid).await,
+            NormalBackend::Auto => match self.system.find_device(udid).await {
+                Ok(device) => Ok(device),
+                Err(error) => {
+                    warn!(%error, "device unavailable through system mux; using direct USB backend");
+                    self.direct.find_device(udid).await
+                }
+            },
+        }
+    }
+
+    pub async fn import_pairing_record(
+        &self,
+        udid: Udid,
+        record: PairingRecord,
+    ) -> Option<PairingRecord> {
+        self.direct.import_pairing_record(udid, record).await
+    }
+
+    pub async fn pairing_record(&self, udid: &Udid) -> Option<PairingRecord> {
+        self.direct.pairing_record(udid).await
+    }
+}
+
+impl Default for NormalMux {
+    fn default() -> Self {
+        Self::new(NormalBackend::Auto)
     }
 }
 
