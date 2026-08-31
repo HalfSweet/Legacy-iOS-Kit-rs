@@ -6,7 +6,7 @@ use thiserror::Error;
 use tokio::time::Instant;
 use tracing::info;
 
-use crate::{PreparedBootComponent, RestorePreparation};
+use crate::{ExploitPolicy, PreparedBootComponent, RestorePreparation};
 
 const RECONNECT_TIMEOUT: Duration = Duration::from_secs(30);
 
@@ -15,6 +15,13 @@ pub async fn boot_restore(
     ecid: Ecid,
 ) -> Result<RestoreBootOutcome, RestoreBootError> {
     let mut client = wait_for_device(ecid).await?;
+    if matches!(
+        preparation.exploit_policy(),
+        ExploitPolicy::Auto | ExploitPolicy::AlreadyPwned
+    ) && client.device_info().pwned().is_none()
+    {
+        return Err(RestoreBootError::NotPwned);
+    }
     if client.mode() == DeviceMode::Dfu {
         client = upload_dfu(client, component(preparation, "iBSS")?, ecid).await?;
     }
@@ -145,6 +152,8 @@ pub enum RestoreBootError {
     },
     #[error("timed out waiting for the device to reconnect")]
     ReconnectTimeout,
+    #[error("device is not in a verified pwned DFU state")]
+    NotPwned,
     #[error(transparent)]
     Recovery(#[from] RecoveryError),
 }

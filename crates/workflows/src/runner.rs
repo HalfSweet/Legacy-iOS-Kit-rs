@@ -13,8 +13,8 @@ use legacy_ios_restore::{
 use thiserror::Error;
 
 use crate::{
-    BasebandPolicy, BasebandRequestError, BasebandResolver, ExploitPolicy, RestoreBootError,
-    RestorePlan, RestorePreparation, boot_restore,
+    BasebandPolicy, BasebandRequestError, BasebandResolver, RestoreBootError, RestorePlan,
+    RestorePreparation, boot_restore,
 };
 
 pub async fn run_restore<P>(
@@ -40,9 +40,6 @@ where
             tss.clone(),
         )?)),
     };
-    if matches!(plan.exploit_policy(), ExploitPolicy::Auto) {
-        return Err(RestoreExecutionError::ExploitNotResolved);
-    }
     let ecid = plan
         .device()
         .ecid()
@@ -137,8 +134,6 @@ pub enum RestoreExecutionError {
     PreparationMismatch,
     #[error("restore execution requires an ECID")]
     MissingEcid,
-    #[error("automatic exploit policy must be resolved before restore execution")]
-    ExploitNotResolved,
     #[error(transparent)]
     Firmware(#[from] FirmwareError),
     #[error(transparent)]

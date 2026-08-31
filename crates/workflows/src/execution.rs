@@ -26,6 +26,7 @@ pub struct RestorePreparation {
     filesystem_path: String,
     recovery_ticket: Option<Vec<u8>>,
     build_major: u32,
+    exploit_policy: crate::ExploitPolicy,
 }
 
 impl RestorePreparation {
@@ -124,6 +125,7 @@ impl RestorePreparation {
             filesystem_path,
             recovery_ticket,
             build_major,
+            exploit_policy: plan.exploit_policy(),
         })
     }
 
@@ -149,6 +151,10 @@ impl RestorePreparation {
 
     pub const fn build_major(&self) -> u32 {
         self.build_major
+    }
+
+    pub const fn exploit_policy(&self) -> crate::ExploitPolicy {
+        self.exploit_policy
     }
 }
 
