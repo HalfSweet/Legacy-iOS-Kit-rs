@@ -6,6 +6,7 @@ mod crypto;
 mod dmg;
 mod fls;
 mod hfs;
+mod hfs_btree;
 mod img3;
 mod img4;
 mod mbn;
