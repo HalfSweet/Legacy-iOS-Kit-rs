@@ -10,13 +10,14 @@ idevice = { version = "=0.1.50", default-features = false, features = ["afc", "d
 legacy-ios-core = { path = "../core" }
 legacy-ios-transport = { path = "../transport" }
 plist = "=1.8.0"
+russh = { version = "=0.63.1", default-features = false, features = ["des", "dsa", "ring", "rsa"] }
 serde.workspace = true
 thiserror.workspace = true
 time = "=0.3.41"
 tokio = { workspace = true, features = ["fs", "io-util"] }
 tracing.workspace = true
 uuid = { version = "1.16.0", features = ["v4"] }
-zeroize = "=1.8.1"
+zeroize = "=1.9.0"
 
 [lints]
 workspace = true

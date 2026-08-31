@@ -7,6 +7,7 @@ mod backup;
 mod files;
 mod normal;
 mod plist_service;
+mod ssh;
 
 pub use app::{AppFilter, InstalledApp};
 pub use backup::{BackupError, BackupOptions, BackupOutcome, BackupRestoreOptions};
@@ -17,3 +18,4 @@ pub use normal::{
     DeviceSyslog, MuxDevice, NormalDevice, NormalDeviceInfo, RawServiceConnection, ServiceError,
     SystemMux,
 };
+pub use ssh::{HostKeyPolicy, RamdiskSsh, SshCommandOutput, SshError, SshPassword, SshTarget};
