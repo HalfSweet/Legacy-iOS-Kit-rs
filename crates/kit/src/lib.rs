@@ -26,8 +26,8 @@ pub use legacy_ios_firmware::{RestoreBehavior, SigningTicket, TicketError};
 pub use legacy_ios_services::{
     ActivationState, AfcPath, AfcPathError, AppFilter, BackupOptions, BackupOutcome,
     BackupRestoreOptions, DeviceFileInfo, DeviceFileKind, DeviceFiles, DeviceStorageInfo,
-    DeviceSyslog, HostKeyPolicy, InstalledApp, RamdiskSsh, ScpPath, ScpPathError, SshCommandOutput,
-    SshPassword, SshTarget,
+    DeviceSyslog, HostKeyPolicy, InstalledApp, NormalBackend, RamdiskSsh, ScpPath, ScpPathError,
+    SshCommandOutput, SshPassword, SshTarget,
 };
 pub use legacy_ios_transport::RecoveryDeviceInfo;
 pub use legacy_ios_workflows::{
@@ -54,6 +54,11 @@ impl LegacyIosKit {
 
     pub fn devices(&self) -> &DeviceManager {
         &self.devices
+    }
+
+    pub fn with_normal_backend(mut self, backend: NormalBackend) -> Self {
+        self.devices = DeviceManager::with_normal_backend(backend);
+        self
     }
 
     pub fn recovery(&self) -> &RecoveryManager {

@@ -4,10 +4,10 @@ use legacy_ios_core::{
     BoardConfig, CapabilitySet, ConnectionId, DeviceIdentity, DeviceMode, DeviceSnapshot, Ecid,
     ProductType, Soc, Udid,
 };
-use legacy_ios_services::SystemMux;
 use legacy_ios_services::{
     ActivationState, AppFilter, BackupOptions, BackupOutcome, BackupRestoreOptions, DeviceFiles,
-    DeviceSyslog, HostKeyPolicy, InstalledApp, RamdiskSsh, SshPassword, SshTarget,
+    DeviceSyslog, HostKeyPolicy, InstalledApp, NormalBackend, NormalMux, RamdiskSsh, SshPassword,
+    SshTarget, SystemMux,
 };
 use legacy_ios_transport::{
     DeviceLocator, NusbDeviceLocator, ObservedUsbDevice, parse_iboot_serial,
@@ -20,10 +20,23 @@ use crate::{KitError, OperationHandle};
 #[derive(Clone, Debug, Default)]
 pub struct DeviceManager {
     bootloader: NusbDeviceLocator,
-    normal: SystemMux,
+    normal: NormalMux,
+    ramdisk: SystemMux,
 }
 
 impl DeviceManager {
+    pub fn with_normal_backend(backend: NormalBackend) -> Self {
+        Self {
+            bootloader: NusbDeviceLocator,
+            normal: NormalMux::new(backend),
+            ramdisk: SystemMux::default(),
+        }
+    }
+
+    pub const fn normal_backend(&self) -> NormalBackend {
+        self.normal.backend()
+    }
+
     pub fn watch_bootloader(&self) -> Result<OperationHandle, KitError> {
         let mut watch = self.bootloader.watch()?;
         let (emitter, handle) = OperationHandle::channel(32);
@@ -216,7 +229,7 @@ impl DeviceManager {
         password: &SshPassword,
         host_key: HostKeyPolicy,
     ) -> Result<RamdiskSsh, KitError> {
-        Ok(RamdiskSsh::connect(&self.normal, target, username, password, host_key).await?)
+        Ok(RamdiskSsh::connect(&self.ramdisk, target, username, password, host_key).await?)
     }
 
     pub async fn activation_state(&self, udid: &Udid) -> Result<ActivationState, KitError> {
