@@ -1,5 +1,6 @@
 use std::io::{Cursor, Read, Write};
 
+use bzip2_rs::DecoderReader;
 use flate2::{Compression, read::ZlibDecoder, write::ZlibEncoder};
 use plist::{Dictionary, Value};
 use thiserror::Error;
@@ -187,8 +188,16 @@ impl DmgImage {
                         return Err(DmgError::ChunkSizeMismatch);
                     }
                 }
+                CHUNK_BZLIB => {
+                    let compressed = chunk.data(&self.data)?;
+                    let start = output.len();
+                    DecoderReader::new(compressed).read_to_end(&mut output)?;
+                    if output.len() - start != expanded_size {
+                        return Err(DmgError::ChunkSizeMismatch);
+                    }
+                }
                 CHUNK_COMMENT | CHUNK_TERM => {}
-                CHUNK_ADC | CHUNK_BZLIB | CHUNK_LZFSE => {
+                CHUNK_ADC | CHUNK_LZFSE => {
                     return Err(DmgError::UnsupportedCompression(chunk.chunk_type));
                 }
                 value => return Err(DmgError::UnknownChunkType(value)),
@@ -467,5 +476,45 @@ mod tests {
 
         assert_eq!(image.partitions()[0].name(), "Apple_HFS");
         assert_eq!(image.extract(0).unwrap(), data);
+    }
+
+    #[test]
+    fn extracts_bzip2_blkx_chunk() {
+        let compressed = vec![
+            0x42, 0x5a, 0x68, 0x39, 0x31, 0x41, 0x59, 0x26, 0x53, 0x59, 0x6f, 0xa6, 0xeb, 0x63,
+            0x00, 0x00, 0x01, 0x82, 0x00, 0x80, 0x10, 0x00, 0x08, 0x20, 0x00, 0x30, 0x80, 0x49,
+            0xea, 0x06, 0xae, 0x2e, 0xe4, 0x8a, 0x70, 0xa1, 0x20, 0xdf, 0x4d, 0xd6, 0xc6,
+        ];
+        let expected = vec![0x5a; SECTOR_SIZE];
+        let image = DmgImage {
+            data: compressed.clone(),
+            partitions: vec![DmgPartition {
+                name: "Apple_HFS".into(),
+                sectors: 1,
+            }],
+            tables: vec![BlkxTable {
+                sector_number: 0,
+                sector_count: 1,
+                checksum: crc32fast::hash(&expected),
+                chunks: vec![
+                    BlkxChunk {
+                        chunk_type: CHUNK_BZLIB,
+                        sector_number: 0,
+                        sector_count: 1,
+                        compressed_offset: 0,
+                        compressed_length: compressed.len() as u64,
+                    },
+                    BlkxChunk {
+                        chunk_type: CHUNK_TERM,
+                        sector_number: 1,
+                        sector_count: 0,
+                        compressed_offset: compressed.len() as u64,
+                        compressed_length: 0,
+                    },
+                ],
+            }],
+        };
+
+        assert_eq!(image.extract(0).unwrap(), expected);
     }
 }
