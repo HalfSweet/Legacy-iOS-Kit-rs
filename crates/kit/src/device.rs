@@ -6,8 +6,8 @@ use legacy_ios_core::{
 };
 use legacy_ios_services::SystemMux;
 use legacy_ios_services::{
-    AppFilter, BackupOptions, BackupOutcome, BackupRestoreOptions, DeviceFiles, DeviceSyslog,
-    HostKeyPolicy, InstalledApp, RamdiskSsh, SshPassword, SshTarget,
+    ActivationState, AppFilter, BackupOptions, BackupOutcome, BackupRestoreOptions, DeviceFiles,
+    DeviceSyslog, HostKeyPolicy, InstalledApp, RamdiskSsh, SshPassword, SshTarget,
 };
 use legacy_ios_transport::{
     DeviceLocator, NusbDeviceLocator, ObservedUsbDevice, parse_iboot_serial,
@@ -217,6 +217,20 @@ impl DeviceManager {
         host_key: HostKeyPolicy,
     ) -> Result<RamdiskSsh, KitError> {
         Ok(RamdiskSsh::connect(&self.normal, target, username, password, host_key).await?)
+    }
+
+    pub async fn activation_state(&self, udid: &Udid) -> Result<ActivationState, KitError> {
+        Ok(self
+            .normal
+            .find_device(udid)
+            .await?
+            .activation_state()
+            .await?)
+    }
+
+    pub async fn deactivate(&self, udid: &Udid) -> Result<(), KitError> {
+        self.normal.find_device(udid).await?.deactivate().await?;
+        Ok(())
     }
 }
 
