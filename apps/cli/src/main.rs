@@ -225,6 +225,34 @@ enum AppCommand {
         #[arg(long)]
         yes: bool,
     },
+    /// List files in an application's container.
+    Files {
+        udid: Udid,
+        bundle_id: String,
+        path: AfcPath,
+        #[arg(long)]
+        documents: bool,
+    },
+    /// Copy a file from an application's container.
+    Pull {
+        udid: Udid,
+        bundle_id: String,
+        source: AfcPath,
+        destination: PathBuf,
+        #[arg(long)]
+        documents: bool,
+    },
+    /// Copy a file into an application's container.
+    Push {
+        udid: Udid,
+        bundle_id: String,
+        source: PathBuf,
+        destination: AfcPath,
+        #[arg(long)]
+        documents: bool,
+        #[arg(long)]
+        yes: bool,
+    },
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
@@ -547,6 +575,66 @@ async fn main() -> Result<()> {
                 .await
                 .context("failed to uninstall application")?;
             write_message(output, "uninstalled-app", &udid)?;
+        }
+        Command::App {
+            command:
+                AppCommand::Files {
+                    udid,
+                    bundle_id,
+                    path,
+                    documents,
+                },
+        } => {
+            let mut files = if documents {
+                kit.devices().app_documents(&udid, &bundle_id).await?
+            } else {
+                kit.devices().app_container(&udid, &bundle_id).await?
+            };
+            write_data_list(output, &files.list(&path).await?)?;
+        }
+        Command::App {
+            command:
+                AppCommand::Pull {
+                    udid,
+                    bundle_id,
+                    source,
+                    destination,
+                    documents,
+                },
+        } => {
+            let mut files = if documents {
+                kit.devices().app_documents(&udid, &bundle_id).await?
+            } else {
+                kit.devices().app_container(&udid, &bundle_id).await?
+            };
+            let data = files.read(&source).await?;
+            tokio::fs::write(&destination, data)
+                .await
+                .with_context(|| format!("failed to write {}", destination.display()))?;
+            write_status(output, "pulled-app-file")?;
+        }
+        Command::App {
+            command:
+                AppCommand::Push {
+                    udid,
+                    bundle_id,
+                    source,
+                    destination,
+                    documents,
+                    yes,
+                },
+        } => {
+            confirm("write the application container file", yes)?;
+            let data = tokio::fs::read(&source)
+                .await
+                .with_context(|| format!("failed to read {}", source.display()))?;
+            let mut files = if documents {
+                kit.devices().app_documents(&udid, &bundle_id).await?
+            } else {
+                kit.devices().app_container(&udid, &bundle_id).await?
+            };
+            files.write(&destination, &data).await?;
+            write_status(output, "pushed-app-file")?;
         }
         Command::Config {
             command: ConfigCommand::Show,
