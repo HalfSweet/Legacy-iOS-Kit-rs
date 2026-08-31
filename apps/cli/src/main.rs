@@ -388,7 +388,7 @@ enum RestoreCommand {
         #[arg(long)]
         firmware: PathBuf,
         #[arg(long)]
-        ticket: PathBuf,
+        ticket: Option<PathBuf>,
         #[arg(long)]
         work_dir: Option<PathBuf>,
         #[arg(long, value_enum, default_value_t = RestoreBehaviorArg::Erase)]
@@ -951,7 +951,9 @@ async fn main() -> Result<()> {
                 device,
                 firmware,
                 behavior: behavior.into(),
-                ticket: TicketPolicy::Provided(ticket.clone()),
+                ticket: ticket
+                    .clone()
+                    .map_or(TicketPolicy::Signed, TicketPolicy::Provided),
                 baseband: if no_baseband {
                     BasebandPolicy::None
                 } else if let Some(baseband) = baseband {
@@ -970,12 +972,20 @@ async fn main() -> Result<()> {
                 yes,
             )?;
             let consent = plan.confirm_destructive();
-            let ticket = SigningTicket::open(&ticket).context("failed to read signing ticket")?;
             let work_directory = work_dir
                 .or_else(|| config.storage.work_dir.clone())
                 .unwrap_or_else(|| std::env::temp_dir().join("legacy-ios-kit"));
-            let mut request = RestoreExecutionRequest::new(plan, consent, ticket, work_directory)
-                .with_flash_version_1(flash_version_1);
+            let mut request = if let Some(ticket) = ticket {
+                RestoreExecutionRequest::new(
+                    plan,
+                    consent,
+                    SigningTicket::open(&ticket).context("failed to read signing ticket")?,
+                    work_directory,
+                )
+            } else {
+                RestoreExecutionRequest::signed(plan, consent, work_directory)
+            }
+            .with_flash_version_1(flash_version_1);
             if let Some(path) = limera1n_payload {
                 request = request.with_limera1n_payload(
                     tokio::fs::read(&path)
