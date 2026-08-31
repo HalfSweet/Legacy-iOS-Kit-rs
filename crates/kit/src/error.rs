@@ -78,6 +78,8 @@ pub enum KitError {
     PwnageWtfDigest,
     #[error("timed out waiting for the device to re-enumerate in Pwnage 2.0 WTF mode")]
     PwnageVerificationTimeout,
+    #[error("timed out waiting for the device to enter kDFU mode")]
+    KdfuTimeout,
     #[error("restored device version mismatch: expected {expected}, got {actual}")]
     VersionMismatch { expected: String, actual: String },
     #[error("unknown product type {0}")]
@@ -140,6 +142,7 @@ impl KitError {
             | Self::Checkm8(_)
             | Self::AutomaticExploitUnsupported(_)
             | Self::PwnageVerificationTimeout
+            | Self::KdfuTimeout
             | Self::PwnageWtfDigest
             | Self::MissingLimera1nPayload
             | Self::PwnVerificationFailed
@@ -166,7 +169,7 @@ impl KitError {
                 Recoverability::RestartOperation
             }
             Self::VerificationTimeout => Recoverability::ReconnectDevice,
-            Self::PwnageVerificationTimeout => Recoverability::ReenterDfu,
+            Self::PwnageVerificationTimeout | Self::KdfuTimeout => Recoverability::ReenterDfu,
             Self::PwnageWtfDigest => Recoverability::NotRecoverable,
             Self::VersionMismatch { .. } => Recoverability::ManualRecoveryRequired,
             Self::Firmware(_)

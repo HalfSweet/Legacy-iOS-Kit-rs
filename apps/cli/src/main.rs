@@ -457,6 +457,26 @@ enum DeviceCommand {
         #[arg(long)]
         yes: bool,
     },
+    /// Enter kDFU mode on a jailbroken device via kloader over SSH.
+    EnterKdfu {
+        udid: Udid,
+        /// IPSW to extract and patch iBSS from (requires --key/--iv).
+        #[arg(long, requires = "key")]
+        firmware: Option<PathBuf>,
+        #[arg(long, requires = "firmware", requires = "iv")]
+        key: Option<String>,
+        #[arg(long, requires = "key")]
+        iv: Option<String>,
+        /// Use a prebuilt RSA-patched iBSS instead of building one.
+        #[arg(long, conflicts_with_all = ["firmware", "key", "iv"])]
+        pwned_ibss: Option<PathBuf>,
+        #[arg(long, default_value = "root")]
+        username: String,
+        #[arg(long)]
+        host_key: Option<String>,
+        #[arg(long)]
+        yes: bool,
+    },
     /// Write the boot nonce generator to NVRAM on a Recovery-mode device.
     SetNonce {
         #[arg(long)]
@@ -1292,6 +1312,67 @@ async fn main() -> Result<()> {
                 .await
                 .context("Pwnage WTF exploit failed")?;
             write_status(output, "pwned-wtf")?;
+        }
+        Command::Device {
+            command:
+                DeviceCommand::EnterKdfu {
+                    udid,
+                    firmware,
+                    key,
+                    iv,
+                    pwned_ibss,
+                    username,
+                    host_key,
+                    yes,
+                },
+        } => {
+            let summaries = kit.devices().list_normal().await?;
+            let device = summaries
+                .iter()
+                .find(|device| device.udid() == Some(&udid))
+                .ok_or_else(|| anyhow!("no normal-mode device with UDID {udid}"))?;
+            let product_type = device
+                .product_type()
+                .ok_or_else(|| anyhow!("device product type is unknown"))?
+                .clone();
+            let ios_major: u32 = device
+                .product_version()
+                .and_then(|version| version.split('.').next()?.parse().ok())
+                .ok_or_else(|| anyhow!("device iOS version is unknown"))?;
+            let ecid = device.ecid();
+
+            let pwned_ibss = if let Some(path) = pwned_ibss {
+                tokio::fs::read(&path)
+                    .await
+                    .with_context(|| format!("failed to read {}", path.display()))?
+            } else {
+                let firmware = firmware.ok_or_else(|| {
+                    anyhow!("either --firmware with --key/--iv or --pwned-ibss is required")
+                })?;
+                let board = device
+                    .board_config()
+                    .ok_or_else(|| anyhow!("device board config is unknown"))?
+                    .clone();
+                let cipher = image_cipher(key, iv)?;
+                tokio::task::spawn_blocking(move || {
+                    legacy_ios_kit::prepare_pwned_ibss(&firmware, &board, cipher.as_ref())
+                })
+                .await
+                .map_err(|error| anyhow!("task failed: {error}"))??
+            };
+
+            let kloader_id = legacy_ios_kit::select_kloader(&product_type, ios_major);
+            let kloader_path = kit
+                .fetch_resource(&kloader_id, config.artifact_cache_dir()?)
+                .await?;
+            let kloader = tokio::fs::read(&kloader_path).await?;
+
+            confirm("enter kDFU mode on the device", yes)?;
+            let ssh = connect_ramdisk_ssh(&kit, None, &username, host_key).await?;
+            kit.enter_kdfu(&ssh, &kloader, &pwned_ibss, ecid)
+                .await
+                .context("failed to enter kDFU mode")?;
+            write_status(output, "entered-kdfu")?;
         }
         Command::Device {
             command:

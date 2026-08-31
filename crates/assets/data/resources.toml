@@ -99,3 +99,30 @@ sha256 = "d12486bc101ec5a2df8dd4267b4f2c00cd4c8e2416b565c11af5051cb9f14d12"
 size = 262
 purpose = "bsdiff patch turning the Apple WTF.s5l8900xall image into the Pwnage 2.0 exploit image for S5L8900"
 redistribution = "download-only"
+
+[[resources]]
+id = "kloader"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/kloader/kloader"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "bec212b4d99a1e3b9fa4add663fa884a2435045d1e47051415f4e26e197f8132"
+size = 52064
+purpose = "Device-side kloader binary for entering kDFU on iOS 6+ (default)"
+redistribution = "download-only"
+
+[[resources]]
+id = "kloader5"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/kloader/kloader5"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "6e21adf7796e01c297b5875d918cbdebcad1e80d2ed135e0a7633460eed59787"
+size = 18928
+purpose = "Device-side kloader binary for entering kDFU on iPad3,x"
+redistribution = "download-only"
+
+[[resources]]
+id = "kloader-axi0mx"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/kloader/kloader_axi0mX"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "e5a5625b758492930c5c51012731de20bb86c39fb5a78684b7485add40bdda33"
+size = 134768
+purpose = "Device-side kloader binary for entering kDFU on iOS 5 and earlier"
+redistribution = "download-only"

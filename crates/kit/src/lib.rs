@@ -9,6 +9,7 @@ mod exploit;
 mod firmware;
 mod hfs;
 mod image_payload;
+mod kdfu;
 mod lease;
 mod operation;
 mod pairing;
@@ -29,6 +30,7 @@ pub use firmware::{
 };
 pub use hfs::{HfsEntrySummary, HfsKind, HfsMutation, HfsStatSummary};
 pub use image_payload::{ImageCipher, ImageCipherError};
+pub use kdfu::{prepare_pwned_ibss, select_kloader};
 pub use lease::DeviceLease;
 pub use legacy_ios_assets::{Redistribution, ResourceId, ResourceRecord};
 pub use legacy_ios_core::{
@@ -286,6 +288,18 @@ impl LegacyIosKit {
             self.tss.clone(),
             request,
         )
+    }
+
+    /// Upload kloader and a pwned iBSS over SSH and wait for kDFU mode.
+    pub async fn enter_kdfu(
+        &self,
+        ssh: &RamdiskSsh,
+        kloader: &[u8],
+        pwned_ibss: &[u8],
+        ecid: Option<Ecid>,
+    ) -> Result<(), KitError> {
+        kdfu::enter_kdfu(ssh, kloader, pwned_ibss).await?;
+        kdfu::await_kdfu(ecid).await
     }
 
     /// Exploit an S5L8900 device in DFU mode with the Pwnage 2.0 WTF image.
