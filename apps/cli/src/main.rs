@@ -10,14 +10,14 @@ use std::{
 use anyhow::{Context, Result, anyhow};
 use clap::{ArgAction, Parser, Subcommand, ValueEnum};
 use legacy_ios_kit::{
-    ActivationState, AfcPath, AppFilter, BackupOptions, BackupOutcome, BackupRestoreOptions,
-    BasebandPolicy, BoardConfig, DeviceDiagnostics, DeviceFileInfo, DeviceInventory,
-    DeviceStorageInfo, DeviceSummary, DmgFirmwareKey, Ecid, ExploitPolicy, FirmwareSummary,
-    HostKeyPolicy, InstalledApp, LegacyIosKit, OperationEvent, OperationHandle, OperationOutcome,
-    ProductType, RamdiskSsh, RecoveryDeviceInfo, RecoveryUploadResult, RemoteFirmwareSummary,
-    RestoreBehavior, RestoreExecutionRequest, RestorePlan, RestoreRequest, ScpPath, SepPolicy,
-    ShshRequest, ShshSummary, SigningTicket, SshCommandOutput, SshPassword, SshTarget,
-    TicketPolicy, Udid,
+    ActivationState, AfcPath, AppFilter, BackupOptions, BackupOutcome, BackupPassword,
+    BackupRestoreOptions, BasebandPolicy, BoardConfig, DeviceDiagnostics, DeviceFileInfo,
+    DeviceInventory, DeviceStorageInfo, DeviceSummary, DmgFirmwareKey, Ecid, ExploitPolicy,
+    FirmwareSummary, HostKeyPolicy, InstalledApp, LegacyIosKit, OperationEvent, OperationHandle,
+    OperationOutcome, ProductType, RamdiskSsh, RecoveryDeviceInfo, RecoveryUploadResult,
+    RemoteFirmwareSummary, RestoreBehavior, RestoreExecutionRequest, RestorePlan, RestoreRequest,
+    ScpPath, SepPolicy, ShshRequest, ShshSummary, SigningTicket, SshCommandOutput, SshPassword,
+    SshTarget, TicketPolicy, Udid,
 };
 use tracing::level_filters::LevelFilter;
 use tracing::{debug, info, warn};
@@ -151,6 +151,22 @@ enum DataCommand {
         system_files: bool,
         #[arg(long)]
         remove_missing: bool,
+        #[arg(long)]
+        password: bool,
+        #[arg(long)]
+        yes: bool,
+    },
+    /// Enable, change, or disable device backup encryption.
+    Encryption {
+        udid: Udid,
+        #[arg(long)]
+        work_dir: Option<PathBuf>,
+        /// Prompt for the existing password.
+        #[arg(long)]
+        current: bool,
+        /// Remove the password instead of setting a new one.
+        #[arg(long)]
+        remove: bool,
         #[arg(long)]
         yes: bool,
     },
@@ -712,20 +728,62 @@ async fn main() -> Result<()> {
                     replace_settings,
                     system_files,
                     remove_missing,
+                    password,
                     yes,
                 },
         } => {
             confirm("restore the device backup", yes)?;
-            let options = BackupRestoreOptions::default()
+            let mut options = BackupRestoreOptions::default()
                 .reboot(!no_reboot)
                 .preserve_settings(!replace_settings)
                 .system_files(system_files)
                 .remove_items_not_restored(remove_missing);
+            if password {
+                options = options.with_password(BackupPassword::new(
+                    rpassword::prompt_password("Backup password: ")
+                        .context("failed to read backup password")?,
+                ));
+            }
             let outcome = kit
                 .devices()
                 .restore_backup(&udid, &root, &source_identifier, options)
                 .await
                 .context("device backup restore failed")?;
+            write_backup_outcome(output, &outcome)?;
+        }
+        Command::Data {
+            command:
+                DataCommand::Encryption {
+                    udid,
+                    work_dir,
+                    current,
+                    remove,
+                    yes,
+                },
+        } => {
+            confirm("change device backup encryption", yes)?;
+            let old = current
+                .then(|| {
+                    rpassword::prompt_password("Current backup password: ")
+                        .context("failed to read current backup password")
+                        .map(BackupPassword::new)
+                })
+                .transpose()?;
+            let new = (!remove)
+                .then(|| {
+                    rpassword::prompt_password("New backup password: ")
+                        .context("failed to read new backup password")
+                        .map(BackupPassword::new)
+                })
+                .transpose()?;
+            let work_directory = work_dir
+                .or_else(|| config.storage.work_dir.clone())
+                .unwrap_or_else(|| std::env::temp_dir().join("legacy-ios-kit-backup"));
+            let outcome = kit
+                .devices()
+                .change_backup_password(&udid, &work_directory, old.as_ref(), new.as_ref())
+                .await
+                .context("failed to change backup encryption")?;
             write_backup_outcome(output, &outcome)?;
         }
         Command::Data {
