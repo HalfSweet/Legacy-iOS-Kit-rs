@@ -5,6 +5,7 @@
 mod archive;
 mod artifact;
 mod custom;
+mod keys;
 mod manifest;
 mod remote_zip;
 mod ticket;
@@ -13,6 +14,7 @@ mod tss;
 pub use archive::FirmwareArchive;
 pub use artifact::{ArtifactError, ArtifactSpec, ArtifactStore, Digest};
 pub use custom::{CustomIpswBuilder, CustomIpswError};
+pub use keys::{FirmwareKey, FirmwareKeyError, FirmwareKeyProvider, FirmwareKeySet};
 pub use manifest::{BuildIdentity, BuildManifest, FirmwareError, RestoreBehavior};
 pub use remote_zip::{RemoteFirmwareArchive, RemoteFirmwareError};
 pub use ticket::{SigningTicket, TicketError, derive_ap_nonce};
