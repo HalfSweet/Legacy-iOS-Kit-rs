@@ -11,7 +11,7 @@ bzip2-rs = "=0.1.2"
 cbc = "=0.1.2"
 crc32fast = "=1.5.1"
 flate2 = { version = "=1.1.10", default-features = false, features = ["rust_backend"] }
-hfsplus = "=0.2.0"
+hfsplus = "=0.2.4"
 legacy-ios-core = { path = "../core" }
 lzfse_rust = "=0.2.1"
 plist = "=1.10.0"
@@ -19,6 +19,7 @@ thiserror.workspace = true
 
 [dev-dependencies]
 hex = "=0.4.3"
+hfsplus = { version = "=0.2.4", features = ["testutil"] }
 
 [lints]
 workspace = true

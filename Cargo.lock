@@ -1164,9 +1164,9 @@ checksum = "e712f64ec3850b98572bffac52e2c6f282b29fe6c5fa6d42334b30be438d95c1"
 
 [[package]]
 name = "hfsplus"
-version = "0.2.0"
+version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5b3bb07e5acba3feb1c57eede7b9cb325e1738f181a676c1ee5439467dcaade8"
+checksum = "1003d8eed80d61e8e8ea6a958bbe1afd3aef060882b9d6134e50500dd307c0dc"
 dependencies = [
  "byteorder",
  "thiserror 2.0.20",
