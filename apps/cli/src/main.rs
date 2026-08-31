@@ -187,6 +187,29 @@ enum RamdiskCommand {
         #[arg(long)]
         host_key: Option<String>,
     },
+    /// Dump activation records from the mounted data partition.
+    DumpActivation {
+        destination: PathBuf,
+        #[arg(long)]
+        device_id: Option<u32>,
+        #[arg(long, default_value = "root")]
+        username: String,
+        #[arg(long)]
+        host_key: Option<String>,
+        /// Device iOS version; read from the mounted rootfs when omitted.
+        #[arg(long)]
+        ios_version: Option<String>,
+    },
+    /// Dump baseband firmware from the mounted root filesystem.
+    DumpBaseband {
+        destination: PathBuf,
+        #[arg(long)]
+        device_id: Option<u32>,
+        #[arg(long, default_value = "root")]
+        username: String,
+        #[arg(long)]
+        host_key: Option<String>,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -2000,6 +2023,58 @@ async fn main() -> Result<()> {
             let ticket = kit.convert_onboard_dump(&dump)?;
             ticket.save(&destination).await?;
             write_status(output, "saved-onboard-ticket")?;
+        }
+        Command::Ramdisk {
+            command:
+                RamdiskCommand::DumpActivation {
+                    destination,
+                    device_id,
+                    username,
+                    host_key,
+                    ios_version,
+                },
+        } => {
+            let ssh = connect_ramdisk_ssh(&kit, device_id, &username, host_key).await?;
+            let version = match ios_version {
+                Some(version) => version,
+                None => {
+                    ssh.mount_filesystems(true).await?;
+                    ssh.system_version()
+                        .await
+                        .context("failed to read the device iOS version")?
+                }
+            };
+            ssh.mount_filesystems(false).await?;
+            let dump = ssh.dump_activation_records(&version).await?;
+            ssh.disconnect().await?;
+            if !legacy_ios_kit::tar_contains_entry(&dump, "_record.plist") {
+                warn!("dump contains no activation record plist");
+            }
+            tokio::fs::write(&destination, dump)
+                .await
+                .with_context(|| format!("failed to write {}", destination.display()))?;
+            write_status(output, "saved-activation-records")?;
+        }
+        Command::Ramdisk {
+            command:
+                RamdiskCommand::DumpBaseband {
+                    destination,
+                    device_id,
+                    username,
+                    host_key,
+                },
+        } => {
+            let ssh = connect_ramdisk_ssh(&kit, device_id, &username, host_key).await?;
+            ssh.mount_filesystems(true).await?;
+            let dump = ssh.dump_baseband().await?;
+            ssh.disconnect().await?;
+            if !legacy_ios_kit::tar_contains_entry(&dump, "bbticket.der") {
+                warn!("dump contains no bbticket.der");
+            }
+            tokio::fs::write(&destination, dump)
+                .await
+                .with_context(|| format!("failed to write {}", destination.display()))?;
+            write_status(output, "saved-baseband-dump")?;
         }
         Command::Shsh {
             command:

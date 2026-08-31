@@ -22,5 +22,5 @@ pub use normal::{
 };
 pub use ssh::{
     HostKeyPolicy, RamdiskSsh, ScpPath, ScpPathError, SshCommandOutput, SshError, SshPassword,
-    SshTarget,
+    SshTarget, tar_contains_entry,
 };

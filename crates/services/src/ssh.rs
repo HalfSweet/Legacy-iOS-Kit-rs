@@ -262,6 +262,147 @@ impl RamdiskSsh {
             .await?;
         Ok(())
     }
+
+    /// Mount the device filesystems from the ramdisk (`mount.sh`).
+    pub async fn mount_filesystems(&self, root: bool) -> Result<(), SshError> {
+        let command = if root { "mount.sh root" } else { "mount.sh" };
+        let result = self.execute(command).await?;
+        if !result.success() {
+            return Err(SshError::RemoteCommand(result.exit_status));
+        }
+        Ok(())
+    }
+
+    /// Read the device's iOS product version from the mounted root filesystem.
+    pub async fn system_version(&self) -> Result<String, SshError> {
+        let plist = self
+            .download(
+                &ScpPath::new("/mnt1/System/Library/CoreServices/SystemVersion.plist")
+                    .map_err(|error| SshError::Scp(error.to_string()))?,
+                1024 * 1024,
+            )
+            .await?;
+        let value: plist::Value =
+            plist::from_bytes(&plist).map_err(|error| SshError::Scp(error.to_string()))?;
+        value
+            .as_dictionary()
+            .and_then(|dictionary| dictionary.get("ProductVersion"))
+            .and_then(plist::Value::as_string)
+            .map(str::to_owned)
+            .ok_or_else(|| SshError::Scp("SystemVersion.plist has no ProductVersion".into()))
+    }
+
+    /// Build and fetch the activation record tar from the mounted data
+    /// partition, mirroring upstream's ramdisk dump flow.
+    pub async fn dump_activation_records(&self, version: &str) -> Result<Vec<u8>, SshError> {
+        let (records, staging, with_data_ark) = activation_paths(version)?;
+        let tmp = "/mnt2/tmp";
+        let mut script = format!(
+            "mkdir -p {tmp}/private/var/{staging}\ncp -R /mnt2/{records}/* {tmp}/private/var/{staging}\n"
+        );
+        if with_data_ark {
+            script.push_str(&format!(
+                "cp /mnt2/containers/Data/System/*/Library/internal/data_ark.plist {tmp}/private/var/root/Library/Lockdown/\n"
+            ));
+        }
+        script.push_str(
+            "mkdir -p /mnt2/tmp/private/var/mobile/Media/iTunes_Control/iTunes \\\n\
+             /mnt2/tmp/private/var/mobile/Library/FairPlay/iTunes_Control/iTunes \\\n\
+             /mnt2/tmp/private/var/mobile/Library/Preferences \\\n\
+             /mnt2/tmp/private/var/wireless/Library/Preferences\n",
+        );
+        for file in [
+            "mobile/Media/iTunes_Control/iTunes/IC-Info.sidv",
+            "mobile/Library/FairPlay/iTunes_Control/iTunes/IC-Info.sisv",
+            "wireless/Library/Preferences/com.apple.commcenter.plist",
+        ] {
+            script.push_str(&format!("cp /mnt2/{file} /mnt2/tmp/private/var/{file}\n"));
+        }
+        script.push_str(
+            "chown -R 501:501 /mnt2/tmp/private/var/mobile\n\
+             chown -R 25:25 /mnt2/tmp/private/var/wireless\n\
+             cd /mnt2/tmp && tar -cf activation.tar private\n",
+        );
+        self.execute(&script).await?;
+        let check = self.execute("test -s /mnt2/tmp/activation.tar").await?;
+        if !check.success() {
+            return Err(SshError::Scp(
+                "device did not produce activation.tar".into(),
+            ));
+        }
+        self.download(
+            &ScpPath::new("/mnt2/tmp/activation.tar")
+                .map_err(|error| SshError::Scp(error.to_string()))?,
+            256 * 1024 * 1024,
+        )
+        .await
+    }
+
+    /// Build and fetch the baseband firmware tar from the mounted root
+    /// filesystem.
+    pub async fn dump_baseband(&self) -> Result<Vec<u8>, SshError> {
+        self.execute("cd /mnt1 && tar -cf /mnt2/tmp/baseband.tar usr/local/standalone/firmware")
+            .await?;
+        let check = self.execute("test -s /mnt2/tmp/baseband.tar").await?;
+        if !check.success() {
+            return Err(SshError::Scp("device did not produce baseband.tar".into()));
+        }
+        self.download(
+            &ScpPath::new("/mnt2/tmp/baseband.tar")
+                .map_err(|error| SshError::Scp(error.to_string()))?,
+            256 * 1024 * 1024,
+        )
+        .await
+    }
+}
+
+/// Activation record locations relative to the data partition, by iOS version.
+fn activation_paths(version: &str) -> Result<(&'static str, &'static str, bool), SshError> {
+    let mut parts = version.split('.');
+    let major: u32 = parts
+        .next()
+        .and_then(|major| major.parse().ok())
+        .ok_or_else(|| SshError::InvalidVersion(version.to_owned()))?;
+    let minor: u32 = parts
+        .next()
+        .and_then(|minor| minor.parse().ok())
+        .unwrap_or(0);
+    Ok(match major {
+        3..=7 => ("root/Library/Lockdown", "root/Library/Lockdown", false),
+        8 => ("mobile/Library/mad", "root/Library/Lockdown", false),
+        9 if minor <= 2 => ("mobile/Library/mad", "root/Library/Lockdown", false),
+        _ => (
+            "containers/Data/System/*/Library/activation_records",
+            "root/Library/Lockdown/activation_records",
+            true,
+        ),
+    })
+}
+
+/// Check whether a tar archive contains an entry whose name ends in `suffix`.
+pub fn tar_contains_entry(archive: &[u8], suffix: &str) -> bool {
+    let mut offset = 0;
+    while offset + 512 <= archive.len() {
+        let header = &archive[offset..offset + 512];
+        if header.iter().all(|byte| *byte == 0) {
+            break;
+        }
+        let name_end = header[..100]
+            .iter()
+            .position(|byte| *byte == 0)
+            .unwrap_or(100);
+        if let Ok(name) = std::str::from_utf8(&header[..name_end])
+            && name.ends_with(suffix)
+        {
+            return true;
+        }
+        let size = std::str::from_utf8(&header[124..136])
+            .ok()
+            .and_then(|field| u64::from_str_radix(field.trim_end_matches(['\0', ' ']), 8).ok())
+            .unwrap_or(0);
+        offset += 512 + (size as usize).next_multiple_of(512);
+    }
+    false
 }
 
 impl fmt::Debug for RamdiskSsh {
@@ -409,6 +550,8 @@ pub enum SshError {
     RemoteCommand(Option<u32>),
     #[error("SSH block read size must be non-zero")]
     InvalidReadSize,
+    #[error("unrecognized iOS version for activation record paths: {0}")]
+    InvalidVersion(String),
     #[error("SSH I/O failed: {0}")]
     Io(#[from] std::io::Error),
     #[error(transparent)]
@@ -438,5 +581,40 @@ mod tests {
     fn quotes_scp_paths_for_remote_shell() {
         assert_eq!(shell_quote("/tmp/it's here"), "'/tmp/it'\\''s here'");
         assert!(ScpPath::new("/tmp/file\nname").is_err());
+    }
+
+    #[test]
+    fn selects_activation_paths_by_version() {
+        assert_eq!(
+            activation_paths("7.1.2").unwrap(),
+            ("root/Library/Lockdown", "root/Library/Lockdown", false)
+        );
+        assert_eq!(
+            activation_paths("9.0.2").unwrap(),
+            ("mobile/Library/mad", "root/Library/Lockdown", false)
+        );
+        assert_eq!(
+            activation_paths("9.3.5").unwrap(),
+            (
+                "containers/Data/System/*/Library/activation_records",
+                "root/Library/Lockdown/activation_records",
+                true
+            )
+        );
+        assert!(activation_paths("unknown").is_err());
+    }
+
+    #[test]
+    fn scans_tar_entry_names() {
+        let mut entry = [0u8; 512];
+        entry[..17].copy_from_slice(b"private/record.md");
+        entry[124..136].copy_from_slice(b"00000000002\0");
+        let mut archive = entry.to_vec();
+        archive.extend_from_slice(b"ab");
+        archive.extend_from_slice(&[0; 1022]);
+
+        assert!(tar_contains_entry(&archive, "record.md"));
+        assert!(!tar_contains_entry(&archive, "_record.plist"));
+        assert!(!tar_contains_entry(&[], "_record.plist"));
     }
 }
