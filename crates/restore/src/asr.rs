@@ -56,6 +56,13 @@ where
         loop {
             let message = self.receive_plist().await?;
             match message.get("Command").and_then(Value::as_string) {
+                Some("Initiate") => {
+                    self.checksum_chunks = message
+                        .get("Checksum Chunks")
+                        .and_then(Value::as_boolean)
+                        .unwrap_or(false);
+                    self.send_packet_info(size).await?;
+                }
                 Some("OOBData") => self.send_oob(&mut file, &message).await?,
                 Some("Payload") => return Ok(()),
                 _ => return Err(AsrError::UnexpectedCommand),
@@ -224,7 +231,36 @@ pub enum AsrError {
 
 #[cfg(test)]
 mod tests {
+    use tokio::io::AsyncWriteExt;
+
     use super::*;
+
+    async fn receive_test_plist(stream: &mut tokio::io::DuplexStream) -> Dictionary {
+        const END: &[u8] = b"</plist>";
+        let mut data = Vec::new();
+        loop {
+            let mut buffer = [0; 1024];
+            let read = stream.read(&mut buffer).await.unwrap();
+            data.extend_from_slice(&buffer[..read]);
+            if data.windows(END.len()).any(|window| window == END) {
+                return Value::from_reader(Cursor::new(data))
+                    .unwrap()
+                    .into_dictionary()
+                    .unwrap();
+            }
+        }
+    }
+
+    async fn send_test_plist(stream: &mut tokio::io::DuplexStream, command: &str, checksums: bool) {
+        let mut message = Dictionary::new();
+        message.insert("Command".into(), command.into());
+        if command == "Initiate" {
+            message.insert("Checksum Chunks".into(), checksums.into());
+        }
+        let mut data = Vec::new();
+        Value::Dictionary(message).to_writer_xml(&mut data).unwrap();
+        stream.write_all(&data).await.unwrap();
+    }
 
     #[tokio::test]
     async fn reads_initiate_command() {
@@ -243,6 +279,33 @@ mod tests {
         });
 
         let client = AsrClient::initiate(client_stream).await.unwrap();
+        server.await.unwrap();
+        assert!(client.checksum_chunks());
+    }
+
+    #[tokio::test]
+    async fn renegotiates_checksum_chunks_during_validation() {
+        let (client_stream, mut server_stream) = tokio::io::duplex(16 * 1024);
+        let server = tokio::spawn(async move {
+            send_test_plist(&mut server_stream, "Initiate", false).await;
+            let first = receive_test_plist(&mut server_stream).await;
+            assert!(!first.contains_key("Checksum Chunk Size"));
+
+            send_test_plist(&mut server_stream, "Initiate", true).await;
+            let second = receive_test_plist(&mut server_stream).await;
+            assert_eq!(
+                second
+                    .get("Checksum Chunk Size")
+                    .and_then(Value::as_unsigned_integer),
+                Some(CHECKSUM_CHUNK_SIZE as u64)
+            );
+            send_test_plist(&mut server_stream, "Payload", false).await;
+        });
+        let file = tempfile::NamedTempFile::new().unwrap();
+        let mut client = AsrClient::initiate(client_stream).await.unwrap();
+
+        client.validate(file.path()).await.unwrap();
+
         server.await.unwrap();
         assert!(client.checksum_chunks());
     }
