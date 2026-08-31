@@ -225,3 +225,282 @@ sha256 = "982ba636f195220cfe73bb5105095ee27df7fbf6edd3f7ca3314d724bef0a4be"
 size = 706560
 purpose = "iOS 7.0.x untether package installed from an SSH ramdisk"
 redistribution = "download-only"
+
+[[resources]]
+id = "lockdownd-patch-iPad1-1-3.2.1-7B405"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPad1,1_3.2.1_7B405.bundle/lockdownd.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "625065c99066845f2ecca1ad418d10839a5c034b9a2ac70cad90fa1543c690b4"
+size = 158
+purpose = "bsdiff patch for hacktivating lockdownd on iPad1,1 3.2.1 7B405" 
+redistribution = "download-only"
+
+[[resources]]
+id = "lockdownd-patch-iPad1-1-3.2.2-7B500"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPad1,1_3.2.2_7B500.bundle/lockdownd.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "625065c99066845f2ecca1ad418d10839a5c034b9a2ac70cad90fa1543c690b4"
+size = 158
+purpose = "bsdiff patch for hacktivating lockdownd on iPad1,1 3.2.2 7B500" 
+redistribution = "download-only"
+
+[[resources]]
+id = "lockdownd-patch-iPad1-1-3.2-7B367"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPad1,1_3.2_7B367.bundle/lockdownd.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "03e1f35cefa5d67b273e11e49b8f2a73ec346b0cb5f580fce845dc1f1375b92b"
+size = 235
+purpose = "bsdiff patch for hacktivating lockdownd on iPad1,1 3.2 7B367" 
+redistribution = "download-only"
+
+[[resources]]
+id = "lockdownd-patch-iPhone1-1-3.1.3-7E18"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone1,1_3.1.3_7E18.bundle/lockdownd.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "d26616571ead4eefe6ad6b5e2482f7a50f7b528ea12b6a5368dd2b7824c777fc"
+size = 209
+purpose = "bsdiff patch for hacktivating lockdownd on iPhone1,1 3.1.3 7E18" 
+redistribution = "download-only"
+
+[[resources]]
+id = "lockdownd-patch-iPhone1-2-3.1.3-7E18"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone1,2_3.1.3_7E18.bundle/lockdownd.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "d26616571ead4eefe6ad6b5e2482f7a50f7b528ea12b6a5368dd2b7824c777fc"
+size = 209
+purpose = "bsdiff patch for hacktivating lockdownd on iPhone1,2 3.1.3 7E18" 
+redistribution = "download-only"
+
+[[resources]]
+id = "lockdownd-patch-iPhone1-2-4.1-8B117"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone1,2_4.1_8B117.bundle/lockdownd.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "20dfa314e020d0b2e8e298ee98b6fb445dd5e14caf6ea97a6ee8110a1a9e74e4"
+size = 211
+purpose = "bsdiff patch for hacktivating lockdownd on iPhone1,2 4.1 8B117" 
+redistribution = "download-only"
+
+[[resources]]
+id = "lockdownd-patch-iPhone1-2-4.2.1-8C148"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone1,2_4.2.1_8C148.bundle/lockdownd.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "b07e659be62c5e6d4c0b4ccc030e0b3f3e871fe5514b775df710615f9c20b27f"
+size = 213
+purpose = "bsdiff patch for hacktivating lockdownd on iPhone1,2 4.2.1 8C148" 
+redistribution = "download-only"
+
+[[resources]]
+id = "lockdownd-patch-iPhone2-1-3.1.2-7D11"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_3.1.2_7D11.bundle/lockdownd.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "377b5257f7f94b01252f1b9b2f11a62316c8b417f133fdef5e221ce1fd436691"
+size = 6785
+purpose = "bsdiff patch for hacktivating lockdownd on iPhone2,1 3.1.2 7D11" 
+redistribution = "download-only"
+
+[[resources]]
+id = "lockdownd-patch-iPhone2-1-3.1.3-7E18"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_3.1.3_7E18.bundle/lockdownd.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "886e162f54baf8e0fab27a168c25079cc7c8347bb1fb370a59335071edfc35c4"
+size = 208
+purpose = "bsdiff patch for hacktivating lockdownd on iPhone2,1 3.1.3 7E18" 
+redistribution = "download-only"
+
+[[resources]]
+id = "lockdownd-patch-iPhone2-1-3.1-7C144"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_3.1_7C144.bundle/lockdownd.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "f31710027c66406900b2195931e9a361812996cb0561bf6d540d3f5a3f98f1d4"
+size = 6778
+purpose = "bsdiff patch for hacktivating lockdownd on iPhone2,1 3.1 7C144" 
+redistribution = "download-only"
+
+[[resources]]
+id = "lockdownd-patch-iPhone2-1-4.0.1-8A306"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_4.0.1_8A306.bundle/lockdownd.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "89c43f08fca632b6a07b4858577632aa6a82584509f8963d75964c5cac74a3cd"
+size = 212
+purpose = "bsdiff patch for hacktivating lockdownd on iPhone2,1 4.0.1 8A306" 
+redistribution = "download-only"
+
+[[resources]]
+id = "lockdownd-patch-iPhone2-1-4.0.2-8A400"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_4.0.2_8A400.bundle/lockdownd.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "89c43f08fca632b6a07b4858577632aa6a82584509f8963d75964c5cac74a3cd"
+size = 212
+purpose = "bsdiff patch for hacktivating lockdownd on iPhone2,1 4.0.2 8A400" 
+redistribution = "download-only"
+
+[[resources]]
+id = "lockdownd-patch-iPhone2-1-4.0-8A293"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_4.0_8A293.bundle/lockdownd.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "89c43f08fca632b6a07b4858577632aa6a82584509f8963d75964c5cac74a3cd"
+size = 212
+purpose = "bsdiff patch for hacktivating lockdownd on iPhone2,1 4.0 8A293" 
+redistribution = "download-only"
+
+[[resources]]
+id = "lockdownd-patch-iPhone2-1-4.1-8B117"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_4.1_8B117.bundle/lockdownd.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "3ca130ef7d75765ff95b73ffdbf6e47bb88d57a26b8f4dbb8c2810bd9894f5ea"
+size = 206
+purpose = "bsdiff patch for hacktivating lockdownd on iPhone2,1 4.1 8B117" 
+redistribution = "download-only"
+
+[[resources]]
+id = "lockdownd-patch-iPhone2-1-4.2.1-8C148a"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_4.2.1_8C148a.bundle/lockdownd.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "ae3e467fccaf010d3412dab0e2a4599a9938f2924733784d7cb39d105cd07655"
+size = 210
+purpose = "bsdiff patch for hacktivating lockdownd on iPhone2,1 4.2.1 8C148a" 
+redistribution = "download-only"
+
+[[resources]]
+id = "lockdownd-patch-iPhone2-1-4.3.1-8G4"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_4.3.1_8G4.bundle/lockdownd.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "61f52d026e276294fd17ba1be5d50e386d803e0a11e4b7609ffc5558de85e129"
+size = 204
+purpose = "bsdiff patch for hacktivating lockdownd on iPhone2,1 4.3.1 8G4" 
+redistribution = "download-only"
+
+[[resources]]
+id = "lockdownd-patch-iPhone2-1-4.3.2-8H7"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_4.3.2_8H7.bundle/lockdownd.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "5c88b9c287b3fc11a8cd56b0149b7ec3cda4205f64220a4694b4db96c9ba3e47"
+size = 209
+purpose = "bsdiff patch for hacktivating lockdownd on iPhone2,1 4.3.2 8H7" 
+redistribution = "download-only"
+
+[[resources]]
+id = "lockdownd-patch-iPhone2-1-4.3.3-8J2"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_4.3.3_8J2.bundle/lockdownd.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "5c88b9c287b3fc11a8cd56b0149b7ec3cda4205f64220a4694b4db96c9ba3e47"
+size = 209
+purpose = "bsdiff patch for hacktivating lockdownd on iPhone2,1 4.3.3 8J2" 
+redistribution = "download-only"
+
+[[resources]]
+id = "lockdownd-patch-iPhone2-1-4.3.4-8K2"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_4.3.4_8K2.bundle/lockdownd.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "d8e767edf0aafdbc2bba340ab995ec5656a78015295a9d68b479fb9159183a3a"
+size = 269
+purpose = "bsdiff patch for hacktivating lockdownd on iPhone2,1 4.3.4 8K2" 
+redistribution = "download-only"
+
+[[resources]]
+id = "lockdownd-patch-iPhone2-1-4.3.5-8L1"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_4.3.5_8L1.bundle/lockdownd.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "d8e767edf0aafdbc2bba340ab995ec5656a78015295a9d68b479fb9159183a3a"
+size = 269
+purpose = "bsdiff patch for hacktivating lockdownd on iPhone2,1 4.3.5 8L1" 
+redistribution = "download-only"
+
+[[resources]]
+id = "lockdownd-patch-iPhone2-1-4.3-8F190"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_4.3_8F190.bundle/lockdownd.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "5a6293e9c83ea414066058157dd1e713a567408a8eee672e1ee55210445dc7fa"
+size = 381
+purpose = "bsdiff patch for hacktivating lockdownd on iPhone2,1 4.3 8F190" 
+redistribution = "download-only"
+
+[[resources]]
+id = "lockdownd-patch-iPhone2-1-5.0.1-9A405"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_5.0.1_9A405.bundle/lockdownd.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "507df572d835bde0b82585fe7a72e39c475bb72097dcde22564460fb7a51c9d6"
+size = 208
+purpose = "bsdiff patch for hacktivating lockdownd on iPhone2,1 5.0.1 9A405" 
+redistribution = "download-only"
+
+[[resources]]
+id = "lockdownd-patch-iPhone2-1-5.0-9A334"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_5.0_9A334.bundle/lockdownd.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "941b66c0caa5c23b9682c3b302ee4adac48815046fd568ae1c327267affec13f"
+size = 26135
+purpose = "bsdiff patch for hacktivating lockdownd on iPhone2,1 5.0 9A334" 
+redistribution = "download-only"
+
+[[resources]]
+id = "lockdownd-patch-iPhone2-1-5.1.1-9B206"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_5.1.1_9B206.bundle/lockdownd.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "542938ef660b0e73d97028a8c55464306b714272e31d5ec94cfa9eafd2429bc5"
+size = 207
+purpose = "bsdiff patch for hacktivating lockdownd on iPhone2,1 5.1.1 9B206" 
+redistribution = "download-only"
+
+[[resources]]
+id = "lockdownd-patch-iPhone2-1-5.1-9B176"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_5.1_9B176.bundle/lockdownd.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "9d3f05ee3ba73998fab54be37b9a13372107c32413feac596432ce8454317d51"
+size = 269
+purpose = "bsdiff patch for hacktivating lockdownd on iPhone2,1 5.1 9B176" 
+redistribution = "download-only"
+
+[[resources]]
+id = "lockdownd-patch-iPhone2-1-6.0.1-10A523"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_6.0.1_10A523.bundle/lockdownd.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "93f124719bd1f7a5ddeb1fa48a202832abf10fd513a0e128c8738f182e19b197"
+size = 223
+purpose = "bsdiff patch for hacktivating lockdownd on iPhone2,1 6.0.1 10A523" 
+redistribution = "download-only"
+
+[[resources]]
+id = "lockdownd-patch-iPhone2-1-6.0-10A403"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_6.0_10A403.bundle/lockdownd.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "93f124719bd1f7a5ddeb1fa48a202832abf10fd513a0e128c8738f182e19b197"
+size = 223
+purpose = "bsdiff patch for hacktivating lockdownd on iPhone2,1 6.0 10A403" 
+redistribution = "download-only"
+
+[[resources]]
+id = "lockdownd-patch-iPhone2-1-6.1.2-10B146"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_6.1.2_10B146.bundle/lockdownd.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "303fce8c01ea8959447a732d099da979b715a4737abed8f13882802acde82454"
+size = 204
+purpose = "bsdiff patch for hacktivating lockdownd on iPhone2,1 6.1.2 10B146" 
+redistribution = "download-only"
+
+[[resources]]
+id = "lockdownd-patch-iPhone2-1-6.1.3-10B329"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_6.1.3_10B329.bundle/lockdownd.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "4d42069a0a08de7267ce9524b44cb05e651158a4e078e309bb803e4242218c9f"
+size = 209
+purpose = "bsdiff patch for hacktivating lockdownd on iPhone2,1 6.1.3 10B329" 
+redistribution = "download-only"
+
+[[resources]]
+id = "lockdownd-patch-iPhone2-1-6.1.6-10B500"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_6.1.6_10B500.bundle/lockdownd.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "0cdd67e13545286432ece6e140f6af07467ac96f702d9319c1109a0df1295e54"
+size = 29008
+purpose = "bsdiff patch for hacktivating lockdownd on iPhone2,1 6.1.6 10B500" 
+redistribution = "download-only"
+
+[[resources]]
+id = "lockdownd-patch-iPhone2-1-6.1-10B141"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_6.1_10B141.bundle/lockdownd.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "303fce8c01ea8959447a732d099da979b715a4737abed8f13882802acde82454"
+size = 204
+purpose = "bsdiff patch for hacktivating lockdownd on iPhone2,1 6.1 10B141" 
+redistribution = "download-only"

@@ -84,6 +84,12 @@ pub enum KitError {
     UnsupportedBootstrapVersion(String),
     #[error("bootstrap package {0} was not provided")]
     MissingBootstrapPackage(&'static str),
+    #[error("the device is already hacktivated")]
+    AlreadyHacktivated,
+    #[error("no lockdownd patch was provided for the hacktivation method")]
+    MissingHacktivationPatch,
+    #[error("no original lockdownd on the device; provide one with a file")]
+    MissingOriginalLockdownd,
     #[error("restored device version mismatch: expected {expected}, got {actual}")]
     VersionMismatch { expected: String, actual: String },
     #[error("unknown product type {0}")]
@@ -120,9 +126,11 @@ impl KitError {
             | Self::UnknownBoardConfig { .. }
             | Self::MissingDeviceSelector => OperationPhase::Planning,
             Self::EraseConsentMismatch => OperationPhase::Preflight,
-            Self::UnsupportedBootstrapVersion(_) | Self::MissingBootstrapPackage(_) => {
-                OperationPhase::Planning
-            }
+            Self::UnsupportedBootstrapVersion(_)
+            | Self::MissingBootstrapPackage(_)
+            | Self::AlreadyHacktivated
+            | Self::MissingHacktivationPatch
+            | Self::MissingOriginalLockdownd => OperationPhase::Planning,
             Self::RamdiskPreparation(_) => OperationPhase::Preflight,
             Self::RamdiskBoot(_) => OperationPhase::Booting,
             Self::Signing(_)
@@ -204,7 +212,10 @@ impl KitError {
             | Self::MissingDeviceSelector => Recoverability::NotRecoverable,
             Self::EraseConsentMismatch
             | Self::UnsupportedBootstrapVersion(_)
-            | Self::MissingBootstrapPackage(_) => Recoverability::NotRecoverable,
+            | Self::MissingBootstrapPackage(_)
+            | Self::AlreadyHacktivated
+            | Self::MissingHacktivationPatch
+            | Self::MissingOriginalLockdownd => Recoverability::NotRecoverable,
         }
     }
 }

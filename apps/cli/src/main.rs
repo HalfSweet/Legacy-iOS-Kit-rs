@@ -561,6 +561,29 @@ enum DeviceCommand {
         #[arg(long)]
         yes: bool,
     },
+    /// Hacktivate a jailbroken device over SSH (patched lockdownd or data_ark).
+    Hacktivate {
+        udid: Udid,
+        #[arg(long, default_value = "root")]
+        username: String,
+        #[arg(long)]
+        host_key: Option<String>,
+        #[arg(long)]
+        yes: bool,
+    },
+    /// Revert hacktivation by restoring the original lockdownd.
+    RevertHacktivate {
+        udid: Udid,
+        /// Use this lockdownd binary instead of the on-device backup.
+        #[arg(long)]
+        lockdownd: Option<PathBuf>,
+        #[arg(long, default_value = "root")]
+        username: String,
+        #[arg(long)]
+        host_key: Option<String>,
+        #[arg(long)]
+        yes: bool,
+    },
     /// Write the boot nonce generator to NVRAM on a Recovery-mode device.
     SetNonce {
         #[arg(long)]
@@ -1457,6 +1480,71 @@ async fn main() -> Result<()> {
                 .await
                 .context("failed to enter kDFU mode")?;
             write_status(output, "entered-kdfu")?;
+        }
+        Command::Device {
+            command:
+                DeviceCommand::Hacktivate {
+                    udid,
+                    username,
+                    host_key,
+                    yes,
+                },
+        } => {
+            let summaries = kit.devices().list_normal().await?;
+            let device = summaries
+                .iter()
+                .find(|device| device.udid() == Some(&udid))
+                .ok_or_else(|| anyhow!("no normal-mode device with UDID {udid}"))?;
+            let product_type = device
+                .product_type()
+                .ok_or_else(|| anyhow!("device product type is unknown"))?
+                .as_str()
+                .to_owned();
+            let version = device
+                .product_version()
+                .ok_or_else(|| anyhow!("device iOS version is unknown"))?
+                .to_owned();
+            let build = device
+                .build_version()
+                .ok_or_else(|| anyhow!("device build version is unknown"))?
+                .to_owned();
+            let method = legacy_ios_kit::hacktivate_method(&product_type, &version, &build)
+                .ok_or_else(|| {
+                    anyhow!("no hacktivation method for {product_type} {version} ({build})")
+                })?;
+            let patch = if let legacy_ios_kit::HacktivateMethod::LockdowndPatch(id) = &method {
+                let path = kit.fetch_resource(id, config.artifact_cache_dir()?).await?;
+                Some(tokio::fs::read(&path).await?)
+            } else {
+                None
+            };
+            confirm("hacktivate the device", yes)?;
+            let ssh = connect_ramdisk_ssh(&kit, None, &username, host_key).await?;
+            kit.hacktivate(&ssh, &method, patch.as_deref())
+                .await
+                .context("hacktivation failed")?;
+            write_status(output, "hacktivated")?;
+        }
+        Command::Device {
+            command:
+                DeviceCommand::RevertHacktivate {
+                    udid: _,
+                    lockdownd,
+                    username,
+                    host_key,
+                    yes,
+                },
+        } => {
+            confirm("revert hacktivation on the device", yes)?;
+            let original = match lockdownd {
+                Some(path) => Some(tokio::fs::read(&path).await?),
+                None => None,
+            };
+            let ssh = connect_ramdisk_ssh(&kit, None, &username, host_key).await?;
+            kit.revert_hacktivate(&ssh, original.as_deref())
+                .await
+                .context("reverting hacktivation failed")?;
+            write_status(output, "reverted-hacktivation")?;
         }
         Command::Device {
             command:

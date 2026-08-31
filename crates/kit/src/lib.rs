@@ -8,6 +8,7 @@ mod erase;
 mod error;
 mod exploit;
 mod firmware;
+mod hacktivate;
 mod hfs;
 mod image_payload;
 mod kdfu;
@@ -33,6 +34,7 @@ pub use error::KitError;
 pub use firmware::{
     CustomRootfsRequest, FirmwareIdentitySummary, FirmwareSummary, RemoteFirmwareSummary,
 };
+pub use hacktivate::{HacktivateMethod, hacktivate_method};
 pub use hfs::{HfsEntrySummary, HfsKind, HfsMutation, HfsStatSummary};
 pub use image_payload::{ImageCipher, ImageCipherError};
 pub use kdfu::{prepare_pwned_ibss, select_kloader};
@@ -306,6 +308,25 @@ impl LegacyIosKit {
     ) -> Result<(), KitError> {
         kdfu::enter_kdfu(ssh, kloader, pwned_ibss).await?;
         kdfu::await_kdfu(ecid).await
+    }
+
+    /// Hacktivate a jailbroken device over SSH.
+    pub async fn hacktivate(
+        &self,
+        ssh: &RamdiskSsh,
+        method: &HacktivateMethod,
+        patch: Option<&[u8]>,
+    ) -> Result<(), KitError> {
+        hacktivate::hacktivate(ssh, method, patch).await
+    }
+
+    /// Revert hacktivation by restoring the original lockdownd.
+    pub async fn revert_hacktivate(
+        &self,
+        ssh: &RamdiskSsh,
+        original: Option<&[u8]>,
+    ) -> Result<(), KitError> {
+        hacktivate::revert_hacktivate(ssh, original).await
     }
 
     /// Install the Cydia bootstrap on a 64-bit iOS 7/8/9 device from an SSH
