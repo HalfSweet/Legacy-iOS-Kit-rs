@@ -6,6 +6,7 @@ mod device;
 mod erase;
 mod error;
 mod firmware;
+mod hfs;
 mod lease;
 mod operation;
 mod pairing;
@@ -19,6 +20,7 @@ pub use device::{
 pub use erase::{EraseConsent, ErasePlan};
 pub use error::KitError;
 pub use firmware::{FirmwareIdentitySummary, FirmwareSummary, RemoteFirmwareSummary};
+pub use hfs::{HfsEntrySummary, HfsKind, HfsMutation, HfsStatSummary};
 pub use lease::DeviceLease;
 pub use legacy_ios_assets::{Redistribution, ResourceId, ResourceRecord};
 pub use legacy_ios_core::{
@@ -135,6 +137,40 @@ impl LegacyIosKit {
         cache_root: impl Into<std::path::PathBuf>,
     ) -> Result<std::path::PathBuf, KitError> {
         firmware::fetch_resource(id, cache_root.into()).await
+    }
+
+    pub async fn list_hfs(
+        &self,
+        image: impl Into<std::path::PathBuf>,
+        path: impl Into<String>,
+    ) -> Result<Vec<HfsEntrySummary>, KitError> {
+        hfs::list(image.into(), path.into()).await
+    }
+
+    pub async fn stat_hfs(
+        &self,
+        image: impl Into<std::path::PathBuf>,
+        path: impl Into<String>,
+    ) -> Result<HfsStatSummary, KitError> {
+        hfs::stat(image.into(), path.into()).await
+    }
+
+    pub async fn extract_hfs_file(
+        &self,
+        image: impl Into<std::path::PathBuf>,
+        path: impl Into<String>,
+        destination: impl Into<std::path::PathBuf>,
+    ) -> Result<(), KitError> {
+        hfs::extract(image.into(), path.into(), destination.into()).await
+    }
+
+    pub async fn edit_hfs(
+        &self,
+        source: impl Into<std::path::PathBuf>,
+        destination: impl Into<std::path::PathBuf>,
+        mutations: Vec<HfsMutation>,
+    ) -> Result<(), KitError> {
+        hfs::edit(source.into(), destination.into(), mutations).await
     }
 
     pub fn convert_onboard_dump(&self, dump: &[u8]) -> Result<SigningTicket, KitError> {

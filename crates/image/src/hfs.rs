@@ -310,6 +310,13 @@ impl HfsImage {
         Ok(())
     }
 
+    pub fn remove(&mut self, path: &str, recursive: bool) -> Result<(), HfsError> {
+        match self.stat(path)?.kind() {
+            HfsEntryKind::Directory => self.remove_directory(path, recursive),
+            HfsEntryKind::File | HfsEntryKind::Symlink => self.remove_file(path),
+        }
+    }
+
     pub fn mkdir(&mut self, path: &str) -> Result<(), HfsError> {
         let (parent_path, name) = split_parent(path)?;
         let mut volume = self.volume()?;

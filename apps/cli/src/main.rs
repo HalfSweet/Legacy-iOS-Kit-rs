@@ -13,11 +13,11 @@ use legacy_ios_kit::{
     ActivationState, AfcPath, AppFilter, BackupOptions, BackupOutcome, BackupPassword,
     BackupRestoreOptions, BasebandPolicy, BoardConfig, DeviceDiagnostics, DeviceFileInfo,
     DeviceInventory, DeviceStorageInfo, DeviceSummary, DmgFirmwareKey, Ecid, ExploitPolicy,
-    FirmwareSummary, HostKeyPolicy, InstalledApp, LegacyIosKit, OperationEvent, OperationHandle,
-    OperationOutcome, ProductType, RamdiskSsh, RecoveryDeviceInfo, RecoveryUploadResult,
-    RemoteFirmwareSummary, ResourceId, RestoreBehavior, RestoreExecutionRequest, RestorePlan,
-    RestoreRequest, ScpPath, SepPolicy, ShshRequest, ShshSummary, SigningTicket, SshCommandOutput,
-    SshPassword, SshTarget, TicketPolicy, Udid,
+    FirmwareSummary, HfsEntrySummary, HfsMutation, HfsStatSummary, HostKeyPolicy, InstalledApp,
+    LegacyIosKit, OperationEvent, OperationHandle, OperationOutcome, ProductType, RamdiskSsh,
+    RecoveryDeviceInfo, RecoveryUploadResult, RemoteFirmwareSummary, ResourceId, RestoreBehavior,
+    RestoreExecutionRequest, RestorePlan, RestoreRequest, ScpPath, SepPolicy, ShshRequest,
+    ShshSummary, SigningTicket, SshCommandOutput, SshPassword, SshTarget, TicketPolicy, Udid,
 };
 use tracing::level_filters::LevelFilter;
 use tracing::{debug, info, warn};
@@ -409,6 +409,11 @@ enum FirmwareCommand {
         #[arg(long)]
         cache_dir: Option<PathBuf>,
     },
+    /// Inspect or modify a raw HFS+/HFSX filesystem image.
+    Hfs {
+        #[command(subcommand)]
+        command: HfsCommand,
+    },
     /// Decrypt a FileVault v2 root filesystem DMG with its firmware key.
     DecryptDmg {
         source: PathBuf,
@@ -426,6 +431,87 @@ enum FirmwareCommand {
         replacements: Vec<String>,
         #[arg(long = "remove", value_name = "ENTRY")]
         removals: Vec<String>,
+        #[arg(long)]
+        yes: bool,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+enum HfsCommand {
+    List {
+        image: PathBuf,
+        #[arg(default_value = "/")]
+        path: String,
+    },
+    Stat {
+        image: PathBuf,
+        path: String,
+    },
+    Extract {
+        image: PathBuf,
+        path: String,
+        destination: PathBuf,
+    },
+    Grow {
+        source: PathBuf,
+        destination: PathBuf,
+        size: usize,
+        #[arg(long)]
+        yes: bool,
+    },
+    Add {
+        source: PathBuf,
+        destination: PathBuf,
+        file: PathBuf,
+        path: String,
+        #[arg(long)]
+        yes: bool,
+    },
+    Remove {
+        source: PathBuf,
+        destination: PathBuf,
+        path: String,
+        #[arg(long)]
+        recursive: bool,
+        #[arg(long)]
+        yes: bool,
+    },
+    Mkdir {
+        source: PathBuf,
+        destination: PathBuf,
+        path: String,
+        #[arg(long)]
+        yes: bool,
+    },
+    Move {
+        image: PathBuf,
+        destination_image: PathBuf,
+        source: String,
+        destination: String,
+        #[arg(long)]
+        yes: bool,
+    },
+    Chmod {
+        source: PathBuf,
+        destination: PathBuf,
+        path: String,
+        mode: String,
+        #[arg(long)]
+        yes: bool,
+    },
+    Chown {
+        source: PathBuf,
+        destination: PathBuf,
+        path: String,
+        owner: u32,
+        group: u32,
+        #[arg(long)]
+        yes: bool,
+    },
+    Untar {
+        source: PathBuf,
+        destination: PathBuf,
+        archive: PathBuf,
         #[arg(long)]
         yes: bool,
     },
@@ -1094,6 +1180,169 @@ async fn main() -> Result<()> {
             write_path(output, &path)?;
         }
         Command::Firmware {
+            command: FirmwareCommand::Hfs { command },
+        } => match command {
+            HfsCommand::List { image, path } => {
+                write_hfs_entries(output, &kit.list_hfs(image, path).await?)?;
+            }
+            HfsCommand::Stat { image, path } => {
+                write_hfs_stat(output, &kit.stat_hfs(image, path).await?)?;
+            }
+            HfsCommand::Extract {
+                image,
+                path,
+                destination,
+            } => {
+                kit.extract_hfs_file(image, path, destination).await?;
+                write_status(output, "extracted-hfs-file")?;
+            }
+            HfsCommand::Grow {
+                source,
+                destination,
+                size,
+                yes,
+            } => {
+                edit_hfs(
+                    &kit,
+                    output,
+                    source,
+                    destination,
+                    HfsMutation::Grow { size },
+                    yes,
+                )
+                .await?;
+            }
+            HfsCommand::Add {
+                source,
+                destination,
+                file,
+                path,
+                yes,
+            } => {
+                let data = tokio::fs::read(&file)
+                    .await
+                    .with_context(|| format!("failed to read {}", file.display()))?;
+                edit_hfs(
+                    &kit,
+                    output,
+                    source,
+                    destination,
+                    HfsMutation::AddFile { path, data },
+                    yes,
+                )
+                .await?;
+            }
+            HfsCommand::Remove {
+                source,
+                destination,
+                path,
+                recursive,
+                yes,
+            } => {
+                edit_hfs(
+                    &kit,
+                    output,
+                    source,
+                    destination,
+                    HfsMutation::Remove { path, recursive },
+                    yes,
+                )
+                .await?;
+            }
+            HfsCommand::Mkdir {
+                source,
+                destination,
+                path,
+                yes,
+            } => {
+                edit_hfs(
+                    &kit,
+                    output,
+                    source,
+                    destination,
+                    HfsMutation::CreateDirectory { path },
+                    yes,
+                )
+                .await?;
+            }
+            HfsCommand::Move {
+                image,
+                destination_image,
+                source,
+                destination,
+                yes,
+            } => {
+                edit_hfs(
+                    &kit,
+                    output,
+                    image,
+                    destination_image,
+                    HfsMutation::Move {
+                        source,
+                        destination,
+                    },
+                    yes,
+                )
+                .await?;
+            }
+            HfsCommand::Chmod {
+                source,
+                destination,
+                path,
+                mode,
+                yes,
+            } => {
+                let mode = u16::from_str_radix(mode.trim_start_matches("0o"), 8)
+                    .context("HFS mode must be octal")?;
+                edit_hfs(
+                    &kit,
+                    output,
+                    source,
+                    destination,
+                    HfsMutation::Chmod { path, mode },
+                    yes,
+                )
+                .await?;
+            }
+            HfsCommand::Chown {
+                source,
+                destination,
+                path,
+                owner,
+                group,
+                yes,
+            } => {
+                edit_hfs(
+                    &kit,
+                    output,
+                    source,
+                    destination,
+                    HfsMutation::Chown { path, owner, group },
+                    yes,
+                )
+                .await?;
+            }
+            HfsCommand::Untar {
+                source,
+                destination,
+                archive,
+                yes,
+            } => {
+                let archive = tokio::fs::read(&archive)
+                    .await
+                    .with_context(|| format!("failed to read {}", archive.display()))?;
+                edit_hfs(
+                    &kit,
+                    output,
+                    source,
+                    destination,
+                    HfsMutation::Untar { archive },
+                    yes,
+                )
+                .await?;
+            }
+        },
+        Command::Firmware {
             command:
                 FirmwareCommand::DecryptDmg {
                     source,
@@ -1600,6 +1849,62 @@ fn write_path(format: OutputFormat, path: &std::path::Path) -> Result<()> {
         OutputFormat::Json => {
             serde_json::to_writer(&mut output, &serde_json::json!({ "path": path }))?;
             writeln!(output)?;
+        }
+    }
+    Ok(())
+}
+
+async fn edit_hfs(
+    kit: &LegacyIosKit,
+    output: OutputFormat,
+    source: PathBuf,
+    destination: PathBuf,
+    mutation: HfsMutation,
+    yes: bool,
+) -> Result<()> {
+    confirm("write the HFS+ image", yes)?;
+    kit.edit_hfs(source, destination, vec![mutation]).await?;
+    write_status(output, "edited-hfs-image")
+}
+
+fn write_hfs_entries(format: OutputFormat, entries: &[HfsEntrySummary]) -> Result<()> {
+    let stdout = io::stdout();
+    let mut output = stdout.lock();
+    match format {
+        OutputFormat::Json => {
+            serde_json::to_writer_pretty(&mut output, entries)?;
+            writeln!(output)?;
+        }
+        OutputFormat::Human => {
+            for entry in entries {
+                writeln!(
+                    output,
+                    "{}\t{}\t{}",
+                    entry.kind(),
+                    entry.size(),
+                    entry.name()
+                )?;
+            }
+        }
+    }
+    Ok(())
+}
+
+fn write_hfs_stat(format: OutputFormat, stat: &HfsStatSummary) -> Result<()> {
+    let stdout = io::stdout();
+    let mut output = stdout.lock();
+    match format {
+        OutputFormat::Json => {
+            serde_json::to_writer_pretty(&mut output, stat)?;
+            writeln!(output)?;
+        }
+        OutputFormat::Human => {
+            writeln!(output, "CNID: {}", stat.cnid())?;
+            writeln!(output, "Kind: {}", stat.kind())?;
+            writeln!(output, "Size: {}", stat.size())?;
+            writeln!(output, "Owner: {}", stat.owner())?;
+            writeln!(output, "Group: {}", stat.group())?;
+            writeln!(output, "Mode: {:06o}", stat.mode())?;
         }
     }
     Ok(())
