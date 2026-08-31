@@ -31,8 +31,8 @@ pub use image_payload::{ImageCipher, ImageCipherError};
 pub use lease::DeviceLease;
 pub use legacy_ios_assets::{Redistribution, ResourceId, ResourceRecord};
 pub use legacy_ios_core::{
-    BoardConfig, BuildId, Capability, CapabilitySet, ConnectionId, DeviceIdentity, DeviceMode,
-    DeviceSelector, DeviceSnapshot, Ecid, IosVersion, OperationEvent, OperationId,
+    BoardConfig, BootNonce, BuildId, Capability, CapabilitySet, ConnectionId, DeviceIdentity,
+    DeviceMode, DeviceSelector, DeviceSnapshot, Ecid, IosVersion, OperationEvent, OperationId,
     OperationOutcome, ProductType, Recoverability, Soc, Udid,
 };
 pub use legacy_ios_firmware::{RestoreBehavior, SigningTicket, TicketError};
@@ -48,7 +48,7 @@ pub use legacy_ios_transport::{
     UsbHostDiagnostics,
 };
 pub use legacy_ios_workflows::{
-    BasebandPolicy, DestructiveConsent, ExploitPolicy, PlanId, RamdiskBootComponent,
+    BasebandPolicy, DestructiveConsent, ExploitPolicy, NoncePolicy, PlanId, RamdiskBootComponent,
     RamdiskBootPlan, RamdiskBootPlanError, RamdiskBootPlanStep, RamdiskBootRequest,
     RamdiskBootStepKind, RestoreComponent, RestorePlan, RestorePlanError, RestoreRequest,
     RestoreStep, RestoreStepKind, SepPolicy, TicketPolicy,

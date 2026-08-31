@@ -18,6 +18,7 @@ pub struct RestoreRequest {
     pub baseband: BasebandPolicy,
     pub sep: SepPolicy,
     pub exploit: ExploitPolicy,
+    pub nonce: NoncePolicy,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -51,6 +52,18 @@ pub enum ExploitPolicy {
     AlreadyPwned,
 }
 
+/// Whether the executor writes the ticket's generator to the device NVRAM
+/// before booting the restore chain.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum NoncePolicy {
+    /// Do not touch the device boot nonce.
+    #[default]
+    Manual,
+    /// Set `com.apple.System.boot-nonce` to the ticket generator.
+    Auto,
+}
+
 #[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct PlanId(pub(crate) String);
@@ -74,6 +87,7 @@ pub struct RestorePlan {
     baseband: BasebandPolicy,
     sep: SepPolicy,
     exploit: ExploitPolicy,
+    nonce: NoncePolicy,
     components: Vec<RestoreComponent>,
     steps: Vec<RestoreStep>,
 }
@@ -161,6 +175,7 @@ impl RestorePlan {
             baseband: request.baseband,
             sep: request.sep,
             exploit: request.exploit,
+            nonce: request.nonce,
             components,
             steps,
         })
@@ -212,6 +227,10 @@ impl RestorePlan {
 
     pub const fn exploit_policy(&self) -> ExploitPolicy {
         self.exploit
+    }
+
+    pub const fn nonce_policy(&self) -> NoncePolicy {
+        self.nonce
     }
 
     pub fn steps(&self) -> &[RestoreStep] {
@@ -330,7 +349,7 @@ const fn step(
 
 fn plan_id(request: &RestoreRequest, product_version: &str, build_id: &str) -> PlanId {
     let material = format!(
-        "{}|{}|{}|{}|{}|{:?}|{:?}|{:?}|{:?}|{:?}",
+        "{}|{}|{}|{}|{}|{:?}|{:?}|{:?}|{:?}|{:?}|{:?}",
         request.device.product_type(),
         request
             .device
@@ -344,6 +363,7 @@ fn plan_id(request: &RestoreRequest, product_version: &str, build_id: &str) -> P
         request.baseband,
         request.sep,
         request.exploit,
+        request.nonce,
     );
     PlanId(hex::encode(Sha256::digest(material.as_bytes())))
 }
@@ -397,6 +417,7 @@ mod tests {
             baseband: BasebandPolicy::Auto,
             sep: SepPolicy::Auto,
             exploit: ExploitPolicy::Auto,
+            nonce: NoncePolicy::Manual,
         };
 
         let plan = RestorePlan::resolve(request).unwrap();

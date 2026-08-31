@@ -25,8 +25,9 @@ pub use ramdisk_boot::{
     RamdiskPreparationError, boot_ramdisk,
 };
 pub use restore::{
-    BasebandPolicy, DestructiveConsent, ExploitPolicy, PlanId, RestoreComponent, RestorePlan,
-    RestorePlanError, RestoreRequest, RestoreStep, RestoreStepKind, SepPolicy, TicketPolicy,
+    BasebandPolicy, DestructiveConsent, ExploitPolicy, NoncePolicy, PlanId, RestoreComponent,
+    RestorePlan, RestorePlanError, RestoreRequest, RestoreStep, RestoreStepKind, SepPolicy,
+    TicketPolicy,
 };
 pub use runner::{
     RestoreExecutionError, RestoreExecutionOutcome, RestoreExecutionProgress, run_restore,

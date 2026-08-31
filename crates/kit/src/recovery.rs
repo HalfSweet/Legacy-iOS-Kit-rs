@@ -1,4 +1,4 @@
-use legacy_ios_core::{DeviceMode, Ecid};
+use legacy_ios_core::{BootNonce, DeviceMode, Ecid};
 use legacy_ios_exploits::Limera1n;
 use legacy_ios_transport::{IbootClient, RecoveryDeviceInfo, UploadResult};
 
@@ -30,6 +30,16 @@ impl RecoveryDevice {
 
     pub async fn send_command(&self, command: &str) -> Result<(), KitError> {
         self.client.send_command(command).await?;
+        Ok(())
+    }
+
+    /// Write the boot nonce generator to NVRAM so the device generates the
+    /// ApNonce matching blobs saved with this generator.
+    pub async fn set_boot_nonce(&self, nonce: BootNonce) -> Result<(), KitError> {
+        self.client
+            .send_command(&format!("setenv com.apple.System.boot-nonce {nonce}"))
+            .await?;
+        self.client.send_command("saveenv").await?;
         Ok(())
     }
 

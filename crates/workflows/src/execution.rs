@@ -25,6 +25,7 @@ pub struct RestorePreparation {
     restored_data: PreparedRestoreData,
     filesystem_path: String,
     recovery_ticket: Option<Vec<u8>>,
+    boot_nonce: Option<String>,
     build_major: u32,
     exploit_policy: crate::ExploitPolicy,
 }
@@ -68,6 +69,19 @@ impl RestorePreparation {
             .and_then(Value::as_data)
             .map(ToOwned::to_owned);
         let ticket_dictionary = ticket.dictionary().clone();
+        let boot_nonce = if plan.nonce_policy() == crate::NoncePolicy::Auto {
+            let generator = ticket
+                .generator()
+                .ok_or(RestorePreparationError::MissingGenerator)?;
+            Some(
+                generator
+                    .parse::<legacy_ios_core::BootNonce>()
+                    .map_err(|_| RestorePreparationError::InvalidGenerator(generator.to_owned()))?
+                    .to_string(),
+            )
+        } else {
+            None
+        };
         let personalizer =
             ComponentPersonalizer::new(archive, identity.clone(), ticket_dictionary.clone());
         let sep = match plan.sep_policy() {
@@ -124,6 +138,7 @@ impl RestorePreparation {
             restored_data,
             filesystem_path,
             recovery_ticket,
+            boot_nonce,
             build_major,
             exploit_policy: plan.exploit_policy(),
         })
@@ -147,6 +162,10 @@ impl RestorePreparation {
 
     pub fn recovery_ticket(&self) -> Option<&[u8]> {
         self.recovery_ticket.as_deref()
+    }
+
+    pub fn boot_nonce(&self) -> Option<&str> {
+        self.boot_nonce.as_deref()
     }
 
     pub const fn build_major(&self) -> u32 {
@@ -211,6 +230,10 @@ pub enum RestorePreparationError {
     FirmwareChanged,
     #[error("firmware build identifier has no numeric major version")]
     InvalidBuildId,
+    #[error("nonce policy is automatic but the ticket has no generator")]
+    MissingGenerator,
+    #[error("ticket generator is not a valid boot nonce: {0}")]
+    InvalidGenerator(String),
     #[error("provided SEP firmware has no RestoreSEP component")]
     MissingProvidedSep,
     #[error(transparent)]
@@ -246,6 +269,7 @@ mod tests {
             baseband: BasebandPolicy::None,
             sep: SepPolicy::Auto,
             exploit: ExploitPolicy::None,
+            nonce: crate::NoncePolicy::Manual,
         })
         .unwrap();
         let consent = plan.confirm_destructive();

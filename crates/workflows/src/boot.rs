@@ -41,6 +41,13 @@ pub async fn boot_restore(
         return Err(RestoreBootError::ExpectedRecovery(client.mode()));
     }
 
+    if let Some(nonce) = preparation.boot_nonce() {
+        client
+            .send_command(&format!("setenv com.apple.System.boot-nonce {nonce}"))
+            .await?;
+        client.send_command("saveenv").await?;
+    }
+
     if preparation.build_major() > 8
         && let Some(ticket) = preparation.recovery_ticket()
     {
