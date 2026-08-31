@@ -3,8 +3,12 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use legacy_ios_assets::{ResourceCatalog, ResourceId};
 use legacy_ios_core::{BoardConfig, BuildId, IosVersion, ProductType};
-use legacy_ios_firmware::{BuildManifest, FirmwareArchive, RemoteFirmwareArchive, RestoreBehavior};
+use legacy_ios_firmware::{
+    ArtifactSpec, ArtifactStore, BuildManifest, FirmwareArchive, RemoteFirmwareArchive,
+    RestoreBehavior,
+};
 use legacy_ios_image::{DmgFirmwareKey, decrypt_firmware_image};
 use serde::{Deserialize, Serialize};
 
@@ -35,6 +39,18 @@ pub(crate) async fn decrypt_dmg(
     .await
     .map_err(|error| KitError::Task(error.to_string()))??;
     Ok(())
+}
+
+pub(crate) async fn fetch_resource(
+    id: &ResourceId,
+    cache_root: PathBuf,
+) -> Result<PathBuf, KitError> {
+    let record = ResourceCatalog::bundled()
+        .get(id)
+        .ok_or_else(|| KitError::UnknownResource(id.clone()))?;
+    let digest = format!("sha256:{}", record.sha256());
+    let spec = ArtifactSpec::parse(record.source_url(), &digest)?.with_size(record.size());
+    Ok(ArtifactStore::new(cache_root).fetch(&spec).await?)
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]

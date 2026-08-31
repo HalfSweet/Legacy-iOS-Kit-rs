@@ -20,6 +20,7 @@ pub use erase::{EraseConsent, ErasePlan};
 pub use error::KitError;
 pub use firmware::{FirmwareIdentitySummary, FirmwareSummary, RemoteFirmwareSummary};
 pub use lease::DeviceLease;
+pub use legacy_ios_assets::{Redistribution, ResourceId, ResourceRecord};
 pub use legacy_ios_core::{
     BoardConfig, BuildId, Capability, CapabilitySet, ConnectionId, DeviceIdentity, DeviceMode,
     DeviceSelector, DeviceSnapshot, Ecid, IosVersion, OperationEvent, OperationId,
@@ -126,6 +127,14 @@ impl LegacyIosKit {
         key: DmgFirmwareKey,
     ) -> Result<(), KitError> {
         firmware::decrypt_dmg(source.into(), destination.into(), key).await
+    }
+
+    pub async fn fetch_resource(
+        &self,
+        id: &ResourceId,
+        cache_root: impl Into<std::path::PathBuf>,
+    ) -> Result<std::path::PathBuf, KitError> {
+        firmware::fetch_resource(id, cache_root.into()).await
     }
 
     pub fn convert_onboard_dump(&self, dump: &[u8]) -> Result<SigningTicket, KitError> {

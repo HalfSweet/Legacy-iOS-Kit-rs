@@ -16,6 +16,8 @@ pub enum KitError {
     Firmware(#[from] legacy_ios_firmware::FirmwareError),
     #[error("remote firmware operation failed: {0}")]
     RemoteFirmware(#[from] legacy_ios_firmware::RemoteFirmwareError),
+    #[error("artifact operation failed: {0}")]
+    Artifact(#[from] legacy_ios_firmware::ArtifactError),
     #[error("custom IPSW operation failed: {0}")]
     CustomIpsw(#[from] legacy_ios_firmware::CustomIpswError),
     #[error("signing service operation failed: {0}")]
@@ -60,6 +62,8 @@ pub enum KitError {
     VersionMismatch { expected: String, actual: String },
     #[error("unknown product type {0}")]
     UnknownProduct(legacy_ios_core::ProductType),
+    #[error("unknown resource {0}")]
+    UnknownResource(legacy_ios_assets::ResourceId),
     #[error("board config {board_config} does not belong to {product_type}")]
     UnknownBoardConfig {
         product_type: legacy_ios_core::ProductType,
@@ -82,6 +86,7 @@ impl KitError {
             | Self::RestorePlan(_)
             | Self::RestorePreparation(_)
             | Self::UnknownProduct(_)
+            | Self::UnknownResource(_)
             | Self::UnknownBoardConfig { .. }
             | Self::MissingDeviceSelector => OperationPhase::Planning,
             Self::EraseConsentMismatch => OperationPhase::Preflight,
@@ -92,6 +97,7 @@ impl KitError {
             | Self::Ticket(_)
             | Self::TicketPolicyMismatch
             | Self::MissingSigningDeviceInfo(_) => OperationPhase::Personalizing,
+            Self::Artifact(_) => OperationPhase::Downloading,
             Self::Transport(_)
             | Self::Service(_)
             | Self::Ssh(_)
@@ -116,7 +122,7 @@ impl KitError {
             Self::Transport(_) | Self::Service(_) | Self::Ssh(_) | Self::DeviceDiscovery { .. } => {
                 Recoverability::ReconnectDevice
             }
-            Self::Signing(_) | Self::Io(_) => Recoverability::RetryImmediately,
+            Self::Signing(_) | Self::Artifact(_) | Self::Io(_) => Recoverability::RetryImmediately,
             Self::Recovery(_) | Self::Limera1n(_) => Recoverability::ReenterDfu,
             Self::PwnVerificationFailed | Self::ExternalExploitTimeout => {
                 Recoverability::ReenterDfu
@@ -139,6 +145,7 @@ impl KitError {
             | Self::TicketPolicyMismatch
             | Self::MissingSigningDeviceInfo(_)
             | Self::UnknownProduct(_)
+            | Self::UnknownResource(_)
             | Self::UnknownBoardConfig { .. }
             | Self::MissingDeviceSelector => Recoverability::NotRecoverable,
             Self::EraseConsentMismatch => Recoverability::NotRecoverable,
