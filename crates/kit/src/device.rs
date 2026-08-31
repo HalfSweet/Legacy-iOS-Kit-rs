@@ -10,7 +10,8 @@ use legacy_ios_services::{
     RamdiskSsh, SshPassword, SshTarget, SystemMux,
 };
 use legacy_ios_transport::{
-    DeviceLocator, NusbDeviceLocator, ObservedUsbDevice, parse_iboot_serial,
+    DeviceLocator, NusbDeviceLocator, ObservedUsbDevice, UsbHostDiagnostics, diagnose_usb_host,
+    parse_iboot_serial,
 };
 use serde::{Deserialize, Serialize};
 use tracing::warn;
@@ -103,6 +104,10 @@ impl DeviceManager {
                 normal: normal.to_string(),
             }),
         }
+    }
+
+    pub async fn host_requirements(&self) -> Result<UsbHostDiagnostics, KitError> {
+        Ok(diagnose_usb_host().await?)
     }
 
     pub async fn list_bootloader(&self) -> Result<Vec<DeviceSummary>, KitError> {

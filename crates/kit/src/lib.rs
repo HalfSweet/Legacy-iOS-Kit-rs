@@ -41,7 +41,10 @@ pub use legacy_ios_services::{
     DeviceStorageInfo, DeviceSyslog, HostKeyPolicy, InstalledApp, NormalBackend, RamdiskSsh,
     ScpPath, ScpPathError, SshCommandOutput, SshPassword, SshTarget,
 };
-pub use legacy_ios_transport::RecoveryDeviceInfo;
+pub use legacy_ios_transport::{
+    HostRequirement, HostRequirementCode, RecoveryDeviceInfo, UsbAccess, UsbHostDevice,
+    UsbHostDiagnostics,
+};
 pub use legacy_ios_workflows::{
     BasebandPolicy, DestructiveConsent, ExploitPolicy, PlanId, RestoreComponent, RestorePlan,
     RestorePlanError, RestoreRequest, RestoreStep, RestoreStepKind, SepPolicy, TicketPolicy,

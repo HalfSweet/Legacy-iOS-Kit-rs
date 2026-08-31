@@ -19,6 +19,7 @@ use legacy_ios_kit::{
     RecoveryUploadResult, RemoteFirmwareSummary, ResourceId, RestoreBehavior,
     RestoreExecutionRequest, RestorePlan, RestoreRequest, ScpPath, SepPolicy, ShshRequest,
     ShshSummary, SigningTicket, SshCommandOutput, SshPassword, SshTarget, TicketPolicy, Udid,
+    UsbHostDiagnostics,
 };
 use tracing::level_filters::LevelFilter;
 use tracing::{debug, info, warn};
@@ -330,6 +331,8 @@ impl From<AppFilterArg> for AppFilter {
 enum DeviceCommand {
     /// List normal, Recovery, DFU, WTF, and KIS devices.
     List,
+    /// Diagnose USB permissions, driver bindings, and device contention.
+    HostRequirements,
     /// Pair a normal-mode device through the configured backend.
     Pair { udid: Udid },
     /// Read battery diagnostics from a paired normal-mode device.
@@ -1066,6 +1069,16 @@ async fn main() -> Result<()> {
                 .await
                 .context("failed to list devices")?;
             write_inventory(output, &inventory)?;
+        }
+        Command::Device {
+            command: DeviceCommand::HostRequirements,
+        } => {
+            let diagnostics = kit
+                .devices()
+                .host_requirements()
+                .await
+                .context("failed to diagnose USB host requirements")?;
+            write_host_requirements(output, &diagnostics)?;
         }
         Command::Device {
             command: DeviceCommand::Pair { udid },
@@ -2496,6 +2509,46 @@ fn write_inventory(format: OutputFormat, inventory: &DeviceInventory) -> Result<
                 for device in inventory.devices() {
                     write_device(&mut output, device)?;
                 }
+            }
+        }
+    }
+    Ok(())
+}
+
+fn write_host_requirements(format: OutputFormat, diagnostics: &UsbHostDiagnostics) -> Result<()> {
+    let stdout = io::stdout();
+    let mut output = stdout.lock();
+    match format {
+        OutputFormat::Json => {
+            serde_json::to_writer_pretty(&mut output, diagnostics)?;
+            writeln!(output)?;
+        }
+        OutputFormat::Human => {
+            if diagnostics.devices().is_empty() {
+                writeln!(output, "No supported Apple USB devices found.")?;
+            }
+            for device in diagnostics.devices() {
+                write!(
+                    output,
+                    "{}  {:#06x}  {}  {}",
+                    device.mode(),
+                    device.product_id(),
+                    device.access(),
+                    device.connection_id()
+                )?;
+                if let Some(driver) = device.driver() {
+                    write!(output, "  driver {driver}")?;
+                }
+                writeln!(output)?;
+            }
+            for requirement in diagnostics.requirements() {
+                writeln!(
+                    output,
+                    "Requirement [{}] {}: {}",
+                    requirement.code(),
+                    requirement.connection_id(),
+                    requirement.message()
+                )?;
             }
         }
     }
