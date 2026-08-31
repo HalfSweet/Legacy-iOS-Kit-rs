@@ -90,3 +90,12 @@ sha256 = "343cf729dd08d693c467304292d26d0ac4132f99ceb29fcb99dd7c8148553a73"
 size = 180
 purpose = "checkm8 DFU request handler payload for 32-bit SoCs, Apache-2.0, bundled at crates/exploits/payloads/payload_handle_checkm8_request_armv7.bin"
 redistribution = "bundled"
+
+[[resources]]
+id = "s5l8900-wtf-pwnage-patch"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/patch/WTF.s5l8900xall.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "d12486bc101ec5a2df8dd4267b4f2c00cd4c8e2416b565c11af5051cb9f14d12"
+size = 262
+purpose = "bsdiff patch turning the Apple WTF.s5l8900xall image into the Pwnage 2.0 exploit image for S5L8900"
+redistribution = "download-only"

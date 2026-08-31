@@ -12,6 +12,7 @@ mod image_payload;
 mod lease;
 mod operation;
 mod pairing;
+mod pwnage;
 mod ramdisk;
 mod ramdisk_boot;
 mod recovery;
@@ -267,6 +268,15 @@ impl LegacyIosKit {
             self.tss.clone(),
             request,
         )
+    }
+
+    /// Exploit an S5L8900 device in DFU mode with the Pwnage 2.0 WTF image.
+    pub async fn pwn_wtf(
+        &self,
+        ecid: Option<Ecid>,
+        cache_root: impl Into<std::path::PathBuf>,
+    ) -> Result<(), KitError> {
+        pwnage::pwn_wtf(ecid, cache_root.into()).await
     }
 
     pub async fn plan_erase(&self, udid: Udid) -> Result<ErasePlan, KitError> {

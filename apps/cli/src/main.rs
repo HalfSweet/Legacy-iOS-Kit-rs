@@ -427,6 +427,13 @@ enum DeviceCommand {
         #[arg(long)]
         yes: bool,
     },
+    /// Exploit an S5L8900 device in DFU mode with the Pwnage 2.0 WTF image.
+    PwnWtf {
+        #[arg(long)]
+        ecid: Option<Ecid>,
+        #[arg(long)]
+        yes: bool,
+    },
     /// Write the boot nonce generator to NVRAM on a Recovery-mode device.
     SetNonce {
         #[arg(long)]
@@ -1241,6 +1248,15 @@ async fn main() -> Result<()> {
                 .context("failed to read limera1n payload")?;
             let device = kit.recovery().open(ecid).await?.limera1n(payload).await?;
             write_recovery_info(output, device.mode(), device.info())?;
+        }
+        Command::Device {
+            command: DeviceCommand::PwnWtf { ecid, yes },
+        } => {
+            confirm("run the Pwnage 2.0 WTF exploit", yes)?;
+            kit.pwn_wtf(ecid, config.artifact_cache_dir()?)
+                .await
+                .context("Pwnage WTF exploit failed")?;
+            write_status(output, "pwned-wtf")?;
         }
         Command::Device {
             command:

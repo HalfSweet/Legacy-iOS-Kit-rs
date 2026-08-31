@@ -28,6 +28,8 @@ pub enum KitError {
     OnboardTicket(#[from] legacy_ios_image::OnboardTicketError),
     #[error("disk image operation failed: {0}")]
     Dmg(#[from] legacy_ios_image::DmgError),
+    #[error("binary patch operation failed: {0}")]
+    Patch(#[from] legacy_ios_image::PatchError),
     #[error("HFS+ operation failed: {0}")]
     Hfs(#[from] legacy_ios_image::HfsError),
     #[error("image payload operation failed: {0}")]
@@ -68,8 +70,12 @@ pub enum KitError {
     Io(#[from] std::io::Error),
     #[error("worker task failed: {0}")]
     Task(String),
-    #[error("timed out waiting for the restored device to return to normal mode")]
+    #[error("timed out waiting for the device to return to normal mode")]
     VerificationTimeout,
+    #[error("WTF image from the Apple IPSW does not match the pinned SHA-1")]
+    PwnageWtfDigest,
+    #[error("timed out waiting for the device to re-enumerate in Pwnage 2.0 WTF mode")]
+    PwnageVerificationTimeout,
     #[error("restored device version mismatch: expected {expected}, got {actual}")]
     VersionMismatch { expected: String, actual: String },
     #[error("unknown product type {0}")]
@@ -112,6 +118,7 @@ impl KitError {
             | Self::Plist(_)
             | Self::OnboardTicket(_)
             | Self::Dmg(_)
+            | Self::Patch(_)
             | Self::Hfs(_)
             | Self::ImagePayload(_)
             | Self::Ticket(_)
@@ -129,6 +136,8 @@ impl KitError {
             Self::Limera1n(_)
             | Self::Checkm8(_)
             | Self::AutomaticExploitUnsupported(_)
+            | Self::PwnageVerificationTimeout
+            | Self::PwnageWtfDigest
             | Self::MissingLimera1nPayload
             | Self::PwnVerificationFailed
             | Self::ExternalExploitTimeout => OperationPhase::Exploiting,
@@ -154,6 +163,8 @@ impl KitError {
                 Recoverability::RestartOperation
             }
             Self::VerificationTimeout => Recoverability::ReconnectDevice,
+            Self::PwnageVerificationTimeout => Recoverability::ReenterDfu,
+            Self::PwnageWtfDigest => Recoverability::NotRecoverable,
             Self::VersionMismatch { .. } => Recoverability::ManualRecoveryRequired,
             Self::Firmware(_)
             | Self::RemoteFirmware(_)
@@ -166,6 +177,7 @@ impl KitError {
             | Self::MissingLimera1nPayload
             | Self::OnboardTicket(_)
             | Self::Dmg(_)
+            | Self::Patch(_)
             | Self::Hfs(_)
             | Self::ImagePayload(_)
             | Self::Ticket(_)

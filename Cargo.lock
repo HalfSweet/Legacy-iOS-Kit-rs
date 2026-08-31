@@ -1683,6 +1683,7 @@ dependencies = [
  "legacy-ios-workflows",
  "plist",
  "serde",
+ "sha1 0.10.6",
  "tempfile",
  "thiserror 2.0.20",
  "tokio",
