@@ -5,9 +5,9 @@ use legacy_ios_core::{
     ProductType, Soc, Udid,
 };
 use legacy_ios_services::{
-    ActivationState, AppFilter, BackupOptions, BackupOutcome, BackupRestoreOptions, DeviceFiles,
-    DeviceSyslog, HostKeyPolicy, InstalledApp, NormalBackend, NormalDevice, NormalMux, RamdiskSsh,
-    SshPassword, SshTarget, SystemMux,
+    ActivationState, AppFilter, BackupOptions, BackupOutcome, BackupPassword, BackupRestoreOptions,
+    DeviceFiles, DeviceSyslog, HostKeyPolicy, InstalledApp, NormalBackend, NormalDevice, NormalMux,
+    RamdiskSsh, SshPassword, SshTarget, SystemMux,
 };
 use legacy_ios_transport::{
     DeviceLocator, NusbDeviceLocator, ObservedUsbDevice, parse_iboot_serial,
@@ -275,6 +275,20 @@ impl DeviceManager {
         work_directory: &std::path::Path,
     ) -> Result<BackupOutcome, KitError> {
         Ok(self.find_normal(udid).await?.erase(work_directory).await?)
+    }
+
+    pub async fn change_backup_password(
+        &self,
+        udid: &Udid,
+        work_directory: &std::path::Path,
+        old: Option<&BackupPassword>,
+        new: Option<&BackupPassword>,
+    ) -> Result<BackupOutcome, KitError> {
+        Ok(self
+            .find_normal(udid)
+            .await?
+            .change_backup_password(work_directory, old, new)
+            .await?)
     }
 
     pub async fn ramdisk_ssh(

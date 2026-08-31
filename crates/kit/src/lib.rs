@@ -29,9 +29,9 @@ pub use legacy_ios_firmware::{RestoreBehavior, SigningTicket, TicketError};
 pub use legacy_ios_image::{DmgError, DmgFirmwareKey};
 pub use legacy_ios_services::{
     ActivationState, AfcPath, AfcPathError, AppFilter, BackupOptions, BackupOutcome,
-    BackupRestoreOptions, DeviceFileInfo, DeviceFileKind, DeviceFiles, DeviceStorageInfo,
-    DeviceSyslog, HostKeyPolicy, InstalledApp, NormalBackend, RamdiskSsh, ScpPath, ScpPathError,
-    SshCommandOutput, SshPassword, SshTarget,
+    BackupPassword, BackupRestoreOptions, DeviceFileInfo, DeviceFileKind, DeviceFiles,
+    DeviceStorageInfo, DeviceSyslog, HostKeyPolicy, InstalledApp, NormalBackend, RamdiskSsh,
+    ScpPath, ScpPathError, SshCommandOutput, SshPassword, SshTarget,
 };
 pub use legacy_ios_transport::RecoveryDeviceInfo;
 pub use legacy_ios_workflows::{
