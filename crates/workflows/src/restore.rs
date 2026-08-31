@@ -115,6 +115,16 @@ impl RestorePlan {
                     })?;
             }
         }
+        if let BasebandPolicy::Provided(path) = &request.baseband {
+            if !path.is_file() {
+                return Err(RestorePlanError::BasebandNotFound(path.clone()));
+            }
+        }
+        if let SepPolicy::Provided(path) = &request.sep {
+            if !path.is_file() {
+                return Err(RestorePlanError::SepNotFound(path.clone()));
+            }
+        }
 
         let archive = FirmwareArchive::open(&request.firmware)?;
         let manifest = archive.build_manifest()?;
@@ -356,6 +366,10 @@ pub enum RestorePlanError {
         #[source]
         source: TicketError,
     },
+    #[error("provided baseband firmware does not exist: {}", .0.display())]
+    BasebandNotFound(PathBuf),
+    #[error("provided SEP firmware does not exist: {}", .0.display())]
+    SepNotFound(PathBuf),
     #[error(transparent)]
     Firmware(#[from] FirmwareError),
 }
