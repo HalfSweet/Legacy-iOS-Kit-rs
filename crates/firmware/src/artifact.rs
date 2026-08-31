@@ -74,11 +74,26 @@ impl FromStr for Digest {
 pub struct ArtifactSpec {
     url: Url,
     digest: Digest,
+    size: Option<u64>,
 }
 
 impl ArtifactSpec {
     pub fn new(url: Url, digest: Digest) -> Self {
-        Self { url, digest }
+        Self {
+            url,
+            digest,
+            size: None,
+        }
+    }
+
+    pub fn parse(url: &str, digest: &str) -> Result<Self, ArtifactError> {
+        let url = Url::parse(url).map_err(|_| ArtifactError::InvalidUrl)?;
+        Ok(Self::new(url, digest.parse()?))
+    }
+
+    pub fn with_size(mut self, size: u64) -> Self {
+        self.size = Some(size);
+        self
     }
 
     pub fn url(&self) -> &Url {
@@ -87,6 +102,10 @@ impl ArtifactSpec {
 
     pub const fn digest(&self) -> Digest {
         self.digest
+    }
+
+    pub const fn size(&self) -> Option<u64> {
+        self.size
     }
 }
 
@@ -165,6 +184,14 @@ impl ArtifactStore {
                 actual,
             });
         }
+        if let Some(expected) = spec.size
+            && expected != downloaded
+        {
+            return Err(ArtifactError::SizeMismatch {
+                expected,
+                actual: downloaded,
+            });
+        }
         tokio::fs::rename(&temporary, &destination).await?;
         info!(bytes = downloaded, path = %destination.display(), "cached artifact");
         Ok(destination)
@@ -216,12 +243,16 @@ async fn hash_file(path: &Path, expected: Digest) -> Result<Digest, ArtifactErro
 pub enum ArtifactError {
     #[error("invalid artifact digest")]
     InvalidDigest,
+    #[error("invalid artifact URL")]
+    InvalidUrl,
     #[error("artifact I/O failed: {0}")]
     Io(#[from] std::io::Error),
     #[error("artifact HTTP request failed: {0}")]
     Http(#[from] reqwest::Error),
     #[error("artifact digest mismatch: expected {expected}, got {actual}")]
     DigestMismatch { expected: Digest, actual: Digest },
+    #[error("artifact size mismatch: expected {expected} bytes, got {actual}")]
+    SizeMismatch { expected: u64, actual: u64 },
 }
 
 #[cfg(test)]
@@ -232,6 +263,10 @@ mod tests {
     fn parses_and_formats_digests() {
         let value = "sha256:000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f";
         assert_eq!(value.parse::<Digest>().unwrap().to_string(), value);
+        let spec = ArtifactSpec::parse("https://example.com/resource", value)
+            .unwrap()
+            .with_size(42);
+        assert_eq!(spec.size(), Some(42));
     }
 
     #[tokio::test]
