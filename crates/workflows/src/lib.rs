@@ -9,7 +9,7 @@ mod personalization;
 mod restore;
 mod runner;
 
-pub use baseband::{BasebandError, BasebandFirmware};
+pub use baseband::{BasebandError, BasebandFirmware, BasebandRequestError, BasebandResolver};
 pub use boot::{RestoreBootError, RestoreBootOutcome, boot_restore};
 pub use execution::{PreparedBootComponent, RestorePreparation, RestorePreparationError};
 pub use personalization::{ComponentPersonalizer, PersonalizationError};

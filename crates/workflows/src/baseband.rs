@@ -1,9 +1,16 @@
 use std::io::{Cursor, Read, Write};
 
+use legacy_ios_firmware::{
+    BasebandParameters, BuildIdentity, FirmwareArchive, FirmwareError, TssClient, TssError,
+    TssRequest,
+};
 use legacy_ios_image::{FlsError, FlsFile, MbnError, MbnFile};
+use legacy_ios_restore::DataRequest;
 use plist::{Dictionary, Value};
 use thiserror::Error;
 use zip::{ZipArchive, ZipWriter, write::SimpleFileOptions};
+
+use crate::RestorePlan;
 
 const MAX_ENTRY_SIZE: u64 = 256 * 1024 * 1024;
 
@@ -93,6 +100,110 @@ impl BasebandFirmware {
         response.insert("BasebandData".into(), Value::Data(self.archive));
         response
     }
+}
+
+#[derive(Clone, Debug)]
+pub struct BasebandResolver {
+    archive: FirmwareArchive,
+    identity: BuildIdentity,
+    firmware_path: String,
+    tss: TssClient,
+    ecid: legacy_ios_core::Ecid,
+}
+
+impl BasebandResolver {
+    pub fn new(plan: &RestorePlan, tss: TssClient) -> Result<Self, BasebandRequestError> {
+        let archive = FirmwareArchive::open(plan.firmware())?;
+        let manifest = archive.build_manifest()?;
+        let board = plan
+            .device()
+            .board_config()
+            .ok_or(BasebandRequestError::MissingBoardConfig)?;
+        let identity = manifest.select_identity(board, plan.behavior())?.clone();
+        let firmware_path = identity.component_path("BasebandFirmware")?.to_owned();
+        let ecid = plan
+            .device()
+            .ecid()
+            .ok_or(BasebandRequestError::MissingEcid)?;
+        Ok(Self {
+            archive,
+            identity,
+            firmware_path,
+            tss,
+            ecid,
+        })
+    }
+
+    pub async fn resolve(&self, request: &DataRequest) -> Result<Dictionary, BasebandRequestError> {
+        let arguments = request
+            .message()
+            .get("Arguments")
+            .and_then(Value::as_dictionary)
+            .ok_or(BasebandRequestError::MissingArgument("Arguments"))?;
+        let chip_id = required_unsigned(arguments, "ChipID")?;
+        let chip_id =
+            u32::try_from(chip_id).map_err(|_| BasebandRequestError::MissingArgument("ChipID"))?;
+        let certificate_id = required_unsigned(arguments, "CertID")?;
+        let serial_number = arguments
+            .get("ChipSerialNo")
+            .and_then(Value::as_data)
+            .ok_or(BasebandRequestError::MissingArgument("ChipSerialNo"))?
+            .to_vec();
+        let nonce = arguments
+            .get("Nonce")
+            .and_then(Value::as_data)
+            .map(ToOwned::to_owned);
+        let mut parameters =
+            BasebandParameters::new(self.ecid, u64::from(chip_id), certificate_id, serial_number);
+        if let Some(nonce) = &nonce {
+            parameters = parameters.with_nonce(nonce.clone());
+        }
+        let request = TssRequest::for_baseband(&self.identity, &parameters)?;
+        let response = self.tss.send(&request).await?;
+        let archive = self.archive.clone();
+        let path = self.firmware_path.clone();
+        let response = response.into_dictionary();
+        let signed = tokio::task::spawn_blocking(move || {
+            let data = archive.read_entry(&path)?;
+            Ok::<_, BasebandRequestError>(BasebandFirmware::sign(
+                &data,
+                &response,
+                nonce.as_deref(),
+                chip_id,
+            )?)
+        })
+        .await
+        .map_err(|error| BasebandRequestError::Task(error.to_string()))??;
+        Ok(signed.into_restore_response())
+    }
+}
+
+fn required_unsigned(
+    dictionary: &Dictionary,
+    key: &'static str,
+) -> Result<u64, BasebandRequestError> {
+    dictionary
+        .get(key)
+        .and_then(Value::as_unsigned_integer)
+        .ok_or(BasebandRequestError::MissingArgument(key))
+}
+
+#[derive(Debug, Error)]
+pub enum BasebandRequestError {
+    #[error("restore plan has no board config")]
+    MissingBoardConfig,
+    #[error("restore plan has no ECID")]
+    MissingEcid,
+    #[error("baseband request is missing {0}")]
+    MissingArgument(&'static str),
+    #[error("baseband worker task failed: {0}")]
+    Task(String),
+    #[error(transparent)]
+    Firmware(#[from] FirmwareError),
+    #[error(transparent)]
+    Tss(#[from] TssError),
+    #[error(transparent)]
+    Signing(#[from] BasebandError),
 }
 
 #[derive(Debug)]
