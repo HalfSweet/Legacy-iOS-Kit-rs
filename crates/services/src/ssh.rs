@@ -1,10 +1,11 @@
-use std::{borrow::Cow, fmt, sync::Arc, time::Duration};
+use std::{borrow::Cow, fmt, str::FromStr, sync::Arc, time::Duration};
 
 use russh::{
     ChannelMsg, Disconnect, client,
     keys::{Algorithm, EcdsaCurve, HashAlg, PublicKeyOrCertificate},
 };
 use thiserror::Error;
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncWriteExt};
 use zeroize::Zeroizing;
 
 use crate::{ServiceError, SystemMux};
@@ -32,6 +33,55 @@ impl SshPassword {
         &self.0
     }
 }
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct ScpPath {
+    path: String,
+    parent: String,
+    name: String,
+}
+
+impl ScpPath {
+    pub fn new(path: impl Into<String>) -> Result<Self, ScpPathError> {
+        let path = path.into();
+        if path.is_empty() || path.bytes().any(|byte| matches!(byte, 0 | b'\n' | b'\r')) {
+            return Err(ScpPathError);
+        }
+        let (parent, name) = path
+            .rsplit_once('/')
+            .map_or((".", path.as_str()), |(parent, name)| {
+                (if parent.is_empty() { "/" } else { parent }, name)
+            });
+        if name.is_empty() || matches!(name, "." | "..") {
+            return Err(ScpPathError);
+        }
+        let parent = parent.to_owned();
+        let name = name.to_owned();
+        Ok(Self { path, parent, name })
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.path
+    }
+}
+
+impl fmt::Display for ScpPath {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.path.fmt(formatter)
+    }
+}
+
+impl FromStr for ScpPath {
+    type Err = ScpPathError;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        Self::new(value)
+    }
+}
+
+#[derive(Clone, Copy, Debug, Error, Eq, PartialEq)]
+#[error("invalid SCP remote path")]
+pub struct ScpPathError;
 
 impl fmt::Debug for SshPassword {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -98,6 +148,84 @@ impl RamdiskSsh {
             stderr,
             exit_status,
         })
+    }
+
+    pub async fn upload(&self, destination: &ScpPath, data: &[u8]) -> Result<(), SshError> {
+        let channel = self.session.channel_open_session().await?;
+        channel
+            .exec(true, format!("scp -t {}", shell_quote(&destination.parent)))
+            .await?;
+        let mut stream = channel.into_stream();
+        read_scp_ack(&mut stream).await?;
+        stream
+            .write_all(format!("C0644 {} {}\n", data.len(), destination.name).as_bytes())
+            .await?;
+        stream.flush().await?;
+        read_scp_ack(&mut stream).await?;
+        stream.write_all(data).await?;
+        stream.write_u8(0).await?;
+        stream.flush().await?;
+        read_scp_ack(&mut stream).await?;
+        stream.shutdown().await?;
+        Ok(())
+    }
+
+    pub async fn download(&self, source: &ScpPath, maximum_size: u64) -> Result<Vec<u8>, SshError> {
+        let channel = self.session.channel_open_session().await?;
+        channel
+            .exec(true, format!("scp -f {}", shell_quote(source.as_str())))
+            .await?;
+        let mut stream = channel.into_stream();
+        stream.write_u8(0).await?;
+        stream.flush().await?;
+        loop {
+            let line = read_scp_line(&mut stream).await?;
+            match line.first().copied() {
+                Some(b'T') => {
+                    stream.write_u8(0).await?;
+                    stream.flush().await?;
+                }
+                Some(b'C') => {
+                    let header = std::str::from_utf8(&line[1..])
+                        .map_err(|_| SshError::Scp("non-UTF-8 file header".into()))?;
+                    let mut fields = header.trim_end().splitn(3, ' ');
+                    let _mode = fields.next().ok_or_else(invalid_scp_header)?;
+                    let size = fields
+                        .next()
+                        .ok_or_else(invalid_scp_header)?
+                        .parse::<u64>()
+                        .map_err(|_| invalid_scp_header())?;
+                    let _name = fields.next().ok_or_else(invalid_scp_header)?;
+                    if size > maximum_size {
+                        return Err(SshError::ScpFileTooLarge {
+                            size,
+                            maximum: maximum_size,
+                        });
+                    }
+                    stream.write_u8(0).await?;
+                    stream.flush().await?;
+                    let size = usize::try_from(size).map_err(|_| SshError::ScpFileTooLarge {
+                        size,
+                        maximum: maximum_size,
+                    })?;
+                    let mut data = vec![0; size];
+                    stream.read_exact(&mut data).await?;
+                    if stream.read_u8().await? != 0 {
+                        return Err(SshError::Scp("missing file terminator".into()));
+                    }
+                    stream.write_u8(0).await?;
+                    stream.flush().await?;
+                    stream.shutdown().await?;
+                    return Ok(data);
+                }
+                Some(1 | 2) => {
+                    return Err(SshError::Scp(
+                        String::from_utf8_lossy(&line[1..]).trim().to_owned(),
+                    ));
+                }
+                _ => return Err(invalid_scp_header()),
+            }
+        }
     }
 
     pub async fn disconnect(&self) -> Result<(), SshError> {
@@ -201,6 +329,42 @@ fn legacy_config() -> client::Config {
     }
 }
 
+fn shell_quote(value: &str) -> String {
+    format!("'{}'", value.replace('\'', "'\\''"))
+}
+
+async fn read_scp_ack(stream: &mut (impl AsyncRead + Unpin)) -> Result<(), SshError> {
+    match stream.read_u8().await? {
+        0 => Ok(()),
+        code @ (1 | 2) => {
+            let message = read_scp_line(stream).await?;
+            Err(SshError::Scp(format!(
+                "remote error {code}: {}",
+                String::from_utf8_lossy(&message).trim()
+            )))
+        }
+        code => Err(SshError::Scp(format!("unexpected ACK {code}"))),
+    }
+}
+
+async fn read_scp_line(stream: &mut (impl AsyncRead + Unpin)) -> Result<Vec<u8>, SshError> {
+    let mut line = Vec::new();
+    loop {
+        if line.len() == 4096 {
+            return Err(SshError::Scp("protocol line is too long".into()));
+        }
+        let byte = stream.read_u8().await?;
+        line.push(byte);
+        if byte == b'\n' {
+            return Ok(line);
+        }
+    }
+}
+
+fn invalid_scp_header() -> SshError {
+    SshError::Scp("invalid file header".into())
+}
+
 #[derive(Debug, Error)]
 pub enum SshError {
     #[error("no USB mux device is available for SSH")]
@@ -209,6 +373,12 @@ pub enum SshError {
     AmbiguousDevices(usize),
     #[error("SSH authentication was rejected")]
     AuthenticationRejected,
+    #[error("SCP protocol failed: {0}")]
+    Scp(String),
+    #[error("SCP file is {size} bytes, exceeding {maximum}")]
+    ScpFileTooLarge { size: u64, maximum: u64 },
+    #[error("SSH I/O failed: {0}")]
+    Io(#[from] std::io::Error),
     #[error(transparent)]
     Service(#[from] ServiceError),
     #[error("SSH protocol failed: {0}")]
@@ -230,5 +400,11 @@ mod tests {
                 .contains(&russh::cipher::TRIPLE_DES_CBC)
         );
         assert!(config.preferred.key.contains(&Algorithm::Dsa));
+    }
+
+    #[test]
+    fn quotes_scp_paths_for_remote_shell() {
+        assert_eq!(shell_quote("/tmp/it's here"), "'/tmp/it'\\''s here'");
+        assert!(ScpPath::new("/tmp/file\nname").is_err());
     }
 }

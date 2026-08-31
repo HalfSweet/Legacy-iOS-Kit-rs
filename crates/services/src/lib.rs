@@ -18,4 +18,7 @@ pub use normal::{
     DeviceSyslog, MuxDevice, NormalDevice, NormalDeviceInfo, RawServiceConnection, ServiceError,
     SystemMux,
 };
-pub use ssh::{HostKeyPolicy, RamdiskSsh, SshCommandOutput, SshError, SshPassword, SshTarget};
+pub use ssh::{
+    HostKeyPolicy, RamdiskSsh, ScpPath, ScpPathError, SshCommandOutput, SshError, SshPassword,
+    SshTarget,
+};
