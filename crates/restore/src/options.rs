@@ -94,6 +94,11 @@ impl RestoreOptions {
         );
         options.insert("UpdateBaseband".into(), self.update_baseband.into());
         options.insert("PersonalizedDuringPreflight".into(), true.into());
+        options.insert("SupportedDataTypes".into(), supported_data_types().into());
+        options.insert(
+            "SupportedMessageTypes".into(),
+            supported_message_types().into(),
+        );
         if let Some(boot_args) = &self.boot_args {
             options.insert("RestoreBootArgs".into(), boot_args.clone().into());
         }
@@ -105,6 +110,110 @@ impl RestoreOptions {
         }
         options
     }
+}
+
+fn supported_data_types() -> Dictionary {
+    capability_dictionary(&[
+        ("AuthInstallCACert", true),
+        ("BasebandBootData", false),
+        ("BasebandData", false),
+        ("BasebandStackData", false),
+        ("BasebandUpdaterOutputData", false),
+        ("BootabilityBundle", false),
+        ("BootabilityBundleV2", false),
+        ("BuildIdentityDict", false),
+        ("BuildIdentityDictV2", false),
+        ("Cryptex1LocalPolicy", true),
+        ("DataType", false),
+        ("DeviceRestoreInfoPreflight", false),
+        ("DiagData", false),
+        ("EANData", false),
+        ("FDRMemoryCommit", false),
+        ("FDRTrustData", false),
+        ("FUDData", false),
+        ("FileData", false),
+        ("FileDataDone", false),
+        ("FirmwareUpdaterData", false),
+        ("FirmwareUpdaterDataV2", false),
+        ("FirmwareUpdaterDataV3", true),
+        ("FirmwareUpdaterPreflight", true),
+        ("GrapeFWData", false),
+        ("HPMFWData", false),
+        ("HostSystemTime", true),
+        ("KernelCache", false),
+        ("MessageUseStreamedImageFile", true),
+        ("NORData", false),
+        ("NitrogenFWData", true),
+        ("OpalFWData", false),
+        ("OverlayRootDataCount", false),
+        ("OverlayRootDataForKey", true),
+        ("OverlayRootDataForKeyIndex", true),
+        ("PeppyFWData", true),
+        ("PersonalizedBootObjectV3", false),
+        ("PersonalizedData", true),
+        ("ProvisioningData", false),
+        ("RamdiskFWData", true),
+        ("ReceiptManifest", true),
+        ("RecoveryOSASRImage", true),
+        ("RecoveryOSAppleLogo", true),
+        ("RecoveryOSDeviceTree", true),
+        ("RecoveryOSFileAssetImage", true),
+        ("RecoveryOSIBEC", true),
+        ("RecoveryOSIBootFWFilesImages", true),
+        ("RecoveryOSImage", true),
+        ("RecoveryOSKernelCache", true),
+        ("RecoveryOSLocalPolicy", true),
+        ("RecoveryOSOverlayRootDataCount", false),
+        ("RecoveryOSRootTicketData", true),
+        ("RecoveryOSStaticTrustCache", true),
+        ("RecoveryOSVersionData", true),
+        ("RestoreLocalPolicy", true),
+        ("RootData", false),
+        ("RootTicket", false),
+        ("S3EOverride", false),
+        ("SourceBootObjectV3", false),
+        ("SourceBootObjectV4", false),
+        ("SourceBootObjectV5", false),
+        ("SsoServiceTicket", false),
+        ("StockholmPostflight", false),
+        ("SystemImageCanonicalMetadata", false),
+        ("SystemImageData", false),
+        ("SystemImageRootHash", false),
+        ("URLAsset", true),
+        ("USBCFWData", false),
+        ("USBCOverride", false),
+        ("UpdateVolumeOverlayRootDataCount", true),
+    ])
+}
+
+fn supported_message_types() -> Dictionary {
+    capability_dictionary(&[
+        ("AsyncDataRequestMsg", true),
+        ("AsyncWait", true),
+        ("BBUpdateStatusMsg", false),
+        ("CheckpointMsg", true),
+        ("CrashLog", true),
+        ("DataRequestMsg", false),
+        ("FDRSubmit", true),
+        ("MsgType", false),
+        ("PreviousRestoreLogMsg", false),
+        ("ProgressMsg", false),
+        ("ProvisioningAck", false),
+        ("ProvisioningInfo", false),
+        ("ProvisioningStatusMsg", false),
+        ("ReceivedFinalStatusMsg", false),
+        ("RestoreAttestation", true),
+        ("RestoreProtocol", true),
+        ("RestoredCrash", true),
+        ("StatusMsg", false),
+    ])
+}
+
+fn capability_dictionary(entries: &[(&str, bool)]) -> Dictionary {
+    entries
+        .iter()
+        .map(|(name, value)| ((*name).to_owned(), Value::Boolean(*value)))
+        .collect()
 }
 
 const fn behavior(erase: bool) -> &'static str {
@@ -134,6 +243,26 @@ mod tests {
                 .get("PersonalizedDuringPreflight")
                 .and_then(Value::as_boolean),
             Some(true)
+        );
+        let data_types = options
+            .get("SupportedDataTypes")
+            .and_then(Value::as_dictionary)
+            .unwrap();
+        assert_eq!(
+            data_types
+                .get("FirmwareUpdaterDataV3")
+                .and_then(Value::as_boolean),
+            Some(true)
+        );
+        let message_types = options
+            .get("SupportedMessageTypes")
+            .and_then(Value::as_dictionary)
+            .unwrap();
+        assert_eq!(
+            message_types
+                .get("DataRequestMsg")
+                .and_then(Value::as_boolean),
+            Some(false)
         );
     }
 }
