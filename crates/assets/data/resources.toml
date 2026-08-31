@@ -45,3 +45,30 @@ sha256 = "1249cdf73d1addc68090b688622e700bf175d2b12e7f07aa84d2648ab8f863f6"
 size = 194560
 purpose = "Device-side binaries for the iOS 4 restore ramdisk"
 redistribution = "download-only"
+
+[[resources]]
+id = "gaster-checkm8-payload-a9"
+source_url = "https://raw.githubusercontent.com/0x7ff/gaster/7fffffff38a1bed1cdc1c5bae0df70f14395129b/payload_A9.bin"
+source_commit = "7fffffff38a1bed1cdc1c5bae0df70f14395129b"
+sha256 = "a698045fae09acdc5bfafc26ef3fe7848f1454b8ce8847fdc45396cc18a532b2"
+size = 280
+purpose = "checkm8 first-stage payload for A9/A9X (CPID 0x8000/0x8003), Apache-2.0, bundled at crates/exploits/payloads/payload_A9.bin"
+redistribution = "bundled"
+
+[[resources]]
+id = "gaster-checkm8-payload-not-a9"
+source_url = "https://raw.githubusercontent.com/0x7ff/gaster/7fffffff38a1bed1cdc1c5bae0df70f14395129b/payload_notA9.bin"
+source_commit = "7fffffff38a1bed1cdc1c5bae0df70f14395129b"
+sha256 = "36fbb1418aa90417fd3ceba88b403d6e3360106b286c5133a54b7a3a4add2190"
+size = 216
+purpose = "checkm8 first-stage payload for arm64 SoCs other than A9, Apache-2.0, bundled at crates/exploits/payloads/payload_notA9.bin"
+redistribution = "bundled"
+
+[[resources]]
+id = "gaster-checkm8-handle-request-payload"
+source_url = "https://raw.githubusercontent.com/0x7ff/gaster/7fffffff38a1bed1cdc1c5bae0df70f14395129b/payload_handle_checkm8_request.bin"
+source_commit = "7fffffff38a1bed1cdc1c5bae0df70f14395129b"
+sha256 = "c0c213047a8902186392396cb7e57c096626b4812b61e07c2cf7cf6b99a9889c"
+size = 248
+purpose = "checkm8 DFU request handler payload for all arm64 SoCs, Apache-2.0, bundled at crates/exploits/payloads/payload_handle_checkm8_request.bin"
+redistribution = "bundled"
