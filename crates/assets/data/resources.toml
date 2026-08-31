@@ -72,3 +72,21 @@ sha256 = "c0c213047a8902186392396cb7e57c096626b4812b61e07c2cf7cf6b99a9889c"
 size = 248
 purpose = "checkm8 DFU request handler payload for all arm64 SoCs, Apache-2.0, bundled at crates/exploits/payloads/payload_handle_checkm8_request.bin"
 redistribution = "bundled"
+
+[[resources]]
+id = "gaster-checkm8-payload-not-a9-armv7"
+source_url = "https://raw.githubusercontent.com/0x7ff/gaster/7fffffff38a1bed1cdc1c5bae0df70f14395129b/payload_notA9_armv7.bin"
+source_commit = "7fffffff38a1bed1cdc1c5bae0df70f14395129b"
+sha256 = "06d8ec32fe560719ddc90aef49f18fbde2d4ed8dae5e8ac1cab7fce9ef0185e6"
+size = 188
+purpose = "checkm8 first-stage payload for 32-bit SoCs (A5X/A6/A6X/T7002/T8002/T8004), Apache-2.0, bundled at crates/exploits/payloads/payload_notA9_armv7.bin"
+redistribution = "bundled"
+
+[[resources]]
+id = "gaster-checkm8-handle-request-payload-armv7"
+source_url = "https://raw.githubusercontent.com/0x7ff/gaster/7fffffff38a1bed1cdc1c5bae0df70f14395129b/payload_handle_checkm8_request_armv7.bin"
+source_commit = "7fffffff38a1bed1cdc1c5bae0df70f14395129b"
+sha256 = "343cf729dd08d693c467304292d26d0ac4132f99ceb29fcb99dd7c8148553a73"
+size = 180
+purpose = "checkm8 DFU request handler payload for 32-bit SoCs, Apache-2.0, bundled at crates/exploits/payloads/payload_handle_checkm8_request_armv7.bin"
+redistribution = "bundled"
