@@ -54,6 +54,10 @@ impl SigningTicket {
         let dictionary = Value::from_reader(std::io::Cursor::new(data))?
             .into_dictionary()
             .ok_or(TicketError::RootNotDictionary)?;
+        Self::from_dictionary(dictionary)
+    }
+
+    pub fn from_dictionary(dictionary: Dictionary) -> Result<Self, TicketError> {
         let root_ticket = ["ApImg4Ticket", "APTicket", "ApTicket"]
             .into_iter()
             .find_map(|key| dictionary.get(key).and_then(Value::as_data))
