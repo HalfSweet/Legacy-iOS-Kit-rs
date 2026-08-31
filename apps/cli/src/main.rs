@@ -93,8 +93,9 @@ enum RamdiskCommand {
         ibss: PathBuf,
         #[arg(long)]
         ibec: Option<PathBuf>,
+        /// RestoreRamDisk image; omit to just boot the kernel tethered.
         #[arg(long)]
-        ramdisk: PathBuf,
+        ramdisk: Option<PathBuf>,
         #[arg(long)]
         device_tree: PathBuf,
         #[arg(long)]

@@ -18,6 +18,7 @@ pub const KERNEL: &str = "RestoreKernelCache";
 pub const APTICKET: &str = "ApTicket";
 
 pub const DEFAULT_BOOT_ARGS: &str = "rd=md0";
+pub const DEFAULT_JUST_BOOT_ARGS: &str = "pio-error=0 -v";
 const MAX_BOOT_ARGS_LEN: usize = 200;
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -25,7 +26,8 @@ pub struct RamdiskBootRequest {
     pub device: DeviceIdentity,
     pub ibss: PathBuf,
     pub ibec: Option<PathBuf>,
-    pub ramdisk: PathBuf,
+    /// RestoreRamDisk image; `None` performs a tethered "just boot".
+    pub ramdisk: Option<PathBuf>,
     pub device_tree: PathBuf,
     pub trust_cache: Option<PathBuf>,
     pub kernel: PathBuf,
@@ -116,7 +118,9 @@ impl RamdiskBootPlan {
         if let Some(ibec) = &request.ibec {
             components.push(pin_component(IBEC, ibec)?);
         }
-        components.push(pin_component(RAMDISK, &request.ramdisk)?);
+        if let Some(ramdisk) = &request.ramdisk {
+            components.push(pin_component(RAMDISK, ramdisk)?);
+        }
         components.push(pin_component(DEVICE_TREE, &request.device_tree)?);
         if let Some(trust_cache) = &request.trust_cache {
             components.push(pin_component(TRUST_CACHE, trust_cache)?);
@@ -143,10 +147,15 @@ impl RamdiskBootPlan {
             })
             .transpose()?;
 
+        let default_args = if request.ramdisk.is_some() {
+            DEFAULT_BOOT_ARGS
+        } else {
+            DEFAULT_JUST_BOOT_ARGS
+        };
         let boot_args = request
             .boot_args
             .clone()
-            .unwrap_or_else(|| DEFAULT_BOOT_ARGS.to_owned());
+            .unwrap_or_else(|| default_args.to_owned());
         if boot_args.is_empty()
             || boot_args.len() > MAX_BOOT_ARGS_LEN
             || boot_args.as_bytes().contains(&0)
@@ -367,6 +376,18 @@ mod tests {
     }
 
     #[test]
+    fn just_boot_plan_omits_ramdisk() {
+        let components = ComponentFixture::new();
+        let mut request = components.request(ExploitPolicy::None);
+        request.ramdisk = None;
+
+        let plan = RamdiskBootPlan::resolve(request).unwrap();
+
+        assert_eq!(plan.components().len(), 4);
+        assert_eq!(plan.boot_args(), DEFAULT_JUST_BOOT_ARGS);
+    }
+
+    #[test]
     fn omits_exploit_step_when_disabled() {
         let components = ComponentFixture::new();
         let plan = RamdiskBootPlan::resolve(components.request(ExploitPolicy::None)).unwrap();
@@ -383,7 +404,7 @@ mod tests {
     fn rejects_missing_component() {
         let components = ComponentFixture::new();
         let mut request = components.request(ExploitPolicy::None);
-        request.ramdisk = PathBuf::from("does-not-exist.img3");
+        request.ramdisk = Some(PathBuf::from("does-not-exist.img3"));
 
         let error = RamdiskBootPlan::resolve(request).unwrap_err();
 
@@ -443,7 +464,7 @@ mod tests {
                     .with_ecid(Ecid::new(42)),
                 ibss: self.write("ibss.img3"),
                 ibec: Some(self.write("ibec.img3")),
-                ramdisk: self.write("ramdisk.img3"),
+                ramdisk: Some(self.write("ramdisk.img3")),
                 device_tree: self.write("devicetree.img3"),
                 trust_cache: None,
                 kernel: self.write("kernel.img3"),

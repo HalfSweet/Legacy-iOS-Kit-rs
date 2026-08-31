@@ -98,6 +98,7 @@ pub async fn boot_ramdisk(
 ) -> Result<RamdiskBootOutcome, RamdiskBootError> {
     let mut chain = RamdiskBootChain::new(
         preparation.find(IBEC).is_some(),
+        preparation.find(RAMDISK).is_some(),
         preparation.find(APTICKET).is_some(),
         preparation.find(TRUST_CACHE).is_some(),
         preparation.boot_args.clone(),
@@ -215,16 +216,24 @@ struct RamdiskBootChain {
 }
 
 impl RamdiskBootChain {
-    fn new(has_ibec: bool, has_ticket: bool, has_trust_cache: bool, boot_args: String) -> Self {
+    fn new(
+        has_ibec: bool,
+        has_ramdisk: bool,
+        has_ticket: bool,
+        has_trust_cache: bool,
+        boot_args: String,
+    ) -> Self {
         let mut pending = VecDeque::new();
         if has_ticket {
             pending.push_back(RamdiskBootAction::UploadRecovery(APTICKET));
             pending.push_back(RamdiskBootAction::Command("ticket".into()));
         }
-        pending.push_back(RamdiskBootAction::UploadRecovery(RAMDISK));
-        pending.push_back(RamdiskBootAction::Command("getenv ramdisk-delay".into()));
-        pending.push_back(RamdiskBootAction::Command("ramdisk".into()));
-        pending.push_back(RamdiskBootAction::Settle(RAMDISK_SETTLE));
+        if has_ramdisk {
+            pending.push_back(RamdiskBootAction::UploadRecovery(RAMDISK));
+            pending.push_back(RamdiskBootAction::Command("getenv ramdisk-delay".into()));
+            pending.push_back(RamdiskBootAction::Command("ramdisk".into()));
+            pending.push_back(RamdiskBootAction::Settle(RAMDISK_SETTLE));
+        }
         pending.push_back(RamdiskBootAction::UploadRecovery(DEVICE_TREE));
         pending.push_back(RamdiskBootAction::Command("devicetree".into()));
         if has_trust_cache {
@@ -376,7 +385,7 @@ mod tests {
 
     #[test]
     fn boots_64_bit_chain_from_dfu() {
-        let mut chain = RamdiskBootChain::new(true, true, true, "rd=md0".into());
+        let mut chain = RamdiskBootChain::new(true, true, true, true, "rd=md0".into());
 
         let actions = drive(
             &mut chain,
@@ -411,7 +420,7 @@ mod tests {
 
     #[test]
     fn boots_32_bit_chain_from_recovery() {
-        let mut chain = RamdiskBootChain::new(false, false, false, "rd=md0 -v".into());
+        let mut chain = RamdiskBootChain::new(false, true, false, false, "rd=md0 -v".into());
 
         let actions = drive(&mut chain, &[DeviceMode::Recovery]).unwrap();
 
@@ -434,7 +443,7 @@ mod tests {
 
     #[test]
     fn sends_ibec_over_dfu_when_device_stays_in_dfu() {
-        let mut chain = RamdiskBootChain::new(true, false, false, "rd=md0".into());
+        let mut chain = RamdiskBootChain::new(true, true, false, false, "rd=md0".into());
 
         let actions = drive(
             &mut chain,
@@ -449,7 +458,7 @@ mod tests {
 
     #[test]
     fn requires_ibec_when_device_stays_in_dfu() {
-        let mut chain = RamdiskBootChain::new(false, false, false, "rd=md0".into());
+        let mut chain = RamdiskBootChain::new(false, true, false, false, "rd=md0".into());
 
         let error = drive(&mut chain, &[DeviceMode::Dfu, DeviceMode::Dfu]).unwrap_err();
 
@@ -458,7 +467,7 @@ mod tests {
 
     #[test]
     fn rejects_unexpected_mode_after_go() {
-        let mut chain = RamdiskBootChain::new(true, false, false, "rd=md0".into());
+        let mut chain = RamdiskBootChain::new(true, true, false, false, "rd=md0".into());
 
         let error = drive(&mut chain, &[DeviceMode::Recovery, DeviceMode::Dfu]).unwrap_err();
 
@@ -470,7 +479,7 @@ mod tests {
 
     #[test]
     fn sends_go_before_reconnecting_recovery_ibec() {
-        let mut chain = RamdiskBootChain::new(true, false, false, "rd=md0".into());
+        let mut chain = RamdiskBootChain::new(true, true, false, false, "rd=md0".into());
 
         let actions = drive(&mut chain, &[DeviceMode::Recovery, DeviceMode::Recovery]).unwrap();
 
@@ -480,8 +489,22 @@ mod tests {
     }
 
     #[test]
+    fn just_boot_skips_ramdisk() {
+        let mut chain = RamdiskBootChain::new(false, false, false, false, "pio-error=0 -v".into());
+
+        let actions = drive(&mut chain, &[DeviceMode::Recovery]).unwrap();
+
+        assert_eq!(actions[0], RamdiskBootAction::UploadRecovery(DEVICE_TREE));
+        assert!(
+            !actions
+                .iter()
+                .any(|action| matches!(action, RamdiskBootAction::UploadRecovery(RAMDISK)))
+        );
+    }
+
+    #[test]
     fn rejects_normal_mode_entry() {
-        let mut chain = RamdiskBootChain::new(false, false, false, "rd=md0".into());
+        let mut chain = RamdiskBootChain::new(false, true, false, false, "rd=md0".into());
 
         let error = drive(&mut chain, &[DeviceMode::Normal]).unwrap_err();
 
