@@ -184,6 +184,22 @@ impl RestorePlan {
         &self.components
     }
 
+    pub fn ticket_policy(&self) -> &TicketPolicy {
+        &self.ticket
+    }
+
+    pub fn baseband_policy(&self) -> &BasebandPolicy {
+        &self.baseband
+    }
+
+    pub fn sep_policy(&self) -> &SepPolicy {
+        &self.sep
+    }
+
+    pub const fn exploit_policy(&self) -> ExploitPolicy {
+        self.exploit
+    }
+
     pub fn steps(&self) -> &[RestoreStep] {
         &self.steps
     }
