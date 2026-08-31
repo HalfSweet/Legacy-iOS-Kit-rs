@@ -8,6 +8,8 @@ pub enum KitError {
     Transport(#[from] legacy_ios_transport::TransportError),
     #[error("normal-mode device discovery failed: {0}")]
     Service(#[from] legacy_ios_services::ServiceError),
+    #[error("device backup failed: {0}")]
+    Backup(#[from] legacy_ios_services::BackupError),
     #[error("firmware operation failed: {0}")]
     Firmware(#[from] legacy_ios_firmware::FirmwareError),
     #[error("remote firmware operation failed: {0}")]
@@ -50,6 +52,7 @@ impl KitError {
             Self::Transport(_) | Self::Service(_) | Self::DeviceDiscovery { .. } | Self::Io(_) => {
                 OperationPhase::Preflight
             }
+            Self::Backup(_) => OperationPhase::TransferringFilesystem,
             Self::Recovery(_) => OperationPhase::Booting,
             Self::Limera1n(_) => OperationPhase::Exploiting,
         }
@@ -63,6 +66,7 @@ impl KitError {
             Self::Signing(_) | Self::Io(_) => Recoverability::RetryImmediately,
             Self::Recovery(_) | Self::Limera1n(_) => Recoverability::ReenterDfu,
             Self::Plist(_) => Recoverability::RestartOperation,
+            Self::Backup(_) => Recoverability::RestartOperation,
             Self::Firmware(_)
             | Self::RemoteFirmware(_)
             | Self::RestorePlan(_)
