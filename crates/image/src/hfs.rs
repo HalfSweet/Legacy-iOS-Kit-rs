@@ -375,6 +375,121 @@ impl HfsImage {
         Ok(())
     }
 
+    pub fn add_file(&mut self, path: &str, contents: &[u8]) -> Result<(), HfsError> {
+        let (parent_path, name) = split_parent(path)?;
+        let mut volume = self.volume()?;
+        if volume.exists(path)? {
+            return Err(HfsError::EntryExists);
+        }
+        let parent = volume.stat(&parent_path)?;
+        if parent.kind != EntryKind::Directory {
+            return Err(HfsError::NotADirectory);
+        }
+        let header = volume.volume_header().clone();
+        let block_size =
+            usize::try_from(header.block_size).map_err(|_| HfsError::CatalogOffsetTooLarge)?;
+        let required_blocks = contents.len().div_ceil(block_size);
+        let blocks = plan_free_blocks(&self.data, &header, required_blocks)?;
+        let extents = blocks_to_extents(&blocks);
+        if extents.len() > 8 {
+            return Err(HfsError::ExtentsOverflowUnsupported);
+        }
+
+        let file_id = header.next_catalog_id;
+        let mut tree = CatalogTree::read(&self.data)?;
+        let parent_index = tree
+            .records()
+            .iter()
+            .position(|record| {
+                let Ok(body) = record_body_offset(record) else {
+                    return false;
+                };
+                matches!(read_u16(record, body), Ok(1))
+                    && matches!(read_u32(record, body + 8), Ok(value) if value == parent.cnid)
+            })
+            .ok_or(HfsError::CatalogRecordNotFound)?;
+        let parent_body = record_body_offset(&tree.records()[parent_index])?;
+        let valence = read_u32(&tree.records()[parent_index], parent_body + 4)?
+            .checked_add(1)
+            .ok_or(HfsError::VolumeTooLarge)?;
+        write_u32(
+            &mut tree.records_mut()[parent_index],
+            parent_body + 4,
+            valence,
+        )?;
+        tree.insert(build_catalog_entry(
+            parent.cnid,
+            &name,
+            &build_file_record(file_id, header.modify_date, contents.len(), &extents)?,
+        ))?;
+        tree.insert(build_catalog_entry(
+            file_id,
+            "",
+            &build_thread_record(4, parent.cnid, &name),
+        ))?;
+
+        let mut updated = self.data.clone();
+        for block in &blocks {
+            set_allocation_block(
+                &mut updated,
+                &header.allocation_file,
+                block_size,
+                *block,
+                true,
+            )?;
+        }
+        for (index, block) in blocks.iter().enumerate() {
+            let offset = block
+                .checked_mul(block_size)
+                .ok_or(HfsError::CatalogOffsetTooLarge)?;
+            let destination = updated
+                .get_mut(offset..offset + block_size)
+                .ok_or(HfsError::InvalidCatalogRecord)?;
+            destination.fill(0);
+            let source_start = index * block_size;
+            let source_end = (source_start + block_size).min(contents.len());
+            destination[..source_end - source_start]
+                .copy_from_slice(&contents[source_start..source_end]);
+        }
+        tree.write(&mut updated)?;
+        let primary = VOLUME_HEADER_OFFSET as usize;
+        write_u32(
+            &mut updated,
+            primary + 32,
+            header
+                .file_count
+                .checked_add(1)
+                .ok_or(HfsError::VolumeTooLarge)?,
+        )?;
+        write_u32(
+            &mut updated,
+            primary + FREE_BLOCKS_OFFSET,
+            header.free_blocks
+                - u32::try_from(blocks.len()).map_err(|_| HfsError::VolumeTooLarge)?,
+        )?;
+        if let Some(last) = blocks.last() {
+            let volume_blocks = usize::try_from(header.total_blocks)
+                .map_err(|_| HfsError::CatalogOffsetTooLarge)?;
+            write_u32(
+                &mut updated,
+                primary + NEXT_ALLOCATION_OFFSET,
+                u32::try_from((last + 1) % volume_blocks).map_err(|_| HfsError::VolumeTooLarge)?,
+            )?;
+        }
+        write_u32(
+            &mut updated,
+            primary + NEXT_CATALOG_ID_OFFSET,
+            file_id.checked_add(1).ok_or(HfsError::VolumeTooLarge)?,
+        )?;
+        sync_alternate_header(
+            &mut updated,
+            usize::try_from(header.total_blocks).map_err(|_| HfsError::CatalogOffsetTooLarge)?,
+            block_size,
+        )?;
+        self.data = updated;
+        Ok(())
+    }
+
     fn expand_file(
         &mut self,
         fork: usize,
@@ -551,6 +666,52 @@ fn record_fork_blocks(record: &[u8], fork: usize) -> Result<Vec<usize>, HfsError
     Ok(blocks)
 }
 
+fn plan_free_blocks(
+    data: &[u8],
+    header: &VolumeHeader,
+    count: usize,
+) -> Result<Vec<usize>, HfsError> {
+    if usize::try_from(header.free_blocks).map_err(|_| HfsError::CatalogOffsetTooLarge)? < count {
+        return Err(HfsError::VolumeFull);
+    }
+    if count == 0 {
+        return Ok(Vec::new());
+    }
+    let block_size =
+        usize::try_from(header.block_size).map_err(|_| HfsError::CatalogOffsetTooLarge)?;
+    let total_blocks =
+        usize::try_from(header.total_blocks).map_err(|_| HfsError::CatalogOffsetTooLarge)?;
+    let mut blocks = Vec::with_capacity(count);
+    let mut candidate =
+        usize::try_from(header.next_allocation).map_err(|_| HfsError::CatalogOffsetTooLarge)?;
+    for _ in 0..total_blocks {
+        if candidate != total_blocks - 1
+            && !allocation_block_used(data, &header.allocation_file, block_size, candidate)?
+        {
+            blocks.push(candidate);
+            if blocks.len() == count {
+                return Ok(blocks);
+            }
+        }
+        candidate = (candidate + 1) % total_blocks;
+    }
+    Err(HfsError::VolumeFull)
+}
+
+fn blocks_to_extents(blocks: &[usize]) -> Vec<(usize, usize)> {
+    let mut extents = Vec::new();
+    for block in blocks {
+        if let Some((start, count)) = extents.last_mut()
+            && *start + *count == *block
+        {
+            *count += 1;
+        } else {
+            extents.push((*block, 1));
+        }
+    }
+    extents
+}
+
 fn split_parent(path: &str) -> Result<(String, String), HfsError> {
     let path = path.trim_matches('/');
     if path.is_empty() {
@@ -602,6 +763,59 @@ fn build_folder_record(folder_id: u32, timestamp: u32) -> Vec<u8> {
     record.extend_from_slice(&[0; 32]);
     record.extend_from_slice(&0_u32.to_be_bytes());
     record
+}
+
+fn build_file_record(
+    file_id: u32,
+    timestamp: u32,
+    logical_size: usize,
+    extents: &[(usize, usize)],
+) -> Result<Vec<u8>, HfsError> {
+    let total_blocks = extents.iter().try_fold(0_usize, |total, (_, count)| {
+        total.checked_add(*count).ok_or(HfsError::VolumeTooLarge)
+    })?;
+    let mut record = Vec::with_capacity(248);
+    record.extend_from_slice(&2_u16.to_be_bytes());
+    record.extend_from_slice(&0_u16.to_be_bytes());
+    record.extend_from_slice(&0_u32.to_be_bytes());
+    record.extend_from_slice(&file_id.to_be_bytes());
+    for _ in 0..5 {
+        record.extend_from_slice(&timestamp.to_be_bytes());
+    }
+    record.extend_from_slice(&0_u32.to_be_bytes());
+    record.extend_from_slice(&0_u32.to_be_bytes());
+    record.extend_from_slice(&[0, 0]);
+    record.extend_from_slice(&0o100644_u16.to_be_bytes());
+    record.extend_from_slice(&0_u32.to_be_bytes());
+    record.extend_from_slice(&[0; 32]);
+    record.extend_from_slice(&0_u32.to_be_bytes());
+    record.extend_from_slice(&0_u32.to_be_bytes());
+    record.extend_from_slice(
+        &u64::try_from(logical_size)
+            .map_err(|_| HfsError::VolumeTooLarge)?
+            .to_be_bytes(),
+    );
+    record.extend_from_slice(&0_u32.to_be_bytes());
+    record.extend_from_slice(
+        &u32::try_from(total_blocks)
+            .map_err(|_| HfsError::VolumeTooLarge)?
+            .to_be_bytes(),
+    );
+    for index in 0..8 {
+        let (start, count) = extents.get(index).copied().unwrap_or((0, 0));
+        record.extend_from_slice(
+            &u32::try_from(start)
+                .map_err(|_| HfsError::VolumeTooLarge)?
+                .to_be_bytes(),
+        );
+        record.extend_from_slice(
+            &u32::try_from(count)
+                .map_err(|_| HfsError::VolumeTooLarge)?
+                .to_be_bytes(),
+        );
+    }
+    record.extend_from_slice(&[0; 80]);
+    Ok(record)
 }
 
 fn build_thread_record(record_type: u16, parent_id: u32, name: &str) -> Vec<u8> {
@@ -993,5 +1207,21 @@ mod tests {
         assert_eq!(volume.stat("/newdir").unwrap().permissions.mode, 0o040755);
         assert_eq!(volume.volume_header().folder_count, 2);
         assert_eq!(volume.volume_header().next_catalog_id, 18);
+    }
+
+    #[test]
+    fn adds_file_and_allocates_its_data_fork() {
+        const BLOCK_SIZE: usize = 4096;
+        let mut image = growable_image();
+        let contents = vec![0x7a; 1024];
+
+        image.add_file("/added", &contents).unwrap();
+
+        let mut volume = image.volume().unwrap();
+        assert_eq!(volume.read_file("/added").unwrap(), contents);
+        assert_eq!(volume.volume_header().file_count, 2);
+        assert_eq!(volume.volume_header().free_blocks, 0);
+        assert_eq!(volume.volume_header().next_catalog_id, 18);
+        assert_eq!(image.data()[6 * BLOCK_SIZE], 0xff);
     }
 }
