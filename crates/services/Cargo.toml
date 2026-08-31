@@ -9,11 +9,11 @@ publish = false
 idevice = { version = "=0.1.65", default-features = false, features = ["afc", "diagnostics_relay", "pair", "ring", "syslog_relay", "usbmuxd"] }
 legacy-ios-core = { path = "../core" }
 legacy-ios-transport = { path = "../transport" }
-plist = "=1.8.0"
+plist = "=1.10.0"
 russh = { version = "=0.63.1", default-features = false, features = ["des", "dsa", "ring", "rsa"] }
 serde.workspace = true
 thiserror.workspace = true
-time = "=0.3.41"
+time = "=0.3.47"
 tokio = { workspace = true, features = ["fs", "io-util"] }
 tracing.workspace = true
 uuid = { version = "1.16.0", features = ["v4"] }

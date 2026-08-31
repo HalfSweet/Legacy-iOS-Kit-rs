@@ -16,7 +16,7 @@ legacy-ios-restore = { path = "../restore" }
 legacy-ios-services = { path = "../services" }
 legacy-ios-transport = { path = "../transport" }
 legacy-ios-workflows = { path = "../workflows" }
-plist = "=1.8.0"
+plist = "=1.10.0"
 serde.workspace = true
 tempfile = "3.20.0"
 thiserror.workspace = true
