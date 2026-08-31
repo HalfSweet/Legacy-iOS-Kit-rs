@@ -67,6 +67,8 @@ pub enum KitError {
     },
     #[error("device identity has no ECID or UDID")]
     MissingDeviceSelector,
+    #[error("erase consent does not belong to the erase plan")]
+    EraseConsentMismatch,
     #[error("both device discovery backends failed (bootloader: {bootloader}; normal: {normal})")]
     DeviceDiscovery { bootloader: String, normal: String },
 }
@@ -82,6 +84,7 @@ impl KitError {
             | Self::UnknownProduct(_)
             | Self::UnknownBoardConfig { .. }
             | Self::MissingDeviceSelector => OperationPhase::Planning,
+            Self::EraseConsentMismatch => OperationPhase::Preflight,
             Self::Signing(_)
             | Self::Plist(_)
             | Self::OnboardTicket(_)
@@ -138,6 +141,7 @@ impl KitError {
             | Self::UnknownProduct(_)
             | Self::UnknownBoardConfig { .. }
             | Self::MissingDeviceSelector => Recoverability::NotRecoverable,
+            Self::EraseConsentMismatch => Recoverability::NotRecoverable,
         }
     }
 }

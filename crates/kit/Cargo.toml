@@ -23,6 +23,7 @@ thiserror.workspace = true
 tokio = { workspace = true, features = ["fs", "io-util"] }
 tokio-util = "0.7.19"
 tracing.workspace = true
+uuid = { version = "=1.26.0", features = ["v4"] }
 
 [lints]
 workspace = true

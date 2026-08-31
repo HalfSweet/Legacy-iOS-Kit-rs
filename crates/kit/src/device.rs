@@ -264,6 +264,19 @@ impl DeviceManager {
             .await?)
     }
 
+    pub(crate) async fn ensure_normal(&self, udid: &Udid) -> Result<(), KitError> {
+        self.normal.find_device(udid).await?;
+        Ok(())
+    }
+
+    pub(crate) async fn erase_internal(
+        &self,
+        udid: &Udid,
+        work_directory: &std::path::Path,
+    ) -> Result<BackupOutcome, KitError> {
+        Ok(self.find_normal(udid).await?.erase(work_directory).await?)
+    }
+
     pub async fn ramdisk_ssh(
         &self,
         target: SshTarget,

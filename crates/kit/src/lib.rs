@@ -3,6 +3,7 @@
 //! Public facade for embedding Legacy iOS Kit workflows.
 
 mod device;
+mod erase;
 mod error;
 mod firmware;
 mod lease;
@@ -15,6 +16,7 @@ mod shsh;
 pub use device::{
     BackendFailure, DeviceDiagnostics, DeviceInventory, DeviceManager, DeviceSummary,
 };
+pub use erase::{EraseConsent, ErasePlan};
 pub use error::KitError;
 pub use firmware::{FirmwareIdentitySummary, FirmwareSummary, RemoteFirmwareSummary};
 pub use lease::DeviceLease;
@@ -161,6 +163,26 @@ impl LegacyIosKit {
             self.leases.clone(),
             self.tss.clone(),
             request,
+        )
+    }
+
+    pub async fn plan_erase(&self, udid: Udid) -> Result<ErasePlan, KitError> {
+        self.devices.ensure_normal(&udid).await?;
+        Ok(ErasePlan::new(udid))
+    }
+
+    pub fn execute_erase(
+        &self,
+        plan: ErasePlan,
+        consent: EraseConsent,
+        work_directory: impl Into<std::path::PathBuf>,
+    ) -> OperationHandle {
+        erase::spawn(
+            self.devices.clone(),
+            self.leases.clone(),
+            plan,
+            consent,
+            work_directory.into(),
         )
     }
 
