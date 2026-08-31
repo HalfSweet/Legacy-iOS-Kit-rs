@@ -36,6 +36,65 @@ pub struct BackupOutcome {
     bytes: u64,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct BackupRestoreOptions {
+    reboot: bool,
+    copy_backup: bool,
+    preserve_settings: bool,
+    system_files: bool,
+    remove_items_not_restored: bool,
+}
+
+impl Default for BackupRestoreOptions {
+    fn default() -> Self {
+        Self {
+            reboot: true,
+            copy_backup: true,
+            preserve_settings: true,
+            system_files: false,
+            remove_items_not_restored: false,
+        }
+    }
+}
+
+impl BackupRestoreOptions {
+    pub fn reboot(mut self, enabled: bool) -> Self {
+        self.reboot = enabled;
+        self
+    }
+
+    pub fn preserve_settings(mut self, enabled: bool) -> Self {
+        self.preserve_settings = enabled;
+        self
+    }
+
+    pub fn system_files(mut self, enabled: bool) -> Self {
+        self.system_files = enabled;
+        self
+    }
+
+    pub fn remove_items_not_restored(mut self, enabled: bool) -> Self {
+        self.remove_items_not_restored = enabled;
+        self
+    }
+
+    fn dictionary(self) -> Dictionary {
+        let mut options = Dictionary::new();
+        options.insert("RestoreShouldReboot".into(), self.reboot.into());
+        options.insert("RestoreDontCopyBackup".into(), (!self.copy_backup).into());
+        options.insert(
+            "RestorePreserveSettings".into(),
+            self.preserve_settings.into(),
+        );
+        options.insert("RestoreSystemFiles".into(), self.system_files.into());
+        options.insert(
+            "RemoveItemsNotRestored".into(),
+            self.remove_items_not_restored.into(),
+        );
+        options
+    }
+}
+
 impl BackupOutcome {
     pub const fn files(&self) -> u64 {
         self.files
@@ -57,6 +116,23 @@ impl NormalDevice {
         let mut protocol = MobileBackup2::connect(stream).await?;
         protocol
             .start_backup(destination, self.udid().as_str(), options)
+            .await
+    }
+
+    pub async fn restore_backup(
+        &self,
+        root: &Path,
+        source_identifier: &str,
+        options: BackupRestoreOptions,
+    ) -> Result<BackupOutcome, BackupError> {
+        let source = safe_join(root, source_identifier)?;
+        if !fs::try_exists(source).await? {
+            return Err(BackupError::BackupNotFound(source_identifier.to_owned()));
+        }
+        let stream = self.connect_service(MOBILEBACKUP2).await?;
+        let mut protocol = MobileBackup2::connect(stream).await?;
+        protocol
+            .start_restore(root, self.udid().as_str(), source_identifier, options)
             .await
     }
 }
@@ -125,34 +201,63 @@ impl MobileBackup2 {
             return Err(remote_error(&response));
         }
 
+        self.exchange(destination, "backup").await
+    }
+
+    async fn start_restore(
+        &mut self,
+        root: &Path,
+        target_identifier: &str,
+        source_identifier: &str,
+        options: BackupRestoreOptions,
+    ) -> Result<BackupOutcome, BackupError> {
+        let mut request = Dictionary::new();
+        request.insert("TargetIdentifier".into(), target_identifier.into());
+        request.insert("SourceIdentifier".into(), source_identifier.into());
+        request.insert("Options".into(), options.dictionary().into());
+        self.link.send_process_message("Restore", request).await?;
+        let response = self.link.receive_process_message().await?;
+        if response.contains_key("ErrorCode")
+            && response.get("ErrorCode").and_then(unsigned) != Some(0)
+        {
+            return Err(remote_error(&response));
+        }
+        self.exchange(root, "restore").await
+    }
+
+    async fn exchange(
+        &mut self,
+        root: &Path,
+        operation: &'static str,
+    ) -> Result<BackupOutcome, BackupError> {
         let mut outcome = BackupOutcome { files: 0, bytes: 0 };
         loop {
             let (tag, value) = self.link.receive_message().await?;
             trace!(tag, "received mobilebackup2 message");
             match tag.as_str() {
                 "DLMessageUploadFiles" => {
-                    let transferred = self.receive_files(destination).await?;
+                    let transferred = self.receive_files(root).await?;
                     outcome.files += transferred.files;
                     outcome.bytes += transferred.bytes;
                     self.link.send_status(0, None, empty_dictionary()).await?;
                 }
                 "DLMessageDownloadFiles" => {
-                    self.send_files(destination, &value).await?;
+                    self.send_files(root, &value).await?;
                 }
                 "DLMessageCreateDirectory" => {
-                    let result = create_directory(destination, &value).await;
+                    let result = create_directory(root, &value).await;
                     self.link.send_result(result).await?;
                 }
                 "DLMessageMoveFiles" | "DLMessageMoveItems" => {
-                    let result = move_files(destination, &value).await;
+                    let result = move_files(root, &value).await;
                     self.link.send_result(result).await?;
                 }
                 "DLMessageRemoveFiles" | "DLMessageRemoveItems" => {
-                    let result = remove_files(destination, &value).await;
+                    let result = remove_files(root, &value).await;
                     self.link.send_result(result).await?;
                 }
                 "DLMessageCopyItem" => {
-                    let result = copy_item(destination, &value).await;
+                    let result = copy_item(root, &value).await;
                     self.link.send_result(result).await?;
                 }
                 "DLMessageGetFreeDiskSpace" => {
@@ -171,7 +276,8 @@ impl MobileBackup2 {
                     info!(
                         files = outcome.files,
                         bytes = outcome.bytes,
-                        "backup completed"
+                        operation,
+                        "mobilebackup2 operation completed"
                     );
                     return Ok(outcome);
                 }
@@ -518,6 +624,8 @@ pub enum BackupError {
     FileTransfer(String),
     #[error("mobilebackup2 path is unsafe: {0}")]
     UnsafePath(String),
+    #[error("mobilebackup2 backup does not exist for {0}")]
+    BackupNotFound(String),
     #[error("mobilebackup2 rejected the request ({code}): {description}")]
     Remote { code: u64, description: String },
 }

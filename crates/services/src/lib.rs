@@ -9,7 +9,7 @@ mod normal;
 mod plist_service;
 
 pub use app::{AppFilter, InstalledApp};
-pub use backup::{BackupError, BackupOptions, BackupOutcome};
+pub use backup::{BackupError, BackupOptions, BackupOutcome, BackupRestoreOptions};
 pub use files::{
     AfcPath, AfcPathError, DeviceFileInfo, DeviceFileKind, DeviceFiles, DeviceStorageInfo,
 };
