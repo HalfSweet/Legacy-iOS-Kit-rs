@@ -9,6 +9,7 @@ use hmac::{Hmac, Mac};
 use plist::{Dictionary, Value};
 use sha1::Sha1;
 use thiserror::Error;
+use zeroize::Zeroize;
 
 use crate::{CryptoError, decrypt_cbc};
 
@@ -271,6 +272,13 @@ impl fmt::Debug for DmgFirmwareKey {
         formatter
             .debug_struct("DmgFirmwareKey")
             .finish_non_exhaustive()
+    }
+}
+
+impl Drop for DmgFirmwareKey {
+    fn drop(&mut self) {
+        self.aes.zeroize();
+        self.hmac.zeroize();
     }
 }
 

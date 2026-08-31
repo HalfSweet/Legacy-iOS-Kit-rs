@@ -18,6 +18,7 @@ lzfse_rust = "=0.2.1"
 plist = "=1.10.0"
 sha1 = "=0.10.6"
 thiserror.workspace = true
+zeroize = "=1.9.0"
 
 [dev-dependencies]
 hex = "=0.4.3"
