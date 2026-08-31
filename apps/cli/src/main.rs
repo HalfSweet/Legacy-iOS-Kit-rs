@@ -10,11 +10,11 @@ use std::{
 use anyhow::{Context, Result, anyhow};
 use clap::{ArgAction, Parser, Subcommand, ValueEnum};
 use legacy_ios_kit::{
-    AfcPath, AppFilter, BackupOptions, BackupOutcome, BasebandPolicy, BoardConfig,
-    DeviceDiagnostics, DeviceFileInfo, DeviceInventory, DeviceStorageInfo, DeviceSummary, Ecid,
-    ExploitPolicy, FirmwareSummary, InstalledApp, LegacyIosKit, ProductType, RecoveryDeviceInfo,
-    RecoveryUploadResult, RemoteFirmwareSummary, RestoreBehavior, RestorePlan, RestoreRequest,
-    SepPolicy, ShshRequest, ShshSummary, TicketPolicy, Udid,
+    AfcPath, AppFilter, BackupOptions, BackupOutcome, BackupRestoreOptions, BasebandPolicy,
+    BoardConfig, DeviceDiagnostics, DeviceFileInfo, DeviceInventory, DeviceStorageInfo,
+    DeviceSummary, Ecid, ExploitPolicy, FirmwareSummary, InstalledApp, LegacyIosKit, ProductType,
+    RecoveryDeviceInfo, RecoveryUploadResult, RemoteFirmwareSummary, RestoreBehavior, RestorePlan,
+    RestoreRequest, SepPolicy, ShshRequest, ShshSummary, TicketPolicy, Udid,
 };
 use tracing::level_filters::LevelFilter;
 
@@ -75,6 +75,22 @@ enum DataCommand {
         destination: PathBuf,
         #[arg(long)]
         full: bool,
+    },
+    /// Restore a mobilebackup2 backup to a device.
+    Restore {
+        udid: Udid,
+        root: PathBuf,
+        source_identifier: String,
+        #[arg(long)]
+        no_reboot: bool,
+        #[arg(long)]
+        replace_settings: bool,
+        #[arg(long)]
+        system_files: bool,
+        #[arg(long)]
+        remove_missing: bool,
+        #[arg(long)]
+        yes: bool,
     },
     /// List an AFC directory.
     List { udid: Udid, path: AfcPath },
@@ -431,6 +447,32 @@ async fn main() -> Result<()> {
                 )
                 .await
                 .context("device backup failed")?;
+            write_backup_outcome(output, &outcome)?;
+        }
+        Command::Data {
+            command:
+                DataCommand::Restore {
+                    udid,
+                    root,
+                    source_identifier,
+                    no_reboot,
+                    replace_settings,
+                    system_files,
+                    remove_missing,
+                    yes,
+                },
+        } => {
+            confirm("restore the device backup", yes)?;
+            let options = BackupRestoreOptions::default()
+                .reboot(!no_reboot)
+                .preserve_settings(!replace_settings)
+                .system_files(system_files)
+                .remove_items_not_restored(remove_missing);
+            let outcome = kit
+                .devices()
+                .restore_backup(&udid, &root, &source_identifier, options)
+                .await
+                .context("device backup restore failed")?;
             write_backup_outcome(output, &outcome)?;
         }
         Command::Data {
