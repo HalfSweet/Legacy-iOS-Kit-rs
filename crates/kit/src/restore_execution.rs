@@ -12,12 +12,12 @@ use legacy_ios_core::{
     OperationPhase, Progress, ProgressUnit, Soc,
 };
 use legacy_ios_exploits::{ExploitError, ExternalA5Pwn, Limera1n};
-use legacy_ios_firmware::{SigningTicket, TssClient};
+use legacy_ios_firmware::{ApParameters, FirmwareArchive, SigningTicket, TssClient, TssRequest};
 use legacy_ios_restore::RestoreOptions;
 use legacy_ios_transport::{IbootClient, RecoveryError};
 use legacy_ios_workflows::{
     BasebandPolicy, DestructiveConsent, ExploitPolicy, RestoreExecutionProgress, RestorePlan,
-    RestorePreparation, run_restore,
+    RestorePreparation, TicketPolicy, run_restore,
 };
 use tracing::debug;
 
@@ -29,7 +29,7 @@ use crate::{
 pub struct RestoreExecutionRequest {
     plan: RestorePlan,
     consent: DestructiveConsent,
-    ticket: SigningTicket,
+    ticket: ExecutionTicket,
     work_directory: PathBuf,
     flash_version_1: bool,
     limera1n_payload: Option<Vec<u8>>,
@@ -45,7 +45,22 @@ impl RestoreExecutionRequest {
         Self {
             plan,
             consent,
-            ticket,
+            ticket: ExecutionTicket::Provided(ticket),
+            work_directory: work_directory.into(),
+            flash_version_1: false,
+            limera1n_payload: None,
+        }
+    }
+
+    pub fn signed(
+        plan: RestorePlan,
+        consent: DestructiveConsent,
+        work_directory: impl Into<PathBuf>,
+    ) -> Self {
+        Self {
+            plan,
+            consent,
+            ticket: ExecutionTicket::Signed,
             work_directory: work_directory.into(),
             flash_version_1: false,
             limera1n_payload: None,
@@ -61,6 +76,11 @@ impl RestoreExecutionRequest {
         self.limera1n_payload = Some(payload);
         self
     }
+}
+
+enum ExecutionTicket {
+    Provided(SigningTicket),
+    Signed,
 }
 
 pub(crate) fn spawn(
@@ -89,26 +109,12 @@ async fn execute(
     emitter: &OperationEmitter,
     request: RestoreExecutionRequest,
 ) -> Result<Option<OperationOutcome>, KitError> {
-    emitter
-        .emit(phase(
-            OperationPhase::Personalizing,
-            CancellationSafety::AtCheckpoint,
-        ))
-        .await;
     let plan = request.plan;
-    let plan_for_preparation = plan.clone();
     let consent = request.consent;
-    let ticket = request.ticket;
+    let ticket_source = request.ticket;
     let flash_version_1 = request.flash_version_1;
     let limera1n_payload = request.limera1n_payload;
-    let preparation = tokio::task::spawn_blocking(move || {
-        RestorePreparation::with_ticket(&plan_for_preparation, &consent, ticket, flash_version_1)
-    })
-    .await
-    .map_err(|error| KitError::Task(error.to_string()))??;
-    if emitter.is_cancelled() {
-        return Ok(None);
-    }
+    let work_directory = request.work_directory;
 
     emitter
         .emit(phase(
@@ -117,6 +123,23 @@ async fn execute(
         ))
         .await;
     let lease = leases.acquire(plan.selector().clone()).await;
+    if emitter.is_cancelled() {
+        return Ok(None);
+    }
+
+    emitter
+        .emit(phase(
+            OperationPhase::Personalizing,
+            CancellationSafety::AtCheckpoint,
+        ))
+        .await;
+    let ticket = resolve_ticket(&plan, ticket_source, tss).await?;
+    let plan_for_preparation = plan.clone();
+    let preparation = tokio::task::spawn_blocking(move || {
+        RestorePreparation::with_ticket(&plan_for_preparation, &consent, ticket, flash_version_1)
+    })
+    .await
+    .map_err(|error| KitError::Task(error.to_string()))??;
     if emitter.is_cancelled() {
         return Ok(None);
     }
@@ -153,7 +176,7 @@ async fn execute(
         &plan,
         &preparation,
         tss,
-        &request.work_directory,
+        &work_directory,
         &options,
         move |value| {
             if callback_emitter.is_cancelled() && !deferred.swap(true, Ordering::Relaxed) {
@@ -215,6 +238,60 @@ async fn execute(
         operation: OperationKind::Restore,
         summary: format!("restored {actual}"),
     }))
+}
+
+async fn resolve_ticket(
+    plan: &RestorePlan,
+    source: ExecutionTicket,
+    tss: &TssClient,
+) -> Result<SigningTicket, KitError> {
+    match source {
+        ExecutionTicket::Provided(ticket) => {
+            if matches!(plan.ticket_policy(), TicketPolicy::Signed) {
+                return Err(KitError::TicketPolicyMismatch);
+            }
+            Ok(ticket)
+        }
+        ExecutionTicket::Signed => {
+            if !matches!(plan.ticket_policy(), TicketPolicy::Signed) {
+                return Err(KitError::TicketPolicyMismatch);
+            }
+            let ecid = plan
+                .device()
+                .ecid()
+                .ok_or(KitError::MissingDeviceSelector)?;
+            let client = IbootClient::open(Some(ecid)).await?;
+            let info = client.device_info();
+            let chip_id = u64::from(
+                info.cpid()
+                    .ok_or(KitError::MissingSigningDeviceInfo("CPID"))?,
+            );
+            let board_id = u64::from(
+                info.bdid()
+                    .ok_or(KitError::MissingSigningDeviceInfo("BDID"))?,
+            );
+            let mut parameters = ApParameters::new(board_id, chip_id, ecid);
+            parameters.ap_nonce = info.ap_nonce().map(ToOwned::to_owned);
+            parameters.sep_nonce = info.sep_nonce().map(ToOwned::to_owned);
+            parameters.supports_img4 = matches!(
+                plan.device().soc(),
+                Soc::A7 | Soc::A8 | Soc::A8x | Soc::A9 | Soc::A9x | Soc::A10 | Soc::A10x | Soc::A11
+            );
+            parameters.in_rom_dfu = client.mode() == legacy_ios_core::DeviceMode::Dfu;
+            drop(client);
+
+            let archive = FirmwareArchive::open(plan.firmware())?;
+            let manifest = archive.build_manifest()?;
+            let board = plan
+                .device()
+                .board_config()
+                .ok_or(KitError::MissingSigningDeviceInfo("BoardConfig"))?;
+            let identity = manifest.select_identity(board, plan.behavior())?;
+            let request = TssRequest::for_build_identity(identity, &parameters);
+            let response = tss.send(&request).await?;
+            Ok(SigningTicket::from_dictionary(response.into_dictionary())?)
+        }
+    }
 }
 
 async fn resolve_exploit(

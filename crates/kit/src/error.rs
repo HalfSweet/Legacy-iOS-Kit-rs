@@ -26,6 +26,10 @@ pub enum KitError {
     OnboardTicket(#[from] legacy_ios_image::OnboardTicketError),
     #[error("signing ticket operation failed: {0}")]
     Ticket(#[from] legacy_ios_firmware::TicketError),
+    #[error("restore execution ticket does not match the plan ticket policy")]
+    TicketPolicyMismatch,
+    #[error("device signing information is missing {0}")]
+    MissingSigningDeviceInfo(&'static str),
     #[error("restore planning failed: {0}")]
     RestorePlan(#[from] legacy_ios_workflows::RestorePlanError),
     #[error("restore preparation failed: {0}")]
@@ -76,9 +80,12 @@ impl KitError {
             | Self::UnknownProduct(_)
             | Self::UnknownBoardConfig { .. }
             | Self::MissingDeviceSelector => OperationPhase::Planning,
-            Self::Signing(_) | Self::Plist(_) | Self::OnboardTicket(_) | Self::Ticket(_) => {
-                OperationPhase::Personalizing
-            }
+            Self::Signing(_)
+            | Self::Plist(_)
+            | Self::OnboardTicket(_)
+            | Self::Ticket(_)
+            | Self::TicketPolicyMismatch
+            | Self::MissingSigningDeviceInfo(_) => OperationPhase::Personalizing,
             Self::Transport(_)
             | Self::Service(_)
             | Self::Ssh(_)
@@ -122,6 +129,8 @@ impl KitError {
             | Self::MissingLimera1nPayload
             | Self::OnboardTicket(_)
             | Self::Ticket(_)
+            | Self::TicketPolicyMismatch
+            | Self::MissingSigningDeviceInfo(_)
             | Self::UnknownProduct(_)
             | Self::UnknownBoardConfig { .. }
             | Self::MissingDeviceSelector => Recoverability::NotRecoverable,
