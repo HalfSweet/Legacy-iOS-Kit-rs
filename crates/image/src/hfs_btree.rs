@@ -54,6 +54,18 @@ impl CatalogTree {
         &mut self.records
     }
 
+    pub(crate) fn insert(&mut self, record: Vec<u8>) -> Result<(), HfsError> {
+        let position = match self
+            .records
+            .binary_search_by(|existing| compare_keys(existing, &record, self.volume.is_hfsx))
+        {
+            Ok(_) => return Err(HfsError::EntryExists),
+            Err(position) => position,
+        };
+        self.records.insert(position, record);
+        Ok(())
+    }
+
     pub(crate) fn write(self, data: &mut [u8]) -> Result<(), HfsError> {
         let node_size = usize::from(self.header.node_size);
         let leaf_groups = pack_records(&self.records, node_size)?;
@@ -259,6 +271,42 @@ pub(crate) fn record_key(record: &[u8]) -> Result<&[u8], HfsError> {
 pub(crate) fn record_body_offset(record: &[u8]) -> Result<usize, HfsError> {
     let length = record_key(record)?.len();
     Ok(length + (length & 1))
+}
+
+fn compare_keys(left: &[u8], right: &[u8], is_hfsx: bool) -> std::cmp::Ordering {
+    let Ok((left_parent, left_name)) = parse_key(left) else {
+        return std::cmp::Ordering::Less;
+    };
+    let Ok((right_parent, right_name)) = parse_key(right) else {
+        return std::cmp::Ordering::Greater;
+    };
+    match left_parent.cmp(&right_parent) {
+        std::cmp::Ordering::Equal if is_hfsx => {
+            hfsplus::unicode::compare_binary(&left_name, &right_name)
+        }
+        std::cmp::Ordering::Equal => {
+            hfsplus::unicode::compare_case_insensitive(&left_name, &right_name)
+        }
+        ordering => ordering,
+    }
+}
+
+fn parse_key(record: &[u8]) -> Result<(u32, Vec<u16>), HfsError> {
+    let key = record_key(record)?;
+    let parent = u32::from_be_bytes(
+        key.get(2..6)
+            .ok_or(HfsError::InvalidCatalogRecord)?
+            .try_into()
+            .map_err(|_| HfsError::InvalidCatalogRecord)?,
+    );
+    let name_length = usize::from(read_u16(key, 6)?);
+    let name = key
+        .get(8..8 + name_length * 2)
+        .ok_or(HfsError::InvalidCatalogRecord)?
+        .chunks_exact(2)
+        .map(|unit| u16::from_be_bytes([unit[0], unit[1]]))
+        .collect();
+    Ok((parent, name))
 }
 
 fn node_offset(

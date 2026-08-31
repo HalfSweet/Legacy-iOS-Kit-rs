@@ -13,6 +13,7 @@ const TOTAL_BLOCKS_OFFSET: usize = 44;
 const FREE_BLOCKS_OFFSET: usize = 48;
 const NEXT_ALLOCATION_OFFSET: usize = 52;
 const ALLOCATION_FILE_OFFSET: usize = 112;
+const NEXT_CATALOG_ID_OFFSET: usize = 64;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct HfsImage {
@@ -305,6 +306,75 @@ impl HfsImage {
         Ok(())
     }
 
+    pub fn mkdir(&mut self, path: &str) -> Result<(), HfsError> {
+        let (parent_path, name) = split_parent(path)?;
+        let mut volume = self.volume()?;
+        if volume.exists(path)? {
+            return Err(HfsError::EntryExists);
+        }
+        let parent = volume.stat(&parent_path)?;
+        if parent.kind != EntryKind::Directory {
+            return Err(HfsError::NotADirectory);
+        }
+        let header = volume.volume_header().clone();
+        let folder_id = header.next_catalog_id;
+        let mut tree = CatalogTree::read(&self.data)?;
+        let parent_index = tree
+            .records()
+            .iter()
+            .position(|record| {
+                let Ok(body) = record_body_offset(record) else {
+                    return false;
+                };
+                matches!(read_u16(record, body), Ok(1))
+                    && matches!(read_u32(record, body + 8), Ok(value) if value == parent.cnid)
+            })
+            .ok_or(HfsError::CatalogRecordNotFound)?;
+        let parent_body = record_body_offset(&tree.records()[parent_index])?;
+        let valence = read_u32(&tree.records()[parent_index], parent_body + 4)?
+            .checked_add(1)
+            .ok_or(HfsError::VolumeTooLarge)?;
+        write_u32(
+            &mut tree.records_mut()[parent_index],
+            parent_body + 4,
+            valence,
+        )?;
+        tree.insert(build_catalog_entry(
+            parent.cnid,
+            &name,
+            &build_folder_record(folder_id, header.modify_date),
+        ))?;
+        tree.insert(build_catalog_entry(
+            folder_id,
+            "",
+            &build_thread_record(3, parent.cnid, &name),
+        ))?;
+
+        let mut updated = self.data.clone();
+        tree.write(&mut updated)?;
+        let primary = VOLUME_HEADER_OFFSET as usize;
+        write_u32(
+            &mut updated,
+            primary + 36,
+            header
+                .folder_count
+                .checked_add(1)
+                .ok_or(HfsError::VolumeTooLarge)?,
+        )?;
+        write_u32(
+            &mut updated,
+            primary + NEXT_CATALOG_ID_OFFSET,
+            folder_id.checked_add(1).ok_or(HfsError::VolumeTooLarge)?,
+        )?;
+        sync_alternate_header(
+            &mut updated,
+            usize::try_from(header.total_blocks).map_err(|_| HfsError::CatalogOffsetTooLarge)?,
+            usize::try_from(header.block_size).map_err(|_| HfsError::CatalogOffsetTooLarge)?,
+        )?;
+        self.data = updated;
+        Ok(())
+    }
+
     fn expand_file(
         &mut self,
         fork: usize,
@@ -479,6 +549,72 @@ fn record_fork_blocks(record: &[u8], fork: usize) -> Result<Vec<usize>, HfsError
         blocks.extend(start..start + count);
     }
     Ok(blocks)
+}
+
+fn split_parent(path: &str) -> Result<(String, String), HfsError> {
+    let path = path.trim_matches('/');
+    if path.is_empty() {
+        return Err(HfsError::InvalidPath);
+    }
+    let (parent, name) = path.rsplit_once('/').unwrap_or(("", path));
+    if name.is_empty() {
+        return Err(HfsError::InvalidPath);
+    }
+    let parent = if parent.is_empty() {
+        "/".to_owned()
+    } else {
+        format!("/{parent}")
+    };
+    Ok((parent, name.to_owned()))
+}
+
+fn build_catalog_entry(parent_id: u32, name: &str, body: &[u8]) -> Vec<u8> {
+    let name = name.encode_utf16().collect::<Vec<_>>();
+    let key_length = 6 + name.len() * 2;
+    let mut record = Vec::with_capacity(2 + key_length + body.len());
+    record.extend_from_slice(&(key_length as u16).to_be_bytes());
+    record.extend_from_slice(&parent_id.to_be_bytes());
+    record.extend_from_slice(&(name.len() as u16).to_be_bytes());
+    for unit in name {
+        record.extend_from_slice(&unit.to_be_bytes());
+    }
+    if !record.len().is_multiple_of(2) {
+        record.push(0);
+    }
+    record.extend_from_slice(body);
+    record
+}
+
+fn build_folder_record(folder_id: u32, timestamp: u32) -> Vec<u8> {
+    let mut record = Vec::with_capacity(84);
+    record.extend_from_slice(&1_u16.to_be_bytes());
+    record.extend_from_slice(&0_u16.to_be_bytes());
+    record.extend_from_slice(&0_u32.to_be_bytes());
+    record.extend_from_slice(&folder_id.to_be_bytes());
+    for _ in 0..5 {
+        record.extend_from_slice(&timestamp.to_be_bytes());
+    }
+    record.extend_from_slice(&0_u32.to_be_bytes());
+    record.extend_from_slice(&0_u32.to_be_bytes());
+    record.extend_from_slice(&[0, 0]);
+    record.extend_from_slice(&0o040755_u16.to_be_bytes());
+    record.extend_from_slice(&0_u32.to_be_bytes());
+    record.extend_from_slice(&[0; 32]);
+    record.extend_from_slice(&0_u32.to_be_bytes());
+    record
+}
+
+fn build_thread_record(record_type: u16, parent_id: u32, name: &str) -> Vec<u8> {
+    let name = name.encode_utf16().collect::<Vec<_>>();
+    let mut record = Vec::with_capacity(10 + name.len() * 2);
+    record.extend_from_slice(&record_type.to_be_bytes());
+    record.extend_from_slice(&0_u16.to_be_bytes());
+    record.extend_from_slice(&parent_id.to_be_bytes());
+    record.extend_from_slice(&(name.len() as u16).to_be_bytes());
+    for unit in name {
+        record.extend_from_slice(&unit.to_be_bytes());
+    }
+    record
 }
 
 fn sync_alternate_header(
@@ -722,6 +858,12 @@ pub enum HfsError {
     CatalogMapCapacityExceeded,
     #[error("HFS+ catalog record of {0} bytes does not fit in a node")]
     CatalogRecordTooLarge(usize),
+    #[error("HFS+ entry already exists")]
+    EntryExists,
+    #[error("HFS+ path is invalid")]
+    InvalidPath,
+    #[error("HFS+ parent is not a directory")]
+    NotADirectory,
 }
 
 #[cfg(test)]
@@ -832,5 +974,24 @@ mod tests {
         assert_eq!(header.file_count, 0);
         assert_eq!(header.free_blocks, 2);
         assert_eq!(image.data()[6 * BLOCK_SIZE], 0xf3);
+    }
+
+    #[test]
+    fn creates_directory_catalog_records() {
+        let mut image = growable_image();
+
+        image.mkdir("/newdir").unwrap();
+
+        let mut volume = image.volume().unwrap();
+        let entry = volume
+            .list_directory("/")
+            .unwrap()
+            .into_iter()
+            .find(|entry| entry.name == "newdir")
+            .unwrap();
+        assert_eq!(entry.kind, EntryKind::Directory);
+        assert_eq!(volume.stat("/newdir").unwrap().permissions.mode, 0o040755);
+        assert_eq!(volume.volume_header().folder_count, 2);
+        assert_eq!(volume.volume_header().next_catalog_id, 18);
     }
 }
