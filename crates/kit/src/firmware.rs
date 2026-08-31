@@ -1,10 +1,41 @@
-use std::path::PathBuf;
+use std::{
+    io::Write,
+    path::{Path, PathBuf},
+};
 
 use legacy_ios_core::{BoardConfig, BuildId, IosVersion, ProductType};
 use legacy_ios_firmware::{BuildManifest, FirmwareArchive, RemoteFirmwareArchive, RestoreBehavior};
+use legacy_ios_image::{DmgFirmwareKey, decrypt_firmware_image};
 use serde::{Deserialize, Serialize};
 
 use crate::KitError;
+
+pub(crate) async fn decrypt_dmg(
+    source: PathBuf,
+    destination: PathBuf,
+    key: DmgFirmwareKey,
+) -> Result<(), KitError> {
+    let encrypted = tokio::fs::read(source).await?;
+    let decrypted = tokio::task::spawn_blocking(move || decrypt_firmware_image(&encrypted, &key))
+        .await
+        .map_err(|error| KitError::Task(error.to_string()))??;
+    tokio::task::spawn_blocking(move || {
+        let parent = destination
+            .parent()
+            .filter(|path| !path.as_os_str().is_empty())
+            .unwrap_or_else(|| Path::new("."));
+        let mut temporary = tempfile::NamedTempFile::new_in(parent)?;
+        temporary.write_all(&decrypted)?;
+        temporary.as_file().sync_all()?;
+        temporary
+            .persist(destination)
+            .map_err(|error| error.error)?;
+        Ok::<_, std::io::Error>(())
+    })
+    .await
+    .map_err(|error| KitError::Task(error.to_string()))??;
+    Ok(())
+}
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct FirmwareSummary {

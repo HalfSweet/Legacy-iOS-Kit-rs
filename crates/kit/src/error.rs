@@ -24,6 +24,8 @@ pub enum KitError {
     Plist(#[from] plist::Error),
     #[error("onboard ticket conversion failed: {0}")]
     OnboardTicket(#[from] legacy_ios_image::OnboardTicketError),
+    #[error("disk image operation failed: {0}")]
+    Dmg(#[from] legacy_ios_image::DmgError),
     #[error("signing ticket operation failed: {0}")]
     Ticket(#[from] legacy_ios_firmware::TicketError),
     #[error("restore execution ticket does not match the plan ticket policy")]
@@ -83,6 +85,7 @@ impl KitError {
             Self::Signing(_)
             | Self::Plist(_)
             | Self::OnboardTicket(_)
+            | Self::Dmg(_)
             | Self::Ticket(_)
             | Self::TicketPolicyMismatch
             | Self::MissingSigningDeviceInfo(_) => OperationPhase::Personalizing,
@@ -128,6 +131,7 @@ impl KitError {
             | Self::AutomaticExploitUnsupported(_)
             | Self::MissingLimera1nPayload
             | Self::OnboardTicket(_)
+            | Self::Dmg(_)
             | Self::Ticket(_)
             | Self::TicketPolicyMismatch
             | Self::MissingSigningDeviceInfo(_)

@@ -24,6 +24,7 @@ pub use legacy_ios_core::{
     OperationOutcome, ProductType, Recoverability, Soc, Udid,
 };
 pub use legacy_ios_firmware::{RestoreBehavior, SigningTicket, TicketError};
+pub use legacy_ios_image::{DmgError, DmgFirmwareKey};
 pub use legacy_ios_services::{
     ActivationState, AfcPath, AfcPathError, AppFilter, BackupOptions, BackupOutcome,
     BackupRestoreOptions, DeviceFileInfo, DeviceFileKind, DeviceFiles, DeviceStorageInfo,
@@ -114,6 +115,15 @@ impl LegacyIosKit {
         let destination = destination.into();
         builder.build(&destination).await?;
         FirmwareSummary::inspect(destination)
+    }
+
+    pub async fn decrypt_firmware_dmg(
+        &self,
+        source: impl Into<std::path::PathBuf>,
+        destination: impl Into<std::path::PathBuf>,
+        key: DmgFirmwareKey,
+    ) -> Result<(), KitError> {
+        firmware::decrypt_dmg(source.into(), destination.into(), key).await
     }
 
     pub fn convert_onboard_dump(&self, dump: &[u8]) -> Result<SigningTicket, KitError> {
