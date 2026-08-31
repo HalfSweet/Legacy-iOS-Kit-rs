@@ -10,6 +10,8 @@ pub enum KitError {
     Service(#[from] legacy_ios_services::ServiceError),
     #[error("device backup failed: {0}")]
     Backup(#[from] legacy_ios_services::BackupError),
+    #[error("ramdisk SSH failed: {0}")]
+    Ssh(#[from] legacy_ios_services::SshError),
     #[error("firmware operation failed: {0}")]
     Firmware(#[from] legacy_ios_firmware::FirmwareError),
     #[error("remote firmware operation failed: {0}")]
@@ -68,9 +70,11 @@ impl KitError {
             | Self::UnknownBoardConfig { .. }
             | Self::MissingDeviceSelector => OperationPhase::Planning,
             Self::Signing(_) | Self::Plist(_) => OperationPhase::Personalizing,
-            Self::Transport(_) | Self::Service(_) | Self::DeviceDiscovery { .. } | Self::Io(_) => {
-                OperationPhase::Preflight
-            }
+            Self::Transport(_)
+            | Self::Service(_)
+            | Self::Ssh(_)
+            | Self::DeviceDiscovery { .. }
+            | Self::Io(_) => OperationPhase::Preflight,
             Self::Backup(_) => OperationPhase::TransferringFilesystem,
             Self::RestoreExecution(_) => OperationPhase::Restoring,
             Self::Recovery(_) => OperationPhase::Booting,
@@ -87,7 +91,7 @@ impl KitError {
 
     pub const fn recovery(&self) -> Recoverability {
         match self {
-            Self::Transport(_) | Self::Service(_) | Self::DeviceDiscovery { .. } => {
+            Self::Transport(_) | Self::Service(_) | Self::Ssh(_) | Self::DeviceDiscovery { .. } => {
                 Recoverability::ReconnectDevice
             }
             Self::Signing(_) | Self::Io(_) => Recoverability::RetryImmediately,

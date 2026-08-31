@@ -25,7 +25,8 @@ pub use legacy_ios_core::{
 pub use legacy_ios_firmware::{RestoreBehavior, SigningTicket, TicketError};
 pub use legacy_ios_services::{
     AfcPath, AfcPathError, AppFilter, BackupOptions, BackupOutcome, BackupRestoreOptions,
-    DeviceFileInfo, DeviceFileKind, DeviceFiles, DeviceStorageInfo, DeviceSyslog, InstalledApp,
+    DeviceFileInfo, DeviceFileKind, DeviceFiles, DeviceStorageInfo, DeviceSyslog, HostKeyPolicy,
+    InstalledApp, RamdiskSsh, SshCommandOutput, SshPassword, SshTarget,
 };
 pub use legacy_ios_transport::RecoveryDeviceInfo;
 pub use legacy_ios_workflows::{

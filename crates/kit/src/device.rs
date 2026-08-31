@@ -7,7 +7,7 @@ use legacy_ios_core::{
 use legacy_ios_services::SystemMux;
 use legacy_ios_services::{
     AppFilter, BackupOptions, BackupOutcome, BackupRestoreOptions, DeviceFiles, DeviceSyslog,
-    InstalledApp,
+    HostKeyPolicy, InstalledApp, RamdiskSsh, SshPassword, SshTarget,
 };
 use legacy_ios_transport::{
     DeviceLocator, NusbDeviceLocator, ObservedUsbDevice, parse_iboot_serial,
@@ -207,6 +207,16 @@ impl DeviceManager {
             .await?
             .restore_backup(root, source_identifier, options)
             .await?)
+    }
+
+    pub async fn ramdisk_ssh(
+        &self,
+        target: SshTarget,
+        username: &str,
+        password: &SshPassword,
+        host_key: HostKeyPolicy,
+    ) -> Result<RamdiskSsh, KitError> {
+        Ok(RamdiskSsh::connect(&self.normal, target, username, password, host_key).await?)
     }
 }
 
