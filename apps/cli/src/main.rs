@@ -324,6 +324,8 @@ enum RestoreCommand {
         #[arg(long)]
         no_baseband: bool,
         #[arg(long)]
+        sep: Option<PathBuf>,
+        #[arg(long)]
         flash_version_1: bool,
         #[arg(long)]
         yes: bool,
@@ -817,6 +819,7 @@ async fn main() -> Result<()> {
                     exploit,
                     baseband,
                     no_baseband,
+                    sep,
                     flash_version_1,
                     yes,
                 },
@@ -834,7 +837,7 @@ async fn main() -> Result<()> {
                 } else {
                     BasebandPolicy::Auto
                 },
-                sep: SepPolicy::Auto,
+                sep: sep.map_or(SepPolicy::Auto, SepPolicy::Provided),
                 exploit: exploit.into(),
             })?;
             confirm(
