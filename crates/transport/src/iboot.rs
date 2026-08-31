@@ -233,7 +233,7 @@ impl IbootClient {
         for chunk in data.chunks(0x8000) {
             send_bulk(&mut endpoint, chunk.to_vec()).await?;
         }
-        if data.len() % 512 == 0 {
+        if data.len().is_multiple_of(512) {
             send_bulk(&mut endpoint, Vec::new()).await?;
         }
         Ok(())

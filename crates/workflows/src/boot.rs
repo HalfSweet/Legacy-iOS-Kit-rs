@@ -28,23 +28,24 @@ pub async fn boot_restore(
 
     if preparation.build_major() > 8 && client.mode() == DeviceMode::Dfu {
         client = upload_dfu(client, component(preparation, "iBEC")?, ecid).await?;
-    } else if preparation.build_major() > 8 && client.mode() == DeviceMode::Recovery {
-        if let Some(ibec) = find_component(preparation, "iBEC") {
-            client.upload_payload(ibec.data()).await?;
-            client.send_command("go").await?;
-            drop(client);
-            client = wait_for_mode(ecid, DeviceMode::Recovery).await?;
-        }
+    } else if preparation.build_major() > 8
+        && client.mode() == DeviceMode::Recovery
+        && let Some(ibec) = find_component(preparation, "iBEC")
+    {
+        client.upload_payload(ibec.data()).await?;
+        client.send_command("go").await?;
+        drop(client);
+        client = wait_for_mode(ecid, DeviceMode::Recovery).await?;
     }
     if client.mode() != DeviceMode::Recovery {
         return Err(RestoreBootError::ExpectedRecovery(client.mode()));
     }
 
-    if preparation.build_major() > 8 {
-        if let Some(ticket) = preparation.recovery_ticket() {
-            client.upload_payload(ticket).await?;
-            client.send_command("ticket").await?;
-        }
+    if preparation.build_major() > 8
+        && let Some(ticket) = preparation.recovery_ticket()
+    {
+        client.upload_payload(ticket).await?;
+        client.send_command("ticket").await?;
     }
     client.send_command("setenv auto-boot false").await?;
     client.send_command("saveenv").await?;

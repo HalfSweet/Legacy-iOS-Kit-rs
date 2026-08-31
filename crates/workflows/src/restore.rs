@@ -115,15 +115,15 @@ impl RestorePlan {
                     })?;
             }
         }
-        if let BasebandPolicy::Provided(path) = &request.baseband {
-            if !path.is_file() {
-                return Err(RestorePlanError::BasebandNotFound(path.clone()));
-            }
+        if let BasebandPolicy::Provided(path) = &request.baseband
+            && !path.is_file()
+        {
+            return Err(RestorePlanError::BasebandNotFound(path.clone()));
         }
-        if let SepPolicy::Provided(path) = &request.sep {
-            if !path.is_file() {
-                return Err(RestorePlanError::SepNotFound(path.clone()));
-            }
+        if let SepPolicy::Provided(path) = &request.sep
+            && !path.is_file()
+        {
+            return Err(RestorePlanError::SepNotFound(path.clone()));
         }
 
         let archive = FirmwareArchive::open(&request.firmware)?;

@@ -77,7 +77,7 @@ The public library is `legacy-ios-kit`; the reference CLI is `lik`.
 - Format: `cargo fmt --all`
 - Lint: `cargo clippy --workspace --all-targets --all-features -- -D warnings`
 - Test: `cargo test --workspace --all-features`
-- MSRV check: `cargo +1.85.0 check --workspace --all-targets --all-features`
+- MSRV check: `cargo +1.88.0 check --workspace --all-targets --all-features`
 - Lefthook runs formatting followed by Clippy before every commit.
 
 ## Commit Discipline

@@ -163,12 +163,11 @@ struct RemoteZipEntry {
 }
 
 async fn discover_length(client: &reqwest::Client, url: &Url) -> Result<u64, RemoteFirmwareError> {
-    if let Ok(response) = client.head(url.clone()).send().await {
-        if response.status().is_success() {
-            if let Some(length) = response.content_length() {
-                return Ok(length);
-            }
-        }
+    if let Ok(response) = client.head(url.clone()).send().await
+        && response.status().is_success()
+        && let Some(length) = response.content_length()
+    {
+        return Ok(length);
     }
     let response = client
         .get(url.clone())

@@ -78,7 +78,7 @@ impl DmgImage {
         let mut main_checksum = crc32fast::Hasher::new();
 
         for (index, partition) in partitions.into_iter().enumerate() {
-            if partition.data.len() % SECTOR_SIZE != 0 {
+            if !partition.data.len().is_multiple_of(SECTOR_SIZE) {
                 return Err(DmgError::UnalignedPartition(partition.name));
             }
             let checksum = crc32fast::hash(&partition.data);

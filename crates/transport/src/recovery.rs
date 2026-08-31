@@ -125,7 +125,7 @@ fn bracket_value(source: &str, tag: &str) -> Option<String> {
 
 fn hex_bytes(source: &str, tag: &str) -> Option<Vec<u8>> {
     let value = field_value(source, tag)?;
-    if value.len() % 2 != 0 {
+    if !value.len().is_multiple_of(2) {
         return None;
     }
 

@@ -11,7 +11,7 @@ pub fn encrypt_cbc(data: &[u8], key: &[u8], iv: &[u8]) -> Result<Vec<u8>, Crypto
 }
 
 fn crypt(data: &[u8], key: &[u8], iv: &[u8], direction: Direction) -> Result<Vec<u8>, CryptoError> {
-    if data.len() % 16 != 0 {
+    if !data.len().is_multiple_of(16) {
         return Err(CryptoError::UnalignedData);
     }
     if iv.len() != 16 {
