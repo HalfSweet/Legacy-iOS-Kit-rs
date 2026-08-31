@@ -135,6 +135,15 @@ impl NormalDevice {
             .start_restore(root, self.udid().as_str(), source_identifier, options)
             .await
     }
+
+    pub async fn erase(&self, work_directory: &Path) -> Result<BackupOutcome, BackupError> {
+        fs::create_dir_all(work_directory).await?;
+        let stream = self.connect_service(MOBILEBACKUP2).await?;
+        let mut protocol = MobileBackup2::connect(stream).await?;
+        protocol
+            .start_erase(work_directory, self.udid().as_str())
+            .await
+    }
 }
 
 struct MobileBackup2 {
@@ -223,6 +232,25 @@ impl MobileBackup2 {
             return Err(remote_error(&response));
         }
         self.exchange(root, "restore").await
+    }
+
+    async fn start_erase(
+        &mut self,
+        root: &Path,
+        target_identifier: &str,
+    ) -> Result<BackupOutcome, BackupError> {
+        let mut request = Dictionary::new();
+        request.insert("TargetIdentifier".into(), target_identifier.into());
+        self.link
+            .send_process_message("EraseDevice", request)
+            .await?;
+        let response = self.link.receive_process_message().await?;
+        if response.contains_key("ErrorCode")
+            && response.get("ErrorCode").and_then(unsigned) != Some(0)
+        {
+            return Err(remote_error(&response));
+        }
+        self.exchange(root, "erase").await
     }
 
     async fn exchange(
