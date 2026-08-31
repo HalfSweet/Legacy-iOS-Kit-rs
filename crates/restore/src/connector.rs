@@ -142,12 +142,12 @@ impl RestoredDataConnector {
         &self,
         proxy: Arc<dyn FdrProxyConnector>,
     ) -> Result<FdrService, FdrServiceError> {
-        let first = self.connect(FDR_CONTROL_PORT).await?;
+        let first = self.connect_fdr_control().await?;
         let control = match FdrControl::handshake_v2(first).await {
             Ok(control) => control,
             Err(error) => {
                 debug!(%error, "FDR v2 handshake failed; retrying v1");
-                let second = self.connect(FDR_CONTROL_PORT).await?;
+                let second = self.connect_fdr_control().await?;
                 FdrControl::handshake_v1(second).await?
             }
         };
@@ -156,6 +156,21 @@ impl RestoredDataConnector {
             connector: self.clone(),
             proxy,
         })
+    }
+
+    async fn connect_fdr_control(&self) -> Result<RawServiceConnection, RestoredConnectError> {
+        let mut last_error = None;
+        for attempt in 1..=10 {
+            match self.connect(FDR_CONTROL_PORT).await {
+                Ok(stream) => return Ok(stream),
+                Err(error) => {
+                    debug!(attempt, %error, "FDR control port is not ready");
+                    last_error = Some(error);
+                    tokio::time::sleep(Duration::from_secs(2)).await;
+                }
+            }
+        }
+        Err(last_error.expect("FDR connection attempt records an error"))
     }
 }
 
