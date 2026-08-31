@@ -10,13 +10,13 @@ use std::{
 use anyhow::{Context, Result, anyhow};
 use clap::{ArgAction, Parser, Subcommand, ValueEnum};
 use legacy_ios_kit::{
-    AfcPath, AppFilter, BackupOptions, BackupOutcome, BackupRestoreOptions, BasebandPolicy,
-    BoardConfig, DeviceDiagnostics, DeviceFileInfo, DeviceInventory, DeviceStorageInfo,
-    DeviceSummary, Ecid, ExploitPolicy, FirmwareSummary, HostKeyPolicy, InstalledApp, LegacyIosKit,
-    OperationEvent, OperationHandle, OperationOutcome, ProductType, RamdiskSsh, RecoveryDeviceInfo,
-    RecoveryUploadResult, RemoteFirmwareSummary, RestoreBehavior, RestoreExecutionRequest,
-    RestorePlan, RestoreRequest, ScpPath, SepPolicy, ShshRequest, ShshSummary, SigningTicket,
-    SshCommandOutput, SshPassword, SshTarget, TicketPolicy, Udid,
+    ActivationState, AfcPath, AppFilter, BackupOptions, BackupOutcome, BackupRestoreOptions,
+    BasebandPolicy, BoardConfig, DeviceDiagnostics, DeviceFileInfo, DeviceInventory,
+    DeviceStorageInfo, DeviceSummary, Ecid, ExploitPolicy, FirmwareSummary, HostKeyPolicy,
+    InstalledApp, LegacyIosKit, OperationEvent, OperationHandle, OperationOutcome, ProductType,
+    RamdiskSsh, RecoveryDeviceInfo, RecoveryUploadResult, RemoteFirmwareSummary, RestoreBehavior,
+    RestoreExecutionRequest, RestorePlan, RestoreRequest, ScpPath, SepPolicy, ShshRequest,
+    ShshSummary, SigningTicket, SshCommandOutput, SshPassword, SshTarget, TicketPolicy, Udid,
 };
 use tracing::level_filters::LevelFilter;
 use tracing::{debug, info, warn};
@@ -250,6 +250,14 @@ enum DeviceCommand {
     Pair { udid: Udid },
     /// Read battery diagnostics from a paired normal-mode device.
     Battery { udid: Udid },
+    /// Query the device activation state.
+    Activation { udid: Udid },
+    /// Deactivate a paired normal-mode device.
+    Deactivate {
+        udid: Udid,
+        #[arg(long)]
+        yes: bool,
+    },
     /// Ask lockdownd to reboot a normal-mode device into Recovery mode.
     EnterRecovery {
         udid: Udid,
@@ -688,6 +696,19 @@ async fn main() -> Result<()> {
                 .await
                 .context("failed to read battery diagnostics")?;
             write_diagnostics(output, &diagnostics)?;
+        }
+        Command::Device {
+            command: DeviceCommand::Activation { udid },
+        } => {
+            let state = kit.devices().activation_state(&udid).await?;
+            write_activation_state(output, &state)?;
+        }
+        Command::Device {
+            command: DeviceCommand::Deactivate { udid, yes },
+        } => {
+            confirm("deactivate the device", yes)?;
+            kit.devices().deactivate(&udid).await?;
+            write_message(output, "deactivated", &udid)?;
         }
         Command::Device {
             command: DeviceCommand::EnterRecovery { udid, yes },
@@ -1409,6 +1430,19 @@ fn write_diagnostics(format: OutputFormat, diagnostics: &DeviceDiagnostics) -> R
                 writeln!(output, "{key}: {value:?}")?;
             }
         }
+    }
+    Ok(())
+}
+
+fn write_activation_state(format: OutputFormat, state: &ActivationState) -> Result<()> {
+    let stdout = io::stdout();
+    let mut output = stdout.lock();
+    match format {
+        OutputFormat::Json => {
+            serde_json::to_writer(&mut output, state)?;
+            writeln!(output)?;
+        }
+        OutputFormat::Human => writeln!(output, "{state:?}")?,
     }
     Ok(())
 }
