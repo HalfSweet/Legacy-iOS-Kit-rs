@@ -10,11 +10,11 @@ use std::{
 use anyhow::{Context, Result, anyhow};
 use clap::{ArgAction, Parser, Subcommand, ValueEnum};
 use legacy_ios_kit::{
-    AfcPath, AppFilter, BasebandPolicy, BoardConfig, DeviceDiagnostics, DeviceFileInfo,
-    DeviceInventory, DeviceStorageInfo, DeviceSummary, Ecid, ExploitPolicy, FirmwareSummary,
-    InstalledApp, LegacyIosKit, ProductType, RecoveryDeviceInfo, RecoveryUploadResult,
-    RemoteFirmwareSummary, RestoreBehavior, RestorePlan, RestoreRequest, SepPolicy, ShshRequest,
-    ShshSummary, TicketPolicy, Udid,
+    AfcPath, AppFilter, BackupOptions, BackupOutcome, BasebandPolicy, BoardConfig,
+    DeviceDiagnostics, DeviceFileInfo, DeviceInventory, DeviceStorageInfo, DeviceSummary, Ecid,
+    ExploitPolicy, FirmwareSummary, InstalledApp, LegacyIosKit, ProductType, RecoveryDeviceInfo,
+    RecoveryUploadResult, RemoteFirmwareSummary, RestoreBehavior, RestorePlan, RestoreRequest,
+    SepPolicy, ShshRequest, ShshSummary, TicketPolicy, Udid,
 };
 use tracing::level_filters::LevelFilter;
 
@@ -69,6 +69,13 @@ enum Command {
 
 #[derive(Debug, Subcommand)]
 enum DataCommand {
+    /// Create a mobilebackup2 backup in a host directory.
+    Backup {
+        udid: Udid,
+        destination: PathBuf,
+        #[arg(long)]
+        full: bool,
+    },
     /// List an AFC directory.
     List { udid: Udid, path: AfcPath },
     /// Read AFC file metadata.
@@ -407,6 +414,25 @@ async fn main() -> Result<()> {
         Command::Config {
             command: ConfigCommand::Path,
         } => write_config_path(output, &config.path)?,
+        Command::Data {
+            command:
+                DataCommand::Backup {
+                    udid,
+                    destination,
+                    full,
+                },
+        } => {
+            let outcome = kit
+                .devices()
+                .backup(
+                    &udid,
+                    &destination,
+                    BackupOptions::default().force_full(full),
+                )
+                .await
+                .context("device backup failed")?;
+            write_backup_outcome(output, &outcome)?;
+        }
         Command::Data {
             command: DataCommand::List { udid, path },
         } => {
@@ -797,6 +823,24 @@ fn write_data_list(format: OutputFormat, entries: &[String]) -> Result<()> {
                 writeln!(output, "{entry}")?;
             }
         }
+    }
+    Ok(())
+}
+
+fn write_backup_outcome(format: OutputFormat, outcome: &BackupOutcome) -> Result<()> {
+    let stdout = io::stdout();
+    let mut output = stdout.lock();
+    match format {
+        OutputFormat::Json => {
+            serde_json::to_writer(&mut output, outcome)?;
+            writeln!(output)?;
+        }
+        OutputFormat::Human => writeln!(
+            output,
+            "Backed up {} files ({} bytes)",
+            outcome.files(),
+            outcome.bytes()
+        )?,
     }
     Ok(())
 }
