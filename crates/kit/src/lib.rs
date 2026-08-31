@@ -23,8 +23,8 @@ pub use legacy_ios_core::{
 };
 pub use legacy_ios_firmware::RestoreBehavior;
 pub use legacy_ios_services::{
-    AfcPath, AfcPathError, AppFilter, BackupOptions, BackupOutcome, DeviceFileInfo, DeviceFileKind,
-    DeviceFiles, DeviceStorageInfo, DeviceSyslog, InstalledApp,
+    AfcPath, AfcPathError, AppFilter, BackupOptions, BackupOutcome, BackupRestoreOptions,
+    DeviceFileInfo, DeviceFileKind, DeviceFiles, DeviceStorageInfo, DeviceSyslog, InstalledApp,
 };
 pub use legacy_ios_transport::RecoveryDeviceInfo;
 pub use legacy_ios_workflows::{

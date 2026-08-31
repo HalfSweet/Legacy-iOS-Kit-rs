@@ -3,7 +3,8 @@ use legacy_ios_assets::DeviceDatabase;
 use legacy_ios_core::{BoardConfig, ConnectionId, DeviceMode, Ecid, ProductType, Soc, Udid};
 use legacy_ios_services::SystemMux;
 use legacy_ios_services::{
-    AppFilter, BackupOptions, BackupOutcome, DeviceFiles, DeviceSyslog, InstalledApp,
+    AppFilter, BackupOptions, BackupOutcome, BackupRestoreOptions, DeviceFiles, DeviceSyslog,
+    InstalledApp,
 };
 use legacy_ios_transport::{
     DeviceLocator, NusbDeviceLocator, ObservedUsbDevice, parse_iboot_serial,
@@ -187,6 +188,21 @@ impl DeviceManager {
             .find_device(udid)
             .await?
             .backup(destination, options)
+            .await?)
+    }
+
+    pub async fn restore_backup(
+        &self,
+        udid: &Udid,
+        root: &std::path::Path,
+        source_identifier: &str,
+        options: BackupRestoreOptions,
+    ) -> Result<BackupOutcome, KitError> {
+        Ok(self
+            .normal
+            .find_device(udid)
+            .await?
+            .restore_backup(root, source_identifier, options)
             .await?)
     }
 }
