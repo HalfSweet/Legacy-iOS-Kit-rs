@@ -10,10 +10,11 @@ use std::{
 use anyhow::{Context, Result, anyhow};
 use clap::{ArgAction, Parser, Subcommand, ValueEnum};
 use legacy_ios_kit::{
-    AppFilter, BasebandPolicy, BoardConfig, DeviceDiagnostics, DeviceInventory, DeviceSummary,
-    Ecid, ExploitPolicy, FirmwareSummary, InstalledApp, LegacyIosKit, ProductType,
-    RecoveryDeviceInfo, RecoveryUploadResult, RemoteFirmwareSummary, RestoreBehavior, RestorePlan,
-    RestoreRequest, SepPolicy, ShshRequest, ShshSummary, TicketPolicy, Udid,
+    AfcPath, AppFilter, BasebandPolicy, BoardConfig, DeviceDiagnostics, DeviceFileInfo,
+    DeviceInventory, DeviceStorageInfo, DeviceSummary, Ecid, ExploitPolicy, FirmwareSummary,
+    InstalledApp, LegacyIosKit, ProductType, RecoveryDeviceInfo, RecoveryUploadResult,
+    RemoteFirmwareSummary, RestoreBehavior, RestorePlan, RestoreRequest, SepPolicy, ShshRequest,
+    ShshSummary, TicketPolicy, Udid,
 };
 use tracing::level_filters::LevelFilter;
 
@@ -44,6 +45,10 @@ enum Command {
         #[command(subcommand)]
         command: ConfigCommand,
     },
+    Data {
+        #[command(subcommand)]
+        command: DataCommand,
+    },
     Device {
         #[command(subcommand)]
         command: DeviceCommand,
@@ -59,6 +64,49 @@ enum Command {
     Shsh {
         #[command(subcommand)]
         command: ShshCommand,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+enum DataCommand {
+    /// List an AFC directory.
+    List { udid: Udid, path: AfcPath },
+    /// Read AFC file metadata.
+    Info { udid: Udid, path: AfcPath },
+    /// Read AFC storage capacity and free space.
+    Storage { udid: Udid },
+    /// Copy a device file to the host.
+    Pull {
+        udid: Udid,
+        source: AfcPath,
+        destination: PathBuf,
+    },
+    /// Copy a host file to the device.
+    Push {
+        udid: Udid,
+        source: PathBuf,
+        destination: AfcPath,
+        #[arg(long)]
+        yes: bool,
+    },
+    /// Create an AFC directory.
+    Mkdir { udid: Udid, path: AfcPath },
+    /// Remove an AFC path.
+    Remove {
+        udid: Udid,
+        path: AfcPath,
+        #[arg(long)]
+        recursive: bool,
+        #[arg(long)]
+        yes: bool,
+    },
+    /// Rename or move an AFC path.
+    Move {
+        udid: Udid,
+        source: AfcPath,
+        destination: AfcPath,
+        #[arg(long)]
+        yes: bool,
     },
 }
 
@@ -359,6 +407,100 @@ async fn main() -> Result<()> {
         Command::Config {
             command: ConfigCommand::Path,
         } => write_config_path(output, &config.path)?,
+        Command::Data {
+            command: DataCommand::List { udid, path },
+        } => {
+            let mut files = kit.devices().files(&udid).await?;
+            let entries = files.list(&path).await?;
+            write_data_list(output, &entries)?;
+        }
+        Command::Data {
+            command: DataCommand::Info { udid, path },
+        } => {
+            let mut files = kit.devices().files(&udid).await?;
+            write_file_info(output, &files.info(&path).await?)?;
+        }
+        Command::Data {
+            command: DataCommand::Storage { udid },
+        } => {
+            let mut files = kit.devices().files(&udid).await?;
+            write_storage_info(output, &files.storage_info().await?)?;
+        }
+        Command::Data {
+            command:
+                DataCommand::Pull {
+                    udid,
+                    source,
+                    destination,
+                },
+        } => {
+            let mut files = kit.devices().files(&udid).await?;
+            let data = files.read(&source).await?;
+            tokio::fs::write(&destination, data)
+                .await
+                .with_context(|| format!("failed to write {}", destination.display()))?;
+            write_status(output, "pulled-file")?;
+        }
+        Command::Data {
+            command:
+                DataCommand::Push {
+                    udid,
+                    source,
+                    destination,
+                    yes,
+                },
+        } => {
+            confirm("write the device file", yes)?;
+            let data = tokio::fs::read(&source)
+                .await
+                .with_context(|| format!("failed to read {}", source.display()))?;
+            kit.devices()
+                .files(&udid)
+                .await?
+                .write(&destination, &data)
+                .await?;
+            write_status(output, "pushed-file")?;
+        }
+        Command::Data {
+            command: DataCommand::Mkdir { udid, path },
+        } => {
+            kit.devices().files(&udid).await?.create_dir(&path).await?;
+            write_status(output, "created-directory")?;
+        }
+        Command::Data {
+            command:
+                DataCommand::Remove {
+                    udid,
+                    path,
+                    recursive,
+                    yes,
+                },
+        } => {
+            confirm("remove the device path", yes)?;
+            kit.devices()
+                .files(&udid)
+                .await?
+                .remove(&path, recursive)
+                .await?;
+            write_status(output, "removed-path")?;
+        }
+        Command::Data {
+            command:
+                DataCommand::Move {
+                    udid,
+                    source,
+                    destination,
+                    yes,
+                },
+        } => {
+            confirm("move the device path", yes)?;
+            kit.devices()
+                .files(&udid)
+                .await?
+                .rename(&source, &destination)
+                .await?;
+            write_status(output, "moved-path")?;
+        }
         Command::Device {
             command: DeviceCommand::List,
         } => {
@@ -638,6 +780,60 @@ fn write_config(format: OutputFormat, config: &AppConfig) -> Result<()> {
             writeln!(output)?;
         }
         OutputFormat::Human => write!(output, "{}", toml::to_string_pretty(config)?)?,
+    }
+    Ok(())
+}
+
+fn write_data_list(format: OutputFormat, entries: &[String]) -> Result<()> {
+    let stdout = io::stdout();
+    let mut output = stdout.lock();
+    match format {
+        OutputFormat::Json => {
+            serde_json::to_writer(&mut output, entries)?;
+            writeln!(output)?;
+        }
+        OutputFormat::Human => {
+            for entry in entries {
+                writeln!(output, "{entry}")?;
+            }
+        }
+    }
+    Ok(())
+}
+
+fn write_file_info(format: OutputFormat, info: &DeviceFileInfo) -> Result<()> {
+    let stdout = io::stdout();
+    let mut output = stdout.lock();
+    match format {
+        OutputFormat::Json => {
+            serde_json::to_writer(&mut output, info)?;
+            writeln!(output)?;
+        }
+        OutputFormat::Human => {
+            writeln!(output, "Type: {:?}", info.kind())?;
+            writeln!(output, "Size: {}", info.size())?;
+            if let Some(target) = info.link_target() {
+                writeln!(output, "Target: {target}")?;
+            }
+        }
+    }
+    Ok(())
+}
+
+fn write_storage_info(format: OutputFormat, info: &DeviceStorageInfo) -> Result<()> {
+    let stdout = io::stdout();
+    let mut output = stdout.lock();
+    match format {
+        OutputFormat::Json => {
+            serde_json::to_writer(&mut output, info)?;
+            writeln!(output)?;
+        }
+        OutputFormat::Human => {
+            writeln!(output, "Model: {}", info.model())?;
+            writeln!(output, "Total: {}", info.total_bytes())?;
+            writeln!(output, "Free: {}", info.free_bytes())?;
+            writeln!(output, "Block size: {}", info.block_size())?;
+        }
     }
     Ok(())
 }
