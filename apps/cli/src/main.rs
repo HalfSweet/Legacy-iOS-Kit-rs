@@ -337,6 +337,17 @@ enum FirmwareCommand {
     Inspect { path: PathBuf },
     /// Inspect a remote IPSW by fetching only its ZIP directory and BuildManifest.
     InspectRemote { url: String },
+    /// Build a custom IPSW by replacing or removing archive entries.
+    Build {
+        source: PathBuf,
+        destination: PathBuf,
+        #[arg(long = "replace", value_name = "ENTRY=FILE")]
+        replacements: Vec<String>,
+        #[arg(long = "remove", value_name = "ENTRY")]
+        removals: Vec<String>,
+        #[arg(long)]
+        yes: bool,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -840,6 +851,36 @@ async fn main() -> Result<()> {
                 .await
                 .context("failed to inspect remote firmware")?;
             write_remote_firmware(output, &summary)?;
+        }
+        Command::Firmware {
+            command:
+                FirmwareCommand::Build {
+                    source,
+                    destination,
+                    replacements,
+                    removals,
+                    yes,
+                },
+        } => {
+            confirm("write the custom IPSW", yes)?;
+            let mut data = Vec::with_capacity(replacements.len());
+            for replacement in replacements {
+                let (entry, path) = replacement
+                    .split_once('=')
+                    .ok_or_else(|| anyhow!("replacement must use ENTRY=FILE"))?;
+                let path = PathBuf::from(path);
+                data.push((
+                    entry.to_owned(),
+                    tokio::fs::read(&path)
+                        .await
+                        .with_context(|| format!("failed to read {}", path.display()))?,
+                ));
+            }
+            let summary = kit
+                .build_custom_ipsw(source, destination, data, removals)
+                .await
+                .context("failed to build custom IPSW")?;
+            write_firmware(output, &summary)?;
         }
         Command::Restore {
             command:
