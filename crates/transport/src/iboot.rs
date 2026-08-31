@@ -14,6 +14,13 @@ use tracing::{debug, trace};
 use crate::{RecoveryDeviceInfo, classify_apple_mode, parse_iboot_serial};
 
 const CONTROL_TIMEOUT: Duration = Duration::from_secs(10);
+const KIS_PORTAL_CONFIG: u8 = 0x01;
+const KIS_PORTAL_RSM: u8 = 0x10;
+const KIS_INDEX_UPLOAD: u16 = 0x0d;
+const KIS_INDEX_ENABLE_A: u16 = 0x0a;
+const KIS_INDEX_ENABLE_B: u16 = 0x14;
+const KIS_INDEX_BOOT_IMAGE: u16 = 0x103;
+const KIS_CHUNK_SIZE: usize = 0x4000;
 
 pub struct IbootClient {
     device: Device,
@@ -133,11 +140,15 @@ impl IbootClient {
                 .await?;
             return Ok(UploadResult::Connected(Box::new(client)));
         }
-        let reenumerates =
-            matches!(self.mode, DeviceMode::Dfu | DeviceMode::Wtf) || self.uses_ios2_upload();
+        let reenumerates = matches!(
+            self.mode,
+            DeviceMode::Dfu | DeviceMode::Wtf | DeviceMode::Kis
+        ) || self.uses_ios2_upload();
         self.upload(data, reenumerates).await?;
         if reenumerates {
-            self.device.reset().await?;
+            if self.mode != DeviceMode::Kis {
+                self.device.reset().await?;
+            }
             Ok(UploadResult::Reenumerating)
         } else {
             Ok(UploadResult::Connected(Box::new(self)))
@@ -209,7 +220,7 @@ impl IbootClient {
             }
             DeviceMode::Recovery => self.upload_recovery(data).await,
             DeviceMode::Dfu | DeviceMode::Wtf => self.upload_dfu(data, finish_dfu, false).await,
-            DeviceMode::Kis => Err(RecoveryError::KisUploadNotImplemented),
+            DeviceMode::Kis => self.upload_kis(data, finish_dfu).await,
             mode => Err(RecoveryError::UploadRequiresBootloader(mode)),
         }
     }
@@ -237,6 +248,71 @@ impl IbootClient {
             send_bulk(&mut endpoint, Vec::new()).await?;
         }
         Ok(())
+    }
+
+    async fn upload_kis(&self, data: &[u8], boot: bool) -> Result<(), RecoveryError> {
+        self.kis_write32(KIS_PORTAL_CONFIG, KIS_INDEX_ENABLE_A, 0x21)
+            .await?;
+        self.kis_write32(KIS_PORTAL_CONFIG, KIS_INDEX_ENABLE_B, 0x01)
+            .await?;
+
+        let mut address = 0_u64;
+        for (index, chunk) in data.chunks(KIS_CHUNK_SIZE).enumerate() {
+            let request = kis_upload_request(address, chunk)?;
+            self.kis_request(KIS_PORTAL_RSM, request, 20).await?;
+            trace!(index, bytes = chunk.len(), "sending KIS upload chunk");
+            address += chunk.len() as u64;
+        }
+        if boot {
+            let length = u32::try_from(data.len()).map_err(|_| RecoveryError::KisImageTooLarge)?;
+            self.kis_write32(KIS_PORTAL_RSM, KIS_INDEX_BOOT_IMAGE, length)
+                .await?;
+        }
+        Ok(())
+    }
+
+    async fn kis_write32(&self, portal: u8, index: u16, value: u32) -> Result<(), RecoveryError> {
+        let mut request = kis_request_header(portal, index, 1, 0, 1)?;
+        request.extend_from_slice(&value.to_le_bytes());
+        let reply = self.kis_request(portal, request, 20).await?;
+        if reply.len() < 20 {
+            return Err(RecoveryError::InvalidKisReply);
+        }
+        let written = u32::from_le_bytes(
+            reply[12..16]
+                .try_into()
+                .map_err(|_| RecoveryError::InvalidKisReply)?,
+        );
+        let status = u32::from_le_bytes(
+            reply[16..20]
+                .try_into()
+                .map_err(|_| RecoveryError::InvalidKisReply)?,
+        );
+        if written != 4 || status != 0 {
+            return Err(RecoveryError::KisRequestRejected { status });
+        }
+        Ok(())
+    }
+
+    async fn kis_request(
+        &self,
+        portal: u8,
+        request: Vec<u8>,
+        reply_length: usize,
+    ) -> Result<Vec<u8>, RecoveryError> {
+        let endpoint = match portal {
+            KIS_PORTAL_CONFIG => 0x01,
+            KIS_PORTAL_RSM => 0x03,
+            _ => return Err(RecoveryError::InvalidKisPortal(portal)),
+        };
+        let mut output = self.interface.endpoint::<Bulk, Out>(endpoint)?;
+        send_bulk(&mut output, request).await?;
+        let mut input = self.interface.endpoint::<Bulk, In>(endpoint | 0x80)?;
+        input.submit(Buffer::new(reply_length));
+        let completion = tokio::time::timeout(CONTROL_TIMEOUT, input.next_complete())
+            .await
+            .map_err(|_| RecoveryError::TransferTimeout)?;
+        Ok(completion.into_result()?.into_vec())
     }
 
     async fn send_legacy_command(&self, command: &str) -> Result<(), RecoveryError> {
@@ -558,6 +634,44 @@ fn command_request(command: &str) -> u8 {
     }
 }
 
+fn kis_request_header(
+    portal: u8,
+    index: u16,
+    argument_count: u8,
+    payload_size: usize,
+    reply_words: u16,
+) -> Result<Vec<u8>, RecoveryError> {
+    if index >= 1 << 10 || reply_words >= 1 << 14 {
+        return Err(RecoveryError::InvalidKisRequest);
+    }
+    let request_size = payload_size
+        .checked_add(usize::from(argument_count) * 4)
+        .and_then(|size| u32::try_from(size).ok())
+        .ok_or(RecoveryError::InvalidKisRequest)?;
+    let mut header = Vec::with_capacity(12);
+    header.extend_from_slice(&0_u16.to_le_bytes());
+    header.push(0xa0);
+    header.push(portal);
+    header.push(argument_count);
+    header.push(index as u8);
+    header.push(((index >> 8) as u8 & 0x03) | ((reply_words << 2) as u8 & 0xfc));
+    header.push((reply_words >> 6) as u8);
+    header.extend_from_slice(&request_size.to_le_bytes());
+    Ok(header)
+}
+
+fn kis_upload_request(address: u64, data: &[u8]) -> Result<Vec<u8>, RecoveryError> {
+    let mut request = kis_request_header(KIS_PORTAL_RSM, KIS_INDEX_UPLOAD, 3, data.len(), 0)?;
+    request.extend_from_slice(&address.to_le_bytes());
+    request.extend_from_slice(
+        &u32::try_from(data.len())
+            .map_err(|_| RecoveryError::InvalidKisRequest)?
+            .to_le_bytes(),
+    );
+    request.extend_from_slice(data);
+    Ok(request)
+}
+
 #[derive(Debug, Error)]
 pub enum RecoveryError {
     #[error("no Apple device was found in Recovery, DFU, WTF, or KIS mode")]
@@ -572,8 +686,16 @@ pub enum RecoveryError {
     LegacyProtocolProbe(usize),
     #[error("early iBoot rejected the command or file transfer")]
     LegacyCommandRejected,
-    #[error("KIS image upload is not implemented yet")]
-    KisUploadNotImplemented,
+    #[error("KIS request is invalid")]
+    InvalidKisRequest,
+    #[error("KIS portal {0:#04x} is invalid")]
+    InvalidKisPortal(u8),
+    #[error("KIS device returned an invalid reply")]
+    InvalidKisReply,
+    #[error("KIS device rejected the request with status {status:#010x}")]
+    KisRequestRejected { status: u32 },
+    #[error("KIS image exceeds the protocol size limit")]
+    KisImageTooLarge,
     #[error("image upload requires a bootloader mode, found {0:?}")]
     UploadRequiresBootloader(DeviceMode),
     #[error("bootrom exploit transfers require DFU mode, found {0:?}")]
@@ -623,5 +745,17 @@ mod tests {
             legacy_message(0x805, 0x1234, 0x0900_0000),
             [0x05, 0x08, 0x34, 0x12, 0x34, 0x12, 0, 0, 0, 0, 0, 9]
         );
+    }
+
+    #[test]
+    fn encodes_kis_upload_request() {
+        let request = kis_upload_request(0x1122_3344_5566_7788, &[1, 2, 3]).unwrap();
+
+        assert_eq!(request.len(), 27);
+        assert_eq!(&request[..8], &[0, 0, 0xa0, 0x10, 3, 0x0d, 0, 0]);
+        assert_eq!(&request[8..12], &15_u32.to_le_bytes());
+        assert_eq!(&request[12..20], &0x1122_3344_5566_7788_u64.to_le_bytes());
+        assert_eq!(&request[20..24], &3_u32.to_le_bytes());
+        assert_eq!(&request[24..], &[1, 2, 3]);
     }
 }
