@@ -1296,15 +1296,18 @@ dependencies = [
 
 [[package]]
 name = "idevice"
-version = "0.1.50"
+version = "0.1.65"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "effc7c8fe1bfa5051717c4dc20c3bcc4828b13009a6c95ff6fc8c3f8ccdf4d43"
+checksum = "7484b3a39a089068167a8ab0b3da6a05b5f6f8969daf1a893da1c7087cb2e09a"
 dependencies = [
  "base64",
  "bytes",
  "chrono",
  "futures",
+ "libc",
  "plist",
+ "plist-macro",
+ "rand 0.10.2",
  "rsa 0.9.10",
  "rustls",
  "serde",
@@ -1313,6 +1316,7 @@ dependencies = [
  "tokio",
  "tokio-rustls",
  "tracing",
+ "web-time",
  "x509-cert",
 ]
 
@@ -2070,6 +2074,15 @@ dependencies = [
  "quick-xml",
  "serde",
  "time",
+]
+
+[[package]]
+name = "plist-macro"
+version = "0.1.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "82c39e020f2d8d361e91a434cfe26bc7c3e21ae54414379816d0110f3f7ca121"
+dependencies = [
+ "plist",
 ]
 
 [[package]]

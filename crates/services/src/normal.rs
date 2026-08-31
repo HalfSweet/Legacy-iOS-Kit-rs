@@ -195,7 +195,11 @@ impl NormalDevice {
         let buid = mux.get_buid().await?;
         let mut lockdown = LockdownClient::connect(self.provider.as_ref()).await?;
         let mut pairing = lockdown
-            .pair(uuid::Uuid::new_v4().to_string().to_uppercase(), buid)
+            .pair(
+                uuid::Uuid::new_v4().to_string().to_uppercase(),
+                buid,
+                Some("legacy-ios-kit"),
+            )
             .await?;
         pairing.udid = Some(self.udid.to_string());
         let serialized = pairing.serialize()?;
