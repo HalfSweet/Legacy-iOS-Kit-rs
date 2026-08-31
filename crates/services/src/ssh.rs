@@ -381,28 +381,45 @@ fn activation_paths(version: &str) -> Result<(&'static str, &'static str, bool),
 
 /// Check whether a tar archive contains an entry whose name ends in `suffix`.
 pub fn tar_contains_entry(archive: &[u8], suffix: &str) -> bool {
+    tar_entries(archive).any(|(name, _, _)| name.ends_with(suffix))
+}
+
+/// Extract a regular file entry from a tar archive by exact name.
+pub fn tar_extract_entry(archive: &[u8], name: &str) -> Option<Vec<u8>> {
+    tar_entries(archive)
+        .find(|(entry, _, _)| *entry == name)
+        .map(|(_, offset, size)| archive[offset..offset + size].to_vec())
+}
+
+fn tar_entries(archive: &[u8]) -> impl Iterator<Item = (&str, usize, usize)> {
     let mut offset = 0;
-    while offset + 512 <= archive.len() {
-        let header = &archive[offset..offset + 512];
-        if header.iter().all(|byte| *byte == 0) {
-            break;
+    std::iter::from_fn(move || {
+        while offset + 512 <= archive.len() {
+            let header = &archive[offset..offset + 512];
+            offset += 512;
+            if header.iter().all(|byte| *byte == 0) {
+                return None;
+            }
+            let name_end = header[..100]
+                .iter()
+                .position(|byte| *byte == 0)
+                .unwrap_or(100);
+            let size = std::str::from_utf8(&header[124..136])
+                .ok()
+                .and_then(|field| u64::from_str_radix(field.trim_end_matches(['\0', ' ']), 8).ok())
+                .unwrap_or(0) as usize;
+            let data_offset = offset;
+            offset += size.next_multiple_of(512);
+            if let Ok(name) = std::str::from_utf8(&header[..name_end]) {
+                return Some((
+                    name,
+                    data_offset,
+                    size.min(archive.len().saturating_sub(data_offset)),
+                ));
+            }
         }
-        let name_end = header[..100]
-            .iter()
-            .position(|byte| *byte == 0)
-            .unwrap_or(100);
-        if let Ok(name) = std::str::from_utf8(&header[..name_end])
-            && name.ends_with(suffix)
-        {
-            return true;
-        }
-        let size = std::str::from_utf8(&header[124..136])
-            .ok()
-            .and_then(|field| u64::from_str_radix(field.trim_end_matches(['\0', ' ']), 8).ok())
-            .unwrap_or(0);
-        offset += 512 + (size as usize).next_multiple_of(512);
-    }
-    false
+        None
+    })
 }
 
 impl fmt::Debug for RamdiskSsh {

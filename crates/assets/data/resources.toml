@@ -126,3 +126,21 @@ sha256 = "e5a5625b758492930c5c51012731de20bb86c39fb5a78684b7485add40bdda33"
 size = 134768
 purpose = "Device-side kloader binary for entering kDFU on iOS 5 and earlier"
 redistribution = "download-only"
+
+[[resources]]
+id = "trollstore-tar"
+source_url = "https://github.com/opa334/TrollStore/releases/download/2.1.1/TrollStore.tar"
+source_commit = "2.1.1"
+sha256 = "144dc741d1b74d582c861e6ed504ddced3745724e216e3de79ab7d37b27d0551"
+size = 2429438
+purpose = "TrollStore application bundle; trollstorehelper is installed into Tips.app from an SSH ramdisk"
+redistribution = "download-only"
+
+[[resources]]
+id = "trollstore-persistence-helper"
+source_url = "https://github.com/opa334/TrollStore/releases/download/2.1.1/PersistenceHelper_Embedded"
+source_commit = "2.1.1"
+sha256 = "f0915cb7a608522ef84a43c6617433037e030ff68f5db89a6bb982f8430a0cb9"
+size = 213635
+purpose = "TrollStore persistence helper binary swapped onto the Tips app executable"
+redistribution = "download-only"

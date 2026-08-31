@@ -162,7 +162,7 @@ mod tests {
     #[test]
     fn bundled_resources_have_fixed_provenance() {
         let catalog = ResourceCatalog::bundled();
-        assert_eq!(catalog.iter().count(), 14);
+        assert_eq!(catalog.iter().count(), 16);
         let resource = catalog.get(&ResourceId::new("ios4-scab-template")).unwrap();
         assert_eq!(resource.sha256().len(), 64);
         assert_eq!(resource.redistribution(), Redistribution::DownloadOnly);

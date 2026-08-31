@@ -19,6 +19,7 @@ mod ramdisk_boot;
 mod recovery;
 mod restore_execution;
 mod shsh;
+mod trollstore;
 
 pub use device::{
     BackendFailure, DeviceDiagnostics, DeviceInventory, DeviceManager, DeviceSummary,
@@ -45,6 +46,7 @@ pub use legacy_ios_services::{
     BackupPassword, BackupRestoreOptions, DeviceFileInfo, DeviceFileKind, DeviceFiles,
     DeviceStorageInfo, DeviceSyslog, HostKeyPolicy, InstalledApp, NormalBackend, RamdiskSsh,
     ScpPath, ScpPathError, SshCommandOutput, SshPassword, SshTarget, tar_contains_entry,
+    tar_extract_entry,
 };
 pub use legacy_ios_transport::{
     HostRequirement, HostRequirementCode, RecoveryDeviceInfo, UsbAccess, UsbHostDevice,
@@ -300,6 +302,17 @@ impl LegacyIosKit {
     ) -> Result<(), KitError> {
         kdfu::enter_kdfu(ssh, kloader, pwned_ibss).await?;
         kdfu::await_kdfu(ecid).await
+    }
+
+    /// Install the TrollStore persistence helper into the Tips app from an
+    /// SSH ramdisk session.
+    pub async fn install_trollstore(
+        &self,
+        ssh: &RamdiskSsh,
+        persistence_helper: &[u8],
+        helper: &[u8],
+    ) -> Result<(), KitError> {
+        trollstore::install_trollstore(ssh, persistence_helper, helper).await
     }
 
     /// Exploit an S5L8900 device in DFU mode with the Pwnage 2.0 WTF image.

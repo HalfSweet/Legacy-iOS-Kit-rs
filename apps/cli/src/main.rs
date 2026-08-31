@@ -210,6 +210,17 @@ enum RamdiskCommand {
         #[arg(long)]
         host_key: Option<String>,
     },
+    /// Install TrollStore into the Tips app from an SSH ramdisk (iOS 14/15).
+    Trollstore {
+        #[arg(long)]
+        device_id: Option<u32>,
+        #[arg(long, default_value = "root")]
+        username: String,
+        #[arg(long)]
+        host_key: Option<String>,
+        #[arg(long)]
+        yes: bool,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -2191,6 +2202,34 @@ async fn main() -> Result<()> {
                 .await
                 .with_context(|| format!("failed to write {}", destination.display()))?;
             write_status(output, "saved-baseband-dump")?;
+        }
+        Command::Ramdisk {
+            command:
+                RamdiskCommand::Trollstore {
+                    device_id,
+                    username,
+                    host_key,
+                    yes,
+                },
+        } => {
+            confirm("install TrollStore into the Tips app", yes)?;
+            let cache = config.artifact_cache_dir()?;
+            let tar_path = kit
+                .fetch_resource(&ResourceId::new("trollstore-tar"), &cache)
+                .await?;
+            let helper_path = kit
+                .fetch_resource(&ResourceId::new("trollstore-persistence-helper"), &cache)
+                .await?;
+            let tar = tokio::fs::read(&tar_path).await?;
+            let helper = legacy_ios_kit::tar_extract_entry(&tar, "TrollStore.app/trollstorehelper")
+                .ok_or_else(|| anyhow!("trollstorehelper not found in TrollStore.tar"))?;
+            let persistence = tokio::fs::read(&helper_path).await?;
+            let ssh = connect_ramdisk_ssh(&kit, device_id, &username, host_key).await?;
+            kit.install_trollstore(&ssh, &persistence, &helper)
+                .await
+                .context("TrollStore installation failed")?;
+            ssh.disconnect().await?;
+            write_status(output, "installed-trollstore")?;
         }
         Command::Shsh {
             command:
