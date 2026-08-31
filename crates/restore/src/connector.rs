@@ -1,13 +1,19 @@
-use std::{fmt, time::Duration};
+use std::{fmt, future::Future, pin::Pin, sync::Arc, time::Duration};
 
 use legacy_ios_core::Ecid;
 use legacy_ios_services::{RawServiceConnection, ServiceError, SystemMux};
 use plist::{Dictionary, Value};
 use thiserror::Error;
-use tokio::time::Instant;
-use tracing::{debug, info};
+use tokio::{
+    io::{AsyncRead, AsyncWrite},
+    time::Instant,
+};
+use tracing::{debug, info, warn};
 
-use crate::{PlistFrameError, PlistFramed, RestoredClient, RestoredError};
+use crate::{
+    FDR_CONTROL_PORT, FdrConnection, FdrConnectionCommand, FdrControl, FdrControlCommand, FdrError,
+    FdrProtocol, FdrProxyRequest, PlistFrameError, PlistFramed, RestoredClient, RestoredError,
+};
 
 const RESTORED_PORT: u16 = 62078;
 const RESTORED_SERVICE: &str = "com.apple.mobile.restored";
@@ -131,6 +137,113 @@ impl RestoredDataConnector {
         framed.send(response).await?;
         Ok(())
     }
+
+    pub async fn connect_fdr(
+        &self,
+        proxy: Arc<dyn FdrProxyConnector>,
+    ) -> Result<FdrService, FdrServiceError> {
+        let first = self.connect(FDR_CONTROL_PORT).await?;
+        let control = match FdrControl::handshake_v2(first).await {
+            Ok(control) => control,
+            Err(error) => {
+                debug!(%error, "FDR v2 handshake failed; retrying v1");
+                let second = self.connect(FDR_CONTROL_PORT).await?;
+                FdrControl::handshake_v1(second).await?
+            }
+        };
+        Ok(FdrService {
+            control,
+            connector: self.clone(),
+            proxy,
+        })
+    }
+}
+
+pub trait FdrProxyStream: AsyncRead + AsyncWrite + Unpin + Send {}
+impl<T> FdrProxyStream for T where T: AsyncRead + AsyncWrite + Unpin + Send {}
+
+pub type FdrProxyFuture =
+    Pin<Box<dyn Future<Output = Result<Box<dyn FdrProxyStream>, std::io::Error>> + Send>>;
+
+pub trait FdrProxyConnector: Send + Sync + fmt::Debug {
+    fn connect(&self, request: FdrProxyRequest) -> FdrProxyFuture;
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+pub struct TcpFdrProxyConnector;
+
+impl FdrProxyConnector for TcpFdrProxyConnector {
+    fn connect(&self, request: FdrProxyRequest) -> FdrProxyFuture {
+        Box::pin(async move {
+            let stream = tokio::net::TcpStream::connect((request.host(), request.port())).await?;
+            Ok(Box::new(stream) as Box<dyn FdrProxyStream>)
+        })
+    }
+}
+
+pub struct FdrService {
+    control: FdrControl<RawServiceConnection>,
+    connector: RestoredDataConnector,
+    proxy: Arc<dyn FdrProxyConnector>,
+}
+
+impl FdrService {
+    pub async fn run(mut self) -> Result<(), FdrServiceError> {
+        loop {
+            match self.control.next_command().await? {
+                FdrControlCommand::OpenConnection => {
+                    let connector = self.connector.clone();
+                    let proxy = Arc::clone(&self.proxy);
+                    let protocol = self.control.protocol();
+                    let port = self.control.connection_port();
+                    tokio::spawn(async move {
+                        if let Err(error) =
+                            run_fdr_connection(connector, proxy, protocol, port).await
+                        {
+                            warn!(%error, "FDR data connection stopped");
+                        }
+                    });
+                }
+                FdrControlCommand::Unknown(command) => {
+                    warn!(command, "ignoring unknown FDR control command")
+                }
+            }
+        }
+    }
+}
+
+impl fmt::Debug for FdrService {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("FdrService")
+            .field("connector", &self.connector)
+            .field("proxy", &self.proxy)
+            .finish_non_exhaustive()
+    }
+}
+
+async fn run_fdr_connection(
+    connector: RestoredDataConnector,
+    proxy: Arc<dyn FdrProxyConnector>,
+    protocol: FdrProtocol,
+    port: u16,
+) -> Result<(), FdrServiceError> {
+    let stream = connector.connect(port).await?;
+    let mut connection = FdrConnection::handshake(stream, protocol).await?;
+    loop {
+        match connection.next_command().await? {
+            FdrConnectionCommand::Ping => {}
+            FdrConnectionCommand::Proxy(request) => {
+                let mut remote = proxy.connect(request).await?;
+                let mut device = connection.into_inner();
+                tokio::io::copy_bidirectional(&mut device, &mut remote).await?;
+                return Ok(());
+            }
+            FdrConnectionCommand::Unknown(command) => {
+                warn!(command, "ignoring unknown FDR data command")
+            }
+        }
+    }
 }
 
 fn hardware_ecid(hardware: &Dictionary) -> Option<Ecid> {
@@ -150,6 +263,16 @@ pub enum RestoredConnectError {
     Restored(#[from] RestoredError),
     #[error(transparent)]
     Frame(#[from] PlistFrameError),
+}
+
+#[derive(Debug, Error)]
+pub enum FdrServiceError {
+    #[error(transparent)]
+    Connect(#[from] RestoredConnectError),
+    #[error(transparent)]
+    Protocol(#[from] FdrError),
+    #[error("FDR proxy connection failed: {0}")]
+    Proxy(#[from] std::io::Error),
 }
 
 #[cfg(test)]

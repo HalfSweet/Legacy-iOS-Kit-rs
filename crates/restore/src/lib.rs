@@ -13,7 +13,9 @@ mod restored;
 
 pub use asr::{ASR_PORT, AsrClient, AsrError, AsrProgress};
 pub use connector::{
+    FdrProxyConnector, FdrProxyFuture, FdrProxyStream, FdrService, FdrServiceError,
     RestoredConnectError, RestoredConnector, RestoredDataConnector, RestoredSession,
+    TcpFdrProxyConnector,
 };
 pub use dispatch::{DispatchAction, PreparedRestoreData, RestoreDispatchError};
 pub use engine::{

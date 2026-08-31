@@ -14,7 +14,7 @@ legacy-ios-transport = { path = "../transport" }
 plist = "=1.10.0"
 sha1 = "=0.10.6"
 thiserror.workspace = true
-tokio = { workspace = true, features = ["fs", "io-util"] }
+tokio = { workspace = true, features = ["fs", "io-util", "net"] }
 tracing.workspace = true
 uuid = { version = "1.16.0", features = ["v4"] }
 
