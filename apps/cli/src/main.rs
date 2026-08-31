@@ -11,15 +11,16 @@ use anyhow::{Context, Result, anyhow};
 use clap::{ArgAction, Parser, Subcommand, ValueEnum};
 use legacy_ios_kit::{
     ActivationState, AfcPath, AppFilter, BackupOptions, BackupOutcome, BackupPassword,
-    BackupRestoreOptions, BasebandPolicy, BoardConfig, CustomRootfsRequest, DeviceDiagnostics,
-    DeviceFileInfo, DeviceInventory, DeviceStorageInfo, DeviceSummary, DmgFirmwareKey, Ecid,
-    ExploitPolicy, FirmwareSummary, HfsEntrySummary, HfsMutation, HfsStatSummary, HostKeyPolicy,
-    ImageCipher, InstalledApp, LegacyIosKit, OperationEvent, OperationHandle, OperationOutcome,
-    ProductType, RamdiskBootExecutionRequest, RamdiskBootRequest, RamdiskBuildRequest,
-    RamdiskBuildSummary, RamdiskSsh, RecoveryDeviceInfo, RecoveryUploadResult,
-    RemoteFirmwareSummary, ResourceId, RestoreBehavior, RestoreExecutionRequest, RestorePlan,
-    RestoreRequest, ScpPath, SepPolicy, ShshRequest, ShshSummary, SigningTicket, SshCommandOutput,
-    SshPassword, SshTarget, TicketPolicy, Udid, UsbHostDiagnostics,
+    BackupRestoreOptions, BasebandPolicy, BoardConfig, BootNonce, CustomRootfsRequest,
+    DeviceDiagnostics, DeviceFileInfo, DeviceInventory, DeviceStorageInfo, DeviceSummary,
+    DmgFirmwareKey, Ecid, ExploitPolicy, FirmwareSummary, HfsEntrySummary, HfsMutation,
+    HfsStatSummary, HostKeyPolicy, ImageCipher, InstalledApp, LegacyIosKit, NoncePolicy,
+    OperationEvent, OperationHandle, OperationOutcome, ProductType, RamdiskBootExecutionRequest,
+    RamdiskBootRequest, RamdiskBuildRequest, RamdiskBuildSummary, RamdiskSsh, RecoveryDeviceInfo,
+    RecoveryUploadResult, RemoteFirmwareSummary, ResourceId, RestoreBehavior,
+    RestoreExecutionRequest, RestorePlan, RestoreRequest, ScpPath, SepPolicy, ShshRequest,
+    ShshSummary, SigningTicket, SshCommandOutput, SshPassword, SshTarget, TicketPolicy, Udid,
+    UsbHostDiagnostics,
 };
 use tracing::level_filters::LevelFilter;
 use tracing::{debug, info, warn};
@@ -425,6 +426,18 @@ enum DeviceCommand {
         #[arg(long)]
         yes: bool,
     },
+    /// Write the boot nonce generator to NVRAM on a Recovery-mode device.
+    SetNonce {
+        #[arg(long)]
+        ecid: Option<Ecid>,
+        #[arg(long)]
+        generator: BootNonce,
+        /// Also set auto-boot false and reset, keeping the device in Recovery.
+        #[arg(long)]
+        stay: bool,
+        #[arg(long)]
+        yes: bool,
+    },
     /// Set auto-boot and reboot a Recovery-mode device to normal mode.
     ExitRecovery {
         #[arg(long)]
@@ -662,6 +675,9 @@ enum RestoreCommand {
         sep: Option<PathBuf>,
         #[arg(long, value_enum, default_value_t = ExploitArg::Auto)]
         exploit: ExploitArg,
+        /// Write the ticket generator to the device boot nonce NVRAM variable.
+        #[arg(long)]
+        set_nonce: bool,
     },
     /// Execute a restore using a provided ticket or live TSS signing.
     Execute {
@@ -691,6 +707,9 @@ enum RestoreCommand {
         sep: Option<PathBuf>,
         #[arg(long)]
         flash_version_1: bool,
+        /// Write the ticket generator to the device boot nonce NVRAM variable.
+        #[arg(long)]
+        set_nonce: bool,
         #[arg(long)]
         yes: bool,
     },
@@ -1223,6 +1242,30 @@ async fn main() -> Result<()> {
             write_recovery_info(output, device.mode(), device.info())?;
         }
         Command::Device {
+            command:
+                DeviceCommand::SetNonce {
+                    ecid,
+                    generator,
+                    stay,
+                    yes,
+                },
+        } => {
+            confirm(
+                &format!("set the device boot nonce generator to {generator}"),
+                yes,
+            )?;
+            let device = kit.recovery().open(ecid).await?;
+            device.set_boot_nonce(generator).await?;
+            if stay {
+                device.send_command("setenv auto-boot false").await?;
+                device.send_command("saveenv").await?;
+                device.reset().await?;
+                write_status(output, "set-nonce-reset-recovery")?;
+            } else {
+                write_status(output, "set-nonce")?;
+            }
+        }
+        Command::Device {
             command: DeviceCommand::ExitRecovery { ecid },
         } => {
             kit.recovery().open(ecid).await?.reboot_to_normal().await?;
@@ -1655,6 +1698,7 @@ async fn main() -> Result<()> {
                     no_baseband,
                     sep,
                     exploit,
+                    set_nonce,
                 },
         } => {
             let device = kit.resolve_device_identity(device, board)?.with_ecid(ecid);
@@ -1682,6 +1726,7 @@ async fn main() -> Result<()> {
                     baseband,
                     sep,
                     exploit: exploit.into(),
+                    nonce: nonce_policy(set_nonce),
                 })
                 .context("failed to resolve restore plan")?;
             write_restore_plan(output, &plan)?;
@@ -1702,6 +1747,7 @@ async fn main() -> Result<()> {
                     no_baseband,
                     sep,
                     flash_version_1,
+                    set_nonce,
                     yes,
                 },
         } => {
@@ -1722,6 +1768,7 @@ async fn main() -> Result<()> {
                 },
                 sep: sep.map_or(SepPolicy::Auto, SepPolicy::Provided),
                 exploit: exploit.into(),
+                nonce: nonce_policy(set_nonce),
             })?;
             confirm(
                 &format!(
@@ -1991,6 +2038,14 @@ async fn connect_ramdisk_ssh(
         .ramdisk_ssh(target, username, &password, host_key)
         .await
         .context("failed to connect to ramdisk SSH")
+}
+
+const fn nonce_policy(set_nonce: bool) -> NoncePolicy {
+    if set_nonce {
+        NoncePolicy::Auto
+    } else {
+        NoncePolicy::Manual
+    }
 }
 
 fn parse_integer(value: &str) -> Result<u64, String> {
