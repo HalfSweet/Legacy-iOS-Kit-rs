@@ -5,7 +5,9 @@ use legacy_ios_restore::PreparedRestoreData;
 use plist::Value;
 use thiserror::Error;
 
-use crate::{ComponentPersonalizer, DestructiveConsent, PersonalizationError, PlanId, RestorePlan};
+use crate::{
+    ComponentPersonalizer, DestructiveConsent, PersonalizationError, PlanId, RestorePlan, SepPolicy,
+};
 
 const BOOT_COMPONENTS: &[&str] = &[
     "iBSS",
@@ -64,19 +66,57 @@ impl RestorePreparation {
             .get("APTicket")
             .and_then(Value::as_data)
             .map(ToOwned::to_owned);
+        let ticket_dictionary = ticket.dictionary().clone();
         let personalizer =
-            ComponentPersonalizer::new(archive, identity.clone(), ticket.dictionary().clone());
+            ComponentPersonalizer::new(archive, identity.clone(), ticket_dictionary.clone());
+        let sep = match plan.sep_policy() {
+            SepPolicy::Auto => None,
+            SepPolicy::Provided(path) => {
+                let archive = FirmwareArchive::open(path)?;
+                let manifest = archive.build_manifest()?;
+                let identity = manifest.select_identity(board, plan.behavior())?.clone();
+                if !identity.manifest().contains_key("RestoreSEP") {
+                    return Err(RestorePreparationError::MissingProvidedSep);
+                }
+                Some((
+                    ComponentPersonalizer::new(archive, identity.clone(), ticket_dictionary),
+                    identity,
+                ))
+            }
+        };
         let boot_components = BOOT_COMPONENTS
             .iter()
-            .filter(|name| identity.manifest().contains_key(name))
+            .copied()
+            .filter(|name| {
+                identity.manifest().contains_key(name) || name == &"RestoreSEP" && sep.is_some()
+            })
             .map(|name| {
+                let source = if name == "RestoreSEP" {
+                    sep.as_ref().map(|(personalizer, _)| personalizer)
+                } else {
+                    None
+                }
+                .unwrap_or(&personalizer);
                 Ok(PreparedBootComponent {
-                    name: (*name).to_owned(),
-                    data: personalizer.personalize(name)?,
+                    name: name.to_owned(),
+                    data: source.personalize(name)?,
                 })
             })
             .collect::<Result<Vec<_>, RestorePreparationError>>()?;
-        let restored_data = personalizer.prepare_restore_data(flash_version_1)?;
+        let mut restored_data = personalizer.prepare_restore_data(flash_version_1)?;
+        if let Some((sep, sep_identity)) = &sep {
+            let mut nor = personalizer.nor_response(flash_version_1)?;
+            for (component, key) in [
+                ("RestoreSEP", "RestoreSEPImageData"),
+                ("SEP", "SEPImageData"),
+                ("SepStage1", "SEPPatchImageData"),
+            ] {
+                if sep_identity.manifest().contains_key(component) {
+                    nor.insert(key.into(), Value::Data(sep.personalize(component)?));
+                }
+            }
+            restored_data = restored_data.with_nor(nor);
+        }
         Ok(Self {
             plan_id: plan.id().clone(),
             boot_components,
@@ -158,6 +198,8 @@ pub enum RestorePreparationError {
     FirmwareChanged,
     #[error("firmware build identifier has no numeric major version")]
     InvalidBuildId,
+    #[error("provided SEP firmware has no RestoreSEP component")]
+    MissingProvidedSep,
     #[error(transparent)]
     Firmware(#[from] FirmwareError),
     #[error(transparent)]
