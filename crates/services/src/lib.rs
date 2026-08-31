@@ -2,6 +2,7 @@
 
 //! Normal-mode iOS services and host integrations.
 
+mod activation;
 mod app;
 mod backup;
 mod files;
@@ -9,6 +10,7 @@ mod normal;
 mod plist_service;
 mod ssh;
 
+pub use activation::ActivationState;
 pub use app::{AppFilter, InstalledApp};
 pub use backup::{BackupError, BackupOptions, BackupOutcome, BackupRestoreOptions};
 pub use files::{
