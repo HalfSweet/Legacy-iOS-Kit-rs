@@ -5,6 +5,7 @@ use idevice::{
     services::{
         afc::{AfcClient, opcode::AfcFopenMode},
         house_arrest::HouseArrestClient,
+        springboardservices::SpringBoardServicesClient,
     },
 };
 use plist::{Dictionary, Value};
@@ -146,6 +147,27 @@ impl NormalDevice {
         Ok(DeviceFiles::new(
             client.vend_documents(bundle_id.to_owned()).await?,
         ))
+    }
+
+    pub async fn app_icon(&self, bundle_id: &str) -> Result<Vec<u8>, ServiceError> {
+        let mut client = SpringBoardServicesClient::connect(self.provider()).await?;
+        Ok(client.get_icon_pngdata(bundle_id.to_owned()).await?)
+    }
+
+    pub async fn icon_state(&self) -> Result<Value, ServiceError> {
+        let mut client = SpringBoardServicesClient::connect(self.provider()).await?;
+        Ok(client.get_icon_state(None).await?)
+    }
+
+    pub async fn set_icon_state(&self, state: Value) -> Result<(), ServiceError> {
+        let mut client = SpringBoardServicesClient::connect(self.provider()).await?;
+        client.set_icon_state(state).await?;
+        Ok(())
+    }
+
+    pub async fn refresh_icon_state(&self) -> Result<(), ServiceError> {
+        let state = self.icon_state().await?;
+        self.set_icon_state(state).await
     }
 }
 
