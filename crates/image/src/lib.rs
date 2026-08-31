@@ -7,6 +7,7 @@ mod dmg;
 mod fls;
 mod hfs;
 mod hfs_btree;
+mod iboot32;
 mod img3;
 mod img4;
 mod mbn;
@@ -20,6 +21,7 @@ pub use dmg::{
 };
 pub use fls::{FlsError, FlsFile};
 pub use hfs::{HfsEntry, HfsEntryKind, HfsError, HfsImage, HfsStat};
+pub use iboot32::{IBoot32, IbootPatchError, patch_iboot32};
 pub use img3::{Img3, Img3Element, Img3Error, Img3Tag};
 pub use img4::{Img4Error, extract_im4p_payload, personalize_img4, replace_im4p_payload};
 pub use mbn::{MbnError, MbnFile, MbnFormat};

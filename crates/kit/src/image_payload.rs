@@ -106,6 +106,27 @@ pub(crate) async fn replace(
     write_atomic(destination, container).await
 }
 
+pub(crate) async fn patch_iboot32(
+    source: PathBuf,
+    destination: PathBuf,
+    boot_args: Option<String>,
+    command_handler: Option<(String, u32)>,
+) -> Result<(), KitError> {
+    let image = tokio::fs::read(source).await?;
+    let patched = tokio::task::spawn_blocking(move || {
+        legacy_ios_image::patch_iboot32(
+            &image,
+            boot_args.as_deref(),
+            command_handler
+                .as_ref()
+                .map(|(command, pointer)| (command.as_str(), *pointer)),
+        )
+    })
+    .await
+    .map_err(|error| KitError::Task(error.to_string()))??;
+    write_atomic(destination, patched).await
+}
+
 #[cfg(test)]
 mod tests {
     use legacy_ios_image::{Img3, Img3Element, Img3Tag};

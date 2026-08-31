@@ -678,6 +678,18 @@ enum ImageCommand {
         #[arg(long)]
         yes: bool,
     },
+    /// Patch a decrypted 32-bit iBoot/iBSS/iBEC image.
+    PatchIboot32 {
+        source: PathBuf,
+        destination: PathBuf,
+        #[arg(long)]
+        boot_args: Option<String>,
+        /// Redirect a recovery console command handler: `--cmd-handler ticket=0x80000000`.
+        #[arg(long, value_name = "CMD=PTR")]
+        cmd_handler: Option<String>,
+        #[arg(long)]
+        yes: bool,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -1579,6 +1591,29 @@ async fn main() -> Result<()> {
                 kit.replace_image_payload(source, payload, destination, image_cipher(key, iv)?)
                     .await?;
                 write_status(output, "replaced-image-payload")?;
+            }
+            ImageCommand::PatchIboot32 {
+                source,
+                destination,
+                boot_args,
+                cmd_handler,
+                yes,
+            } => {
+                confirm("write the patched iBoot image", yes)?;
+                let handler = cmd_handler
+                    .map(|value| {
+                        let (command, pointer) = value
+                            .split_once('=')
+                            .ok_or_else(|| anyhow!("command handler must use CMD=PTR"))?;
+                        let pointer = parse_integer(pointer)
+                            .map_err(|error| anyhow!("invalid handler pointer: {error}"))?
+                            as u32;
+                        Ok::<_, anyhow::Error>((command.to_owned(), pointer))
+                    })
+                    .transpose()?;
+                kit.patch_iboot32(source, destination, boot_args, handler)
+                    .await?;
+                write_status(output, "patched-iboot32")?;
             }
         },
         Command::Firmware {

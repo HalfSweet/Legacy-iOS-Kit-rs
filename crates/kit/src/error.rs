@@ -34,6 +34,8 @@ pub enum KitError {
     Hfs(#[from] legacy_ios_image::HfsError),
     #[error("image payload operation failed: {0}")]
     ImagePayload(#[from] legacy_ios_image::ImagePayloadError),
+    #[error("iBoot patch failed: {0}")]
+    IbootPatch(#[from] legacy_ios_image::IbootPatchError),
     #[error("signing ticket operation failed: {0}")]
     Ticket(#[from] legacy_ios_firmware::TicketError),
     #[error("restore execution ticket does not match the plan ticket policy")]
@@ -121,6 +123,7 @@ impl KitError {
             | Self::Patch(_)
             | Self::Hfs(_)
             | Self::ImagePayload(_)
+            | Self::IbootPatch(_)
             | Self::Ticket(_)
             | Self::TicketPolicyMismatch
             | Self::MissingSigningDeviceInfo(_) => OperationPhase::Personalizing,
@@ -180,6 +183,7 @@ impl KitError {
             | Self::Patch(_)
             | Self::Hfs(_)
             | Self::ImagePayload(_)
+            | Self::IbootPatch(_)
             | Self::Ticket(_)
             | Self::TicketPolicyMismatch
             | Self::MissingSigningDeviceInfo(_)

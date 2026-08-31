@@ -221,6 +221,24 @@ impl LegacyIosKit {
         image_payload::replace(source.into(), payload.into(), destination.into(), cipher).await
     }
 
+    /// Patch a decrypted 32-bit iBoot/iBSS/iBEC image (RSA check removal,
+    /// debug-enabled, optional boot-args and command handler override).
+    pub async fn patch_iboot32(
+        &self,
+        source: impl Into<std::path::PathBuf>,
+        destination: impl Into<std::path::PathBuf>,
+        boot_args: Option<String>,
+        command_handler: Option<(String, u32)>,
+    ) -> Result<(), KitError> {
+        image_payload::patch_iboot32(
+            source.into(),
+            destination.into(),
+            boot_args,
+            command_handler,
+        )
+        .await
+    }
+
     pub fn convert_onboard_dump(&self, dump: &[u8]) -> Result<SigningTicket, KitError> {
         let ticket = legacy_ios_image::OnboardTicket::parse(dump)?;
         Ok(SigningTicket::from_img4_ticket(
