@@ -6,8 +6,9 @@ use tokio::io::{AsyncRead, AsyncWrite};
 use tracing::{debug, warn};
 
 use crate::{
-    AsrError, DispatchAction, PreparedRestoreData, RestoreDispatchError, RestoreOptions,
-    RestoredClient, RestoredConnectError, RestoredError, RestoredMessage, RestoredSession,
+    AsrError, DataRequest, DispatchAction, PreparedRestoreData, RestoreDispatchError,
+    RestoreOptions, RestoredClient, RestoredConnectError, RestoredError, RestoredMessage,
+    RestoredSession,
 };
 
 pub async fn run_restored_session<F, Fut, P>(
@@ -22,13 +23,38 @@ where
     Fut: Future<Output = Result<(), RestoreRunError>>,
     P: FnMut(RestoreProgress),
 {
+    let dispatch = |request: DataRequest| {
+        std::future::ready(
+            prepared
+                .dispatch(request.data_type())
+                .map_err(RestoreRunError::from),
+        )
+    };
+    run_restored_session_with_dispatcher(session, options, dispatch, send_system_image, progress)
+        .await
+}
+
+pub async fn run_restored_session_with_dispatcher<F, Fut, R, RFut, P>(
+    session: &mut RestoredSession,
+    options: &RestoreOptions,
+    dispatch: R,
+    send_system_image: F,
+    progress: P,
+) -> Result<RestoreOutcome, RestoreRunError>
+where
+    F: FnMut(Option<u16>) -> Fut,
+    Fut: Future<Output = Result<(), RestoreRunError>>,
+    R: FnMut(DataRequest) -> RFut,
+    RFut: Future<Output = Result<DispatchAction, RestoreRunError>>,
+    P: FnMut(RestoreProgress),
+{
     let protocol_version = session.protocol_version();
     let data = session.data_connector();
-    run_restored_with_data_ports(
+    run_restored_with_dispatcher(
         session.client_mut(),
         options,
         protocol_version,
-        prepared,
+        dispatch,
         send_system_image,
         move |port, response| {
             let data = data.clone();
@@ -56,11 +82,18 @@ where
     Fut: Future<Output = Result<(), RestoreRunError>>,
     P: FnMut(RestoreProgress),
 {
-    run_restored_with_data_ports(
+    let dispatch = |request: DataRequest| {
+        std::future::ready(
+            prepared
+                .dispatch(request.data_type())
+                .map_err(RestoreRunError::from),
+        )
+    };
+    run_restored_with_dispatcher(
         client,
         options,
         protocol_version,
-        prepared,
+        dispatch,
         send_system_image,
         |_port, _response| async { Err(RestoreRunError::DataPortNotConfigured) },
         progress,
@@ -73,6 +106,42 @@ pub async fn run_restored_with_data_ports<S, F, Fut, D, DFut, P>(
     options: &RestoreOptions,
     protocol_version: u64,
     prepared: &PreparedRestoreData,
+    send_system_image: F,
+    send_data_response: D,
+    progress: P,
+) -> Result<RestoreOutcome, RestoreRunError>
+where
+    S: AsyncRead + AsyncWrite + Unpin,
+    F: FnMut(Option<u16>) -> Fut,
+    Fut: Future<Output = Result<(), RestoreRunError>>,
+    D: FnMut(u16, Dictionary) -> DFut,
+    DFut: Future<Output = Result<(), RestoreRunError>>,
+    P: FnMut(RestoreProgress),
+{
+    let dispatch = |request: DataRequest| {
+        std::future::ready(
+            prepared
+                .dispatch(request.data_type())
+                .map_err(RestoreRunError::from),
+        )
+    };
+    run_restored_with_dispatcher(
+        client,
+        options,
+        protocol_version,
+        dispatch,
+        send_system_image,
+        send_data_response,
+        progress,
+    )
+    .await
+}
+
+pub async fn run_restored_with_dispatcher<S, F, Fut, D, DFut, R, RFut, P>(
+    client: &mut RestoredClient<S>,
+    options: &RestoreOptions,
+    protocol_version: u64,
+    mut dispatch: R,
     mut send_system_image: F,
     mut send_data_response: D,
     mut progress: P,
@@ -83,6 +152,8 @@ where
     Fut: Future<Output = Result<(), RestoreRunError>>,
     D: FnMut(u16, Dictionary) -> DFut,
     DFut: Future<Output = Result<(), RestoreRunError>>,
+    R: FnMut(DataRequest) -> RFut,
+    RFut: Future<Output = Result<DispatchAction, RestoreRunError>>,
     P: FnMut(RestoreProgress),
 {
     client
@@ -92,10 +163,11 @@ where
     loop {
         match client.next_message().await? {
             RestoredMessage::DataRequest(request) => {
-                match prepared.dispatch(request.data_type())? {
-                    DispatchAction::SystemImage => send_system_image(request.data_port()).await?,
+                let data_port = request.data_port();
+                match dispatch(request).await? {
+                    DispatchAction::SystemImage => send_system_image(data_port).await?,
                     DispatchAction::Send(response) => {
-                        if let Some(port) = request.data_port() {
+                        if let Some(port) = data_port {
                             send_data_response(port, response).await?;
                         } else {
                             client.send(&response).await?;
