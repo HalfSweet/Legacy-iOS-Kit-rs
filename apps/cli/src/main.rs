@@ -12,11 +12,14 @@ use clap::{ArgAction, Parser, Subcommand, ValueEnum};
 use legacy_ios_kit::{
     AfcPath, AppFilter, BackupOptions, BackupOutcome, BackupRestoreOptions, BasebandPolicy,
     BoardConfig, DeviceDiagnostics, DeviceFileInfo, DeviceInventory, DeviceStorageInfo,
-    DeviceSummary, Ecid, ExploitPolicy, FirmwareSummary, InstalledApp, LegacyIosKit, ProductType,
-    RecoveryDeviceInfo, RecoveryUploadResult, RemoteFirmwareSummary, RestoreBehavior, RestorePlan,
-    RestoreRequest, SepPolicy, ShshRequest, ShshSummary, TicketPolicy, Udid,
+    DeviceSummary, Ecid, ExploitPolicy, FirmwareSummary, InstalledApp, LegacyIosKit,
+    OperationEvent, OperationHandle, OperationOutcome, ProductType, RecoveryDeviceInfo,
+    RecoveryUploadResult, RemoteFirmwareSummary, RestoreBehavior, RestoreExecutionRequest,
+    RestorePlan, RestoreRequest, SepPolicy, ShshRequest, ShshSummary, SigningTicket, TicketPolicy,
+    Udid,
 };
 use tracing::level_filters::LevelFilter;
+use tracing::{debug, info, warn};
 
 use config::AppConfig;
 
@@ -297,6 +300,29 @@ enum RestoreCommand {
         sep: Option<PathBuf>,
         #[arg(long, value_enum, default_value_t = ExploitArg::Auto)]
         exploit: ExploitArg,
+    },
+    /// Execute a previously modeled restore using a provided ticket.
+    Execute {
+        #[arg(long)]
+        device: ProductType,
+        #[arg(long)]
+        board: BoardConfig,
+        #[arg(long)]
+        ecid: Ecid,
+        #[arg(long)]
+        firmware: PathBuf,
+        #[arg(long)]
+        ticket: PathBuf,
+        #[arg(long)]
+        work_dir: Option<PathBuf>,
+        #[arg(long, value_enum, default_value_t = RestoreBehaviorArg::Erase)]
+        behavior: RestoreBehaviorArg,
+        #[arg(long, value_enum, default_value_t = ExploitArg::AlreadyPwned)]
+        exploit: ExploitArg,
+        #[arg(long)]
+        flash_version_1: bool,
+        #[arg(long)]
+        yes: bool,
     },
 }
 
@@ -774,6 +800,47 @@ async fn main() -> Result<()> {
                 .context("failed to resolve restore plan")?;
             write_restore_plan(output, &plan)?;
         }
+        Command::Restore {
+            command:
+                RestoreCommand::Execute {
+                    device,
+                    board,
+                    ecid,
+                    firmware,
+                    ticket,
+                    work_dir,
+                    behavior,
+                    exploit,
+                    flash_version_1,
+                    yes,
+                },
+        } => {
+            let device = kit.resolve_device_identity(device, board)?.with_ecid(ecid);
+            let plan = kit.plan_restore(RestoreRequest {
+                device,
+                firmware,
+                behavior: behavior.into(),
+                ticket: TicketPolicy::Provided(ticket.clone()),
+                baseband: BasebandPolicy::None,
+                sep: SepPolicy::Auto,
+                exploit: exploit.into(),
+            })?;
+            confirm(
+                &format!(
+                    "erase/restore the selected device with plan {}",
+                    plan.id().as_str()
+                ),
+                yes,
+            )?;
+            let consent = plan.confirm_destructive();
+            let ticket = SigningTicket::open(&ticket).context("failed to read signing ticket")?;
+            let work_directory = work_dir
+                .or_else(|| config.storage.work_dir.clone())
+                .unwrap_or_else(|| std::env::temp_dir().join("legacy-ios-kit"));
+            let request = RestoreExecutionRequest::new(plan, consent, ticket, work_directory)
+                .with_flash_version_1(flash_version_1);
+            consume_operation(output, kit.execute_restore(request)).await?;
+        }
         Command::Shsh {
             command:
                 ShshCommand::Save {
@@ -848,6 +915,71 @@ fn write_config(format: OutputFormat, config: &AppConfig) -> Result<()> {
             writeln!(output)?;
         }
         OutputFormat::Human => write!(output, "{}", toml::to_string_pretty(config)?)?,
+    }
+    Ok(())
+}
+
+async fn consume_operation(format: OutputFormat, mut handle: OperationHandle) -> Result<()> {
+    let mut cancellation_requested = false;
+    loop {
+        tokio::select! {
+            event = handle.next_event() => {
+                let Some(event) = event else {
+                    return if cancellation_requested {
+                        Err(anyhow!("operation cancelled"))
+                    } else {
+                        Err(anyhow!("operation ended without a result"))
+                    };
+                };
+                match event? {
+                    OperationEvent::PhaseStarted { phase, cancellation } => {
+                        info!(?phase, ?cancellation, "operation phase started");
+                    }
+                    OperationEvent::Progress(progress) => {
+                        debug!(
+                            phase = ?progress.phase,
+                            completed = progress.completed,
+                            total = progress.total,
+                            unit = ?progress.unit,
+                            "operation progress"
+                        );
+                    }
+                    OperationEvent::ModeChanged { mode } => info!(?mode, "device mode changed"),
+                    OperationEvent::DeviceDisconnected => info!("device disconnected"),
+                    OperationEvent::DeviceReconnected { device } => {
+                        info!(mode = ?device.mode(), "device reconnected");
+                    }
+                    OperationEvent::ActionRequired { action, .. } => {
+                        warn!(?action, "operation requires user action");
+                    }
+                    OperationEvent::Warning { message } => warn!(message, "operation warning"),
+                    OperationEvent::CancellationDeferred { phase } => {
+                        warn!(?phase, "cancellation deferred until safe point");
+                    }
+                    OperationEvent::Completed { outcome } => {
+                        return write_operation_outcome(format, &outcome);
+                    }
+                }
+            }
+            result = tokio::signal::ctrl_c(), if !cancellation_requested => {
+                result.context("failed to listen for Ctrl-C")?;
+                cancellation_requested = true;
+                handle.cancel();
+                warn!("cancellation requested");
+            }
+        }
+    }
+}
+
+fn write_operation_outcome(format: OutputFormat, outcome: &OperationOutcome) -> Result<()> {
+    let stdout = io::stdout();
+    let mut output = stdout.lock();
+    match format {
+        OutputFormat::Json => {
+            serde_json::to_writer(&mut output, outcome)?;
+            writeln!(output)?;
+        }
+        OutputFormat::Human => writeln!(output, "{}", outcome.summary)?,
     }
     Ok(())
 }
