@@ -11,6 +11,7 @@ mod image_payload;
 mod lease;
 mod operation;
 mod pairing;
+mod ramdisk;
 mod recovery;
 mod restore_execution;
 mod shsh;
@@ -47,6 +48,7 @@ pub use legacy_ios_workflows::{
 };
 pub use operation::OperationHandle;
 pub use pairing::PairingStore;
+pub use ramdisk::{RamdiskBuildRequest, RamdiskBuildSummary};
 pub use recovery::{RecoveryDevice, RecoveryManager, RecoveryUploadResult};
 pub use restore_execution::RestoreExecutionRequest;
 pub use shsh::{ShshRequest, ShshSummary};
@@ -182,6 +184,13 @@ impl LegacyIosKit {
         request: CustomRootfsRequest,
     ) -> Result<FirmwareSummary, KitError> {
         firmware::build_custom_rootfs(request).await
+    }
+
+    pub async fn build_ramdisk(
+        &self,
+        request: RamdiskBuildRequest,
+    ) -> Result<RamdiskBuildSummary, KitError> {
+        ramdisk::build(request).await
     }
 
     pub async fn extract_image_payload(

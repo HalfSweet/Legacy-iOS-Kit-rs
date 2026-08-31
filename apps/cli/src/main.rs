@@ -15,10 +15,10 @@ use legacy_ios_kit::{
     DeviceFileInfo, DeviceInventory, DeviceStorageInfo, DeviceSummary, DmgFirmwareKey, Ecid,
     ExploitPolicy, FirmwareSummary, HfsEntrySummary, HfsMutation, HfsStatSummary, HostKeyPolicy,
     ImageCipher, InstalledApp, LegacyIosKit, OperationEvent, OperationHandle, OperationOutcome,
-    ProductType, RamdiskSsh, RecoveryDeviceInfo, RecoveryUploadResult, RemoteFirmwareSummary,
-    ResourceId, RestoreBehavior, RestoreExecutionRequest, RestorePlan, RestoreRequest, ScpPath,
-    SepPolicy, ShshRequest, ShshSummary, SigningTicket, SshCommandOutput, SshPassword, SshTarget,
-    TicketPolicy, Udid,
+    ProductType, RamdiskBuildRequest, RamdiskBuildSummary, RamdiskSsh, RecoveryDeviceInfo,
+    RecoveryUploadResult, RemoteFirmwareSummary, ResourceId, RestoreBehavior,
+    RestoreExecutionRequest, RestorePlan, RestoreRequest, ScpPath, SepPolicy, ShshRequest,
+    ShshSummary, SigningTicket, SshCommandOutput, SshPassword, SshTarget, TicketPolicy, Udid,
 };
 use tracing::level_filters::LevelFilter;
 use tracing::{debug, info, warn};
@@ -79,6 +79,31 @@ enum Command {
 
 #[derive(Debug, Subcommand)]
 enum RamdiskCommand {
+    /// Build a patched RestoreRamDisk component from an IPSW identity.
+    Build {
+        firmware: PathBuf,
+        destination: PathBuf,
+        #[arg(long)]
+        board: BoardConfig,
+        #[arg(long, value_enum, default_value_t = RestoreBehaviorArg::Erase)]
+        behavior: RestoreBehaviorArg,
+        #[arg(long, requires = "iv")]
+        key: Option<String>,
+        #[arg(long, requires = "key")]
+        iv: Option<String>,
+        #[arg(long)]
+        grow: Option<usize>,
+        #[arg(long = "add", value_name = "HFS_PATH=FILE")]
+        additions: Vec<String>,
+        #[arg(long = "remove", value_name = "HFS_PATH")]
+        removals: Vec<String>,
+        #[arg(long)]
+        recursive: bool,
+        #[arg(long = "tar", value_name = "ARCHIVE")]
+        archives: Vec<PathBuf>,
+        #[arg(long)]
+        yes: bool,
+    },
     /// Execute a command over SSH through the system USB mux.
     Ssh {
         #[arg(long)]
@@ -1687,6 +1712,61 @@ async fn main() -> Result<()> {
         }
         Command::Ramdisk {
             command:
+                RamdiskCommand::Build {
+                    firmware,
+                    destination,
+                    board,
+                    behavior,
+                    key,
+                    iv,
+                    grow,
+                    additions,
+                    removals,
+                    recursive,
+                    archives,
+                    yes,
+                },
+        } => {
+            confirm("write the patched restore ramdisk", yes)?;
+            let mut mutations = Vec::new();
+            if let Some(size) = grow {
+                mutations.push(HfsMutation::Grow { size });
+            }
+            for addition in additions {
+                let (path, file) = addition
+                    .split_once('=')
+                    .ok_or_else(|| anyhow!("ramdisk addition must use HFS_PATH=FILE"))?;
+                let file = PathBuf::from(file);
+                mutations.push(HfsMutation::AddFile {
+                    path: path.to_owned(),
+                    data: tokio::fs::read(&file)
+                        .await
+                        .with_context(|| format!("failed to read {}", file.display()))?,
+                });
+            }
+            for path in removals {
+                mutations.push(HfsMutation::Remove { path, recursive });
+            }
+            for archive in archives {
+                mutations.push(HfsMutation::Untar {
+                    archive: tokio::fs::read(&archive)
+                        .await
+                        .with_context(|| format!("failed to read {}", archive.display()))?,
+                });
+            }
+            let mut request =
+                RamdiskBuildRequest::new(firmware, destination, board, behavior.into(), mutations);
+            if let Some(cipher) = image_cipher(key, iv)? {
+                request = request.with_cipher(cipher);
+            }
+            let summary = kit
+                .build_ramdisk(request)
+                .await
+                .context("failed to build restore ramdisk")?;
+            write_ramdisk_build(output, &summary)?;
+        }
+        Command::Ramdisk {
+            command:
                 RamdiskCommand::Ssh {
                     device_id,
                     username,
@@ -2099,6 +2179,23 @@ fn write_hfs_stat(format: OutputFormat, stat: &HfsStatSummary) -> Result<()> {
             writeln!(output, "Owner: {}", stat.owner())?;
             writeln!(output, "Group: {}", stat.group())?;
             writeln!(output, "Mode: {:06o}", stat.mode())?;
+        }
+    }
+    Ok(())
+}
+
+fn write_ramdisk_build(format: OutputFormat, summary: &RamdiskBuildSummary) -> Result<()> {
+    let stdout = io::stdout();
+    let mut output = stdout.lock();
+    match format {
+        OutputFormat::Json => {
+            serde_json::to_writer_pretty(&mut output, summary)?;
+            writeln!(output)?;
+        }
+        OutputFormat::Human => {
+            writeln!(output, "Component: {}", summary.component_path())?;
+            writeln!(output, "Destination: {}", summary.destination().display())?;
+            writeln!(output, "Size: {}", summary.size())?;
         }
     }
     Ok(())

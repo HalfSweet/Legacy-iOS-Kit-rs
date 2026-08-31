@@ -22,11 +22,11 @@ impl ImageCipher {
         Ok(Self { key, iv })
     }
 
-    fn key(&self) -> &[u8] {
+    pub(crate) fn key(&self) -> &[u8] {
         &self.key
     }
 
-    fn iv(&self) -> &[u8] {
+    pub(crate) fn iv(&self) -> &[u8] {
         &self.iv
     }
 }
