@@ -13,9 +13,9 @@ use legacy_ios_kit::{
     AfcPath, AppFilter, BackupOptions, BackupOutcome, BackupRestoreOptions, BasebandPolicy,
     BoardConfig, DeviceDiagnostics, DeviceFileInfo, DeviceInventory, DeviceStorageInfo,
     DeviceSummary, Ecid, ExploitPolicy, FirmwareSummary, HostKeyPolicy, InstalledApp, LegacyIosKit,
-    OperationEvent, OperationHandle, OperationOutcome, ProductType, RecoveryDeviceInfo,
+    OperationEvent, OperationHandle, OperationOutcome, ProductType, RamdiskSsh, RecoveryDeviceInfo,
     RecoveryUploadResult, RemoteFirmwareSummary, RestoreBehavior, RestoreExecutionRequest,
-    RestorePlan, RestoreRequest, SepPolicy, ShshRequest, ShshSummary, SigningTicket,
+    RestorePlan, RestoreRequest, ScpPath, SepPolicy, ShshRequest, ShshSummary, SigningTicket,
     SshCommandOutput, SshPassword, SshTarget, TicketPolicy, Udid,
 };
 use tracing::level_filters::LevelFilter;
@@ -86,6 +86,32 @@ enum RamdiskCommand {
         host_key: Option<String>,
         #[arg(required = true, num_args = 1.., trailing_var_arg = true)]
         command: Vec<String>,
+    },
+    /// Copy a host file into the ramdisk over SCP.
+    Push {
+        source: PathBuf,
+        destination: ScpPath,
+        #[arg(long)]
+        device_id: Option<u32>,
+        #[arg(long, default_value = "root")]
+        username: String,
+        #[arg(long)]
+        host_key: Option<String>,
+        #[arg(long)]
+        yes: bool,
+    },
+    /// Copy a ramdisk file to the host over SCP.
+    Pull {
+        source: ScpPath,
+        destination: PathBuf,
+        #[arg(long)]
+        device_id: Option<u32>,
+        #[arg(long, default_value = "root")]
+        username: String,
+        #[arg(long)]
+        host_key: Option<String>,
+        #[arg(long, default_value_t = 1024 * 1024 * 1024)]
+        max_size: u64,
     },
 }
 
@@ -894,23 +920,7 @@ async fn main() -> Result<()> {
                     command,
                 },
         } => {
-            let password = SshPassword::new(
-                rpassword::prompt_password("SSH password: ")
-                    .context("failed to read SSH password")?,
-            );
-            let target = device_id.map_or(SshTarget::OnlyUsbDevice, SshTarget::DeviceId);
-            let host_key = host_key.map_or_else(
-                || {
-                    warn!("accepting ephemeral ramdisk SSH host key");
-                    HostKeyPolicy::AcceptEphemeral
-                },
-                HostKeyPolicy::Sha256,
-            );
-            let ssh = kit
-                .devices()
-                .ramdisk_ssh(target, &username, &password, host_key)
-                .await
-                .context("failed to connect to ramdisk SSH")?;
+            let ssh = connect_ramdisk_ssh(&kit, device_id, &username, host_key).await?;
             let result = ssh
                 .execute(&command.join(" "))
                 .await
@@ -923,6 +933,45 @@ async fn main() -> Result<()> {
                     result.exit_status()
                 ));
             }
+        }
+        Command::Ramdisk {
+            command:
+                RamdiskCommand::Push {
+                    source,
+                    destination,
+                    device_id,
+                    username,
+                    host_key,
+                    yes,
+                },
+        } => {
+            confirm("write the ramdisk file", yes)?;
+            let data = tokio::fs::read(&source)
+                .await
+                .with_context(|| format!("failed to read {}", source.display()))?;
+            let ssh = connect_ramdisk_ssh(&kit, device_id, &username, host_key).await?;
+            ssh.upload(&destination, &data).await?;
+            ssh.disconnect().await?;
+            write_status(output, "pushed-ramdisk-file")?;
+        }
+        Command::Ramdisk {
+            command:
+                RamdiskCommand::Pull {
+                    source,
+                    destination,
+                    device_id,
+                    username,
+                    host_key,
+                    max_size,
+                },
+        } => {
+            let ssh = connect_ramdisk_ssh(&kit, device_id, &username, host_key).await?;
+            let data = ssh.download(&source, max_size).await?;
+            ssh.disconnect().await?;
+            tokio::fs::write(&destination, data)
+                .await
+                .with_context(|| format!("failed to write {}", destination.display()))?;
+            write_status(output, "pulled-ramdisk-file")?;
         }
         Command::Shsh {
             command:
@@ -955,6 +1004,29 @@ async fn main() -> Result<()> {
         }
     }
     Ok(())
+}
+
+async fn connect_ramdisk_ssh(
+    kit: &LegacyIosKit,
+    device_id: Option<u32>,
+    username: &str,
+    host_key: Option<String>,
+) -> Result<RamdiskSsh> {
+    let password = SshPassword::new(
+        rpassword::prompt_password("SSH password: ").context("failed to read SSH password")?,
+    );
+    let target = device_id.map_or(SshTarget::OnlyUsbDevice, SshTarget::DeviceId);
+    let host_key = host_key.map_or_else(
+        || {
+            warn!("accepting ephemeral ramdisk SSH host key");
+            HostKeyPolicy::AcceptEphemeral
+        },
+        HostKeyPolicy::Sha256,
+    );
+    kit.devices()
+        .ramdisk_ssh(target, username, &password, host_key)
+        .await
+        .context("failed to connect to ramdisk SSH")
 }
 
 fn parse_integer(value: &str) -> Result<u64, String> {
