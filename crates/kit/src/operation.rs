@@ -38,6 +38,7 @@ impl OperationHandle {
     }
 }
 
+#[derive(Clone)]
 pub(crate) struct OperationEmitter {
     events: mpsc::Sender<Result<OperationEvent, KitError>>,
     cancellation: CancellationToken,
@@ -50,6 +51,14 @@ impl OperationEmitter {
 
     pub(crate) fn is_cancelled(&self) -> bool {
         self.cancellation.is_cancelled()
+    }
+
+    pub(crate) fn try_emit(&self, event: OperationEvent) {
+        let _ = self.events.try_send(Ok(event));
+    }
+
+    pub(crate) async fn fail(&self, error: KitError) {
+        let _ = self.events.send(Err(error)).await;
     }
 }
 

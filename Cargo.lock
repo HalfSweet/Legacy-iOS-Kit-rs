@@ -1011,6 +1011,7 @@ dependencies = [
  "legacy-ios-core",
  "legacy-ios-exploits",
  "legacy-ios-firmware",
+ "legacy-ios-restore",
  "legacy-ios-services",
  "legacy-ios-transport",
  "legacy-ios-workflows",

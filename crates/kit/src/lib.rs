@@ -8,6 +8,7 @@ mod firmware;
 mod lease;
 mod operation;
 mod recovery;
+mod restore_execution;
 mod shsh;
 
 pub use device::{
@@ -21,7 +22,7 @@ pub use legacy_ios_core::{
     DeviceSelector, DeviceSnapshot, Ecid, IosVersion, OperationEvent, OperationId, ProductType,
     Recoverability, Soc, Udid,
 };
-pub use legacy_ios_firmware::RestoreBehavior;
+pub use legacy_ios_firmware::{RestoreBehavior, SigningTicket, TicketError};
 pub use legacy_ios_services::{
     AfcPath, AfcPathError, AppFilter, BackupOptions, BackupOutcome, BackupRestoreOptions,
     DeviceFileInfo, DeviceFileKind, DeviceFiles, DeviceStorageInfo, DeviceSyslog, InstalledApp,
@@ -33,6 +34,7 @@ pub use legacy_ios_workflows::{
 };
 pub use operation::OperationHandle;
 pub use recovery::{RecoveryDevice, RecoveryManager, RecoveryUploadResult};
+pub use restore_execution::RestoreExecutionRequest;
 pub use shsh::{ShshRequest, ShshSummary};
 
 #[derive(Clone, Debug, Default)]
@@ -99,6 +101,10 @@ impl LegacyIosKit {
 
     pub fn plan_restore(&self, request: RestoreRequest) -> Result<RestorePlan, KitError> {
         Ok(RestorePlan::resolve(request)?)
+    }
+
+    pub fn execute_restore(&self, request: RestoreExecutionRequest) -> OperationHandle {
+        restore_execution::spawn(self.devices.clone(), self.leases.clone(), request)
     }
 
     pub async fn save_shsh(

@@ -1,6 +1,9 @@
 use futures_util::StreamExt;
 use legacy_ios_assets::DeviceDatabase;
-use legacy_ios_core::{BoardConfig, ConnectionId, DeviceMode, Ecid, ProductType, Soc, Udid};
+use legacy_ios_core::{
+    BoardConfig, CapabilitySet, ConnectionId, DeviceIdentity, DeviceMode, DeviceSnapshot, Ecid,
+    ProductType, Soc, Udid,
+};
 use legacy_ios_services::SystemMux;
 use legacy_ios_services::{
     AppFilter, BackupOptions, BackupOutcome, BackupRestoreOptions, DeviceFiles, DeviceSyslog,
@@ -327,6 +330,30 @@ impl DeviceSummary {
 
     pub fn build_version(&self) -> Option<&str> {
         self.build_version.as_deref()
+    }
+
+    pub(crate) fn snapshot(&self) -> Option<DeviceSnapshot> {
+        let product_type = self.product_type.clone()?;
+        let soc = self.soc?;
+        let mut identity = DeviceIdentity::new(product_type.clone(), soc);
+        if let Some(board_config) = &self.board_config {
+            identity = identity.with_board_config(board_config.clone());
+        }
+        if let Some(ecid) = self.ecid {
+            identity = identity.with_ecid(ecid);
+        }
+        if let Some(udid) = &self.udid {
+            identity = identity.with_udid(udid.clone());
+        }
+        let capabilities = DeviceDatabase::bundled()
+            .find_product(&product_type)
+            .map_or_else(CapabilitySet::default, |profile| profile.capabilities());
+        Some(DeviceSnapshot::new(
+            identity,
+            self.mode,
+            self.connection_id.clone(),
+            capabilities,
+        ))
     }
 }
 

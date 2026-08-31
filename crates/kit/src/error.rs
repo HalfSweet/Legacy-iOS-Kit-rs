@@ -20,12 +20,22 @@ pub enum KitError {
     Plist(#[from] plist::Error),
     #[error("restore planning failed: {0}")]
     RestorePlan(#[from] legacy_ios_workflows::RestorePlanError),
+    #[error("restore preparation failed: {0}")]
+    RestorePreparation(#[from] legacy_ios_workflows::RestorePreparationError),
+    #[error("restore execution failed: {0}")]
+    RestoreExecution(#[from] legacy_ios_workflows::RestoreExecutionError),
     #[error("Recovery/DFU operation failed: {0}")]
     Recovery(#[from] legacy_ios_transport::RecoveryError),
     #[error("bootrom exploit failed: {0}")]
     Limera1n(#[from] legacy_ios_exploits::Limera1nError),
     #[error("host I/O failed: {0}")]
     Io(#[from] std::io::Error),
+    #[error("worker task failed: {0}")]
+    Task(String),
+    #[error("timed out waiting for the restored device to return to normal mode")]
+    VerificationTimeout,
+    #[error("restored device version mismatch: expected {expected}, got {actual}")]
+    VersionMismatch { expected: String, actual: String },
     #[error("unknown product type {0}")]
     UnknownProduct(legacy_ios_core::ProductType),
     #[error("board config {board_config} does not belong to {product_type}")]
@@ -45,6 +55,7 @@ impl KitError {
             Self::Firmware(_)
             | Self::RemoteFirmware(_)
             | Self::RestorePlan(_)
+            | Self::RestorePreparation(_)
             | Self::UnknownProduct(_)
             | Self::UnknownBoardConfig { .. }
             | Self::MissingDeviceSelector => OperationPhase::Planning,
@@ -53,8 +64,12 @@ impl KitError {
                 OperationPhase::Preflight
             }
             Self::Backup(_) => OperationPhase::TransferringFilesystem,
+            Self::RestoreExecution(_) => OperationPhase::Restoring,
             Self::Recovery(_) => OperationPhase::Booting,
             Self::Limera1n(_) => OperationPhase::Exploiting,
+            Self::Task(_) | Self::VerificationTimeout | Self::VersionMismatch { .. } => {
+                OperationPhase::Verifying
+            }
         }
     }
 
@@ -65,11 +80,15 @@ impl KitError {
             }
             Self::Signing(_) | Self::Io(_) => Recoverability::RetryImmediately,
             Self::Recovery(_) | Self::Limera1n(_) => Recoverability::ReenterDfu,
-            Self::Plist(_) => Recoverability::RestartOperation,
-            Self::Backup(_) => Recoverability::RestartOperation,
+            Self::Plist(_) | Self::Backup(_) | Self::RestoreExecution(_) | Self::Task(_) => {
+                Recoverability::RestartOperation
+            }
+            Self::VerificationTimeout => Recoverability::ReconnectDevice,
+            Self::VersionMismatch { .. } => Recoverability::ManualRecoveryRequired,
             Self::Firmware(_)
             | Self::RemoteFirmware(_)
             | Self::RestorePlan(_)
+            | Self::RestorePreparation(_)
             | Self::UnknownProduct(_)
             | Self::UnknownBoardConfig { .. }
             | Self::MissingDeviceSelector => Recoverability::NotRecoverable,
