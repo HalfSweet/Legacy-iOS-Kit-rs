@@ -228,6 +228,34 @@ impl RamdiskSsh {
         }
     }
 
+    pub async fn read_prefix(
+        &self,
+        source: &ScpPath,
+        block_size: u32,
+        count: u32,
+    ) -> Result<Vec<u8>, SshError> {
+        if block_size == 0 || count == 0 {
+            return Err(SshError::InvalidReadSize);
+        }
+        let expected = u64::from(block_size) * u64::from(count);
+        let result = self
+            .execute(&format!(
+                "dd if={} bs={block_size} count={count} 2>/dev/null",
+                shell_quote(source.as_str())
+            ))
+            .await?;
+        if !result.success() {
+            return Err(SshError::RemoteCommand(result.exit_status));
+        }
+        if result.stdout.len() as u64 > expected {
+            return Err(SshError::ScpFileTooLarge {
+                size: result.stdout.len() as u64,
+                maximum: expected,
+            });
+        }
+        Ok(result.stdout)
+    }
+
     pub async fn disconnect(&self) -> Result<(), SshError> {
         self.session
             .disconnect(Disconnect::ByApplication, "", "English")
@@ -377,6 +405,10 @@ pub enum SshError {
     Scp(String),
     #[error("SCP file is {size} bytes, exceeding {maximum}")]
     ScpFileTooLarge { size: u64, maximum: u64 },
+    #[error("SSH remote command failed with status {0:?}")]
+    RemoteCommand(Option<u32>),
+    #[error("SSH block read size must be non-zero")]
+    InvalidReadSize,
     #[error("SSH I/O failed: {0}")]
     Io(#[from] std::io::Error),
     #[error(transparent)]
