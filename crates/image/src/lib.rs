@@ -12,6 +12,7 @@ mod img4;
 mod mbn;
 mod onboard;
 mod patch;
+mod payload;
 
 pub use crypto::{CryptoError, decrypt_cbc, encrypt_cbc};
 pub use dmg::{
@@ -20,7 +21,8 @@ pub use dmg::{
 pub use fls::{FlsError, FlsFile};
 pub use hfs::{HfsEntry, HfsEntryKind, HfsError, HfsImage, HfsStat};
 pub use img3::{Img3, Img3Element, Img3Error, Img3Tag};
-pub use img4::{Img4Error, personalize_img4};
+pub use img4::{Img4Error, extract_im4p_payload, personalize_img4, replace_im4p_payload};
 pub use mbn::{MbnError, MbnFile, MbnFormat};
 pub use onboard::{OnboardTicket, OnboardTicketError};
 pub use patch::{PatchError, apply_bsdiff};
+pub use payload::{ImagePayloadError, extract_image_payload, replace_image_payload};

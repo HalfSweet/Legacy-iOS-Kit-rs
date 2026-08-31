@@ -14,10 +14,10 @@ use legacy_ios_kit::{
     BackupRestoreOptions, BasebandPolicy, BoardConfig, CustomRootfsRequest, DeviceDiagnostics,
     DeviceFileInfo, DeviceInventory, DeviceStorageInfo, DeviceSummary, DmgFirmwareKey, Ecid,
     ExploitPolicy, FirmwareSummary, HfsEntrySummary, HfsMutation, HfsStatSummary, HostKeyPolicy,
-    InstalledApp, LegacyIosKit, OperationEvent, OperationHandle, OperationOutcome, ProductType,
-    RamdiskSsh, RecoveryDeviceInfo, RecoveryUploadResult, RemoteFirmwareSummary, ResourceId,
-    RestoreBehavior, RestoreExecutionRequest, RestorePlan, RestoreRequest, ScpPath, SepPolicy,
-    ShshRequest, ShshSummary, SigningTicket, SshCommandOutput, SshPassword, SshTarget,
+    ImageCipher, InstalledApp, LegacyIosKit, OperationEvent, OperationHandle, OperationOutcome,
+    ProductType, RamdiskSsh, RecoveryDeviceInfo, RecoveryUploadResult, RemoteFirmwareSummary,
+    ResourceId, RestoreBehavior, RestoreExecutionRequest, RestorePlan, RestoreRequest, ScpPath,
+    SepPolicy, ShshRequest, ShshSummary, SigningTicket, SshCommandOutput, SshPassword, SshTarget,
     TicketPolicy, Udid,
 };
 use tracing::level_filters::LevelFilter;
@@ -415,6 +415,11 @@ enum FirmwareCommand {
         #[command(subcommand)]
         command: HfsCommand,
     },
+    /// Extract or replace IMG3/IM4P payload bytes.
+    Image {
+        #[command(subcommand)]
+        command: ImageCommand,
+    },
     /// Decrypt a FileVault v2 root filesystem DMG with its firmware key.
     DecryptDmg {
         source: PathBuf,
@@ -544,6 +549,29 @@ enum HfsCommand {
         source: PathBuf,
         destination: PathBuf,
         archive: PathBuf,
+        #[arg(long)]
+        yes: bool,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+enum ImageCommand {
+    Extract {
+        source: PathBuf,
+        destination: PathBuf,
+        #[arg(long, requires = "iv")]
+        key: Option<String>,
+        #[arg(long, requires = "key")]
+        iv: Option<String>,
+    },
+    Replace {
+        source: PathBuf,
+        payload: PathBuf,
+        destination: PathBuf,
+        #[arg(long, requires = "iv")]
+        key: Option<String>,
+        #[arg(long, requires = "key")]
+        iv: Option<String>,
         #[arg(long)]
         yes: bool,
     },
@@ -1375,6 +1403,33 @@ async fn main() -> Result<()> {
             }
         },
         Command::Firmware {
+            command: FirmwareCommand::Image { command },
+        } => match command {
+            ImageCommand::Extract {
+                source,
+                destination,
+                key,
+                iv,
+            } => {
+                kit.extract_image_payload(source, destination, image_cipher(key, iv)?)
+                    .await?;
+                write_status(output, "extracted-image-payload")?;
+            }
+            ImageCommand::Replace {
+                source,
+                payload,
+                destination,
+                key,
+                iv,
+                yes,
+            } => {
+                confirm("write the image container", yes)?;
+                kit.replace_image_payload(source, payload, destination, image_cipher(key, iv)?)
+                    .await?;
+                write_status(output, "replaced-image-payload")?;
+            }
+        },
+        Command::Firmware {
             command:
                 FirmwareCommand::DecryptDmg {
                     source,
@@ -1994,6 +2049,16 @@ async fn edit_hfs(
     confirm("write the HFS+ image", yes)?;
     kit.edit_hfs(source, destination, vec![mutation]).await?;
     write_status(output, "edited-hfs-image")
+}
+
+fn image_cipher(key: Option<String>, iv: Option<String>) -> Result<Option<ImageCipher>> {
+    match (key, iv) {
+        (Some(key), Some(iv)) => Ok(Some(
+            ImageCipher::from_hex(&key, &iv).context("invalid image cipher")?,
+        )),
+        (None, None) => Ok(None),
+        _ => Err(anyhow!("image key and IV must be supplied together")),
+    }
 }
 
 fn write_hfs_entries(format: OutputFormat, entries: &[HfsEntrySummary]) -> Result<()> {

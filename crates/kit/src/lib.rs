@@ -7,6 +7,7 @@ mod erase;
 mod error;
 mod firmware;
 mod hfs;
+mod image_payload;
 mod lease;
 mod operation;
 mod pairing;
@@ -23,6 +24,7 @@ pub use firmware::{
     CustomRootfsRequest, FirmwareIdentitySummary, FirmwareSummary, RemoteFirmwareSummary,
 };
 pub use hfs::{HfsEntrySummary, HfsKind, HfsMutation, HfsStatSummary};
+pub use image_payload::{ImageCipher, ImageCipherError};
 pub use lease::DeviceLease;
 pub use legacy_ios_assets::{Redistribution, ResourceId, ResourceRecord};
 pub use legacy_ios_core::{
@@ -180,6 +182,25 @@ impl LegacyIosKit {
         request: CustomRootfsRequest,
     ) -> Result<FirmwareSummary, KitError> {
         firmware::build_custom_rootfs(request).await
+    }
+
+    pub async fn extract_image_payload(
+        &self,
+        source: impl Into<std::path::PathBuf>,
+        destination: impl Into<std::path::PathBuf>,
+        cipher: Option<ImageCipher>,
+    ) -> Result<(), KitError> {
+        image_payload::extract(source.into(), destination.into(), cipher).await
+    }
+
+    pub async fn replace_image_payload(
+        &self,
+        source: impl Into<std::path::PathBuf>,
+        payload: impl Into<std::path::PathBuf>,
+        destination: impl Into<std::path::PathBuf>,
+        cipher: Option<ImageCipher>,
+    ) -> Result<(), KitError> {
+        image_payload::replace(source.into(), payload.into(), destination.into(), cipher).await
     }
 
     pub fn convert_onboard_dump(&self, dump: &[u8]) -> Result<SigningTicket, KitError> {

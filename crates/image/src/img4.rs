@@ -5,6 +5,7 @@ use thiserror::Error;
 const ASN1_SEQUENCE: u8 = 0x30;
 const ASN1_IA5_STRING: u8 = 0x16;
 const ASN1_CONTEXT_ZERO: u8 = 0xa0;
+const ASN1_OCTET_STRING: u8 = 0x04;
 
 pub fn personalize_img4(
     component_name: &str,
@@ -25,6 +26,20 @@ pub fn personalize_img4(
     let mut content = der_element(ASN1_IA5_STRING, b"IMG4");
     content.extend_from_slice(&component);
     content.extend_from_slice(&der_element(ASN1_CONTEXT_ZERO, ticket));
+    Ok(der_element(ASN1_SEQUENCE, &content))
+}
+
+pub fn extract_im4p_payload(component: &[u8]) -> Result<&[u8], Img4Error> {
+    let payload = im4p_payload_element(component)?;
+    Ok(&component[payload.content])
+}
+
+pub fn replace_im4p_payload(component: &[u8], payload: &[u8]) -> Result<Vec<u8>, Img4Error> {
+    let sequence = read_element(component, 0)?;
+    let old_payload = im4p_payload_element(component)?;
+    let mut content = component[sequence.content.start..old_payload.total_start].to_vec();
+    content.extend_from_slice(&der_element(ASN1_OCTET_STRING, payload));
+    content.extend_from_slice(&component[old_payload.total_end..sequence.content.end]);
     Ok(der_element(ASN1_SEQUENCE, &content))
 }
 
@@ -63,6 +78,27 @@ fn im4p_tag_range(component: &[u8]) -> Result<Range<usize>, Img4Error> {
     Ok(image_type.content)
 }
 
+fn im4p_payload_element(component: &[u8]) -> Result<DerElement, Img4Error> {
+    let sequence = read_element(component, 0)?;
+    if sequence.tag != ASN1_SEQUENCE || sequence.total_end != component.len() {
+        return Err(Img4Error::InvalidIm4p);
+    }
+    let magic = read_element(component, sequence.content.start)?;
+    if magic.tag != ASN1_IA5_STRING || &component[magic.content.clone()] != b"IM4P" {
+        return Err(Img4Error::InvalidIm4p);
+    }
+    let image_type = read_element(component, magic.total_end)?;
+    let description = read_element(component, image_type.total_end)?;
+    let payload = read_element(component, description.total_end)?;
+    if image_type.tag != ASN1_IA5_STRING
+        || description.tag != ASN1_IA5_STRING
+        || payload.tag != ASN1_OCTET_STRING
+    {
+        return Err(Img4Error::InvalidIm4p);
+    }
+    Ok(payload)
+}
+
 fn der_element(tag: u8, content: &[u8]) -> Vec<u8> {
     let mut output = Vec::with_capacity(1 + 5 + content.len());
     output.push(tag);
@@ -89,6 +125,7 @@ fn write_length(length: usize, output: &mut Vec<u8>) {
 
 struct DerElement {
     tag: u8,
+    total_start: usize,
     content: Range<usize>,
     total_end: usize,
 }
@@ -120,6 +157,7 @@ fn read_element(data: &[u8], offset: usize) -> Result<DerElement, Img4Error> {
     }
     Ok(DerElement {
         tag,
+        total_start: offset,
         content: content_start..total_end,
         total_end,
     })
@@ -145,6 +183,7 @@ mod tests {
         let mut content = der_element(ASN1_IA5_STRING, b"IM4P");
         content.extend_from_slice(&der_element(ASN1_IA5_STRING, tag));
         content.extend_from_slice(&der_element(ASN1_IA5_STRING, b"test"));
+        content.extend_from_slice(&der_element(ASN1_OCTET_STRING, b"payload"));
         der_element(ASN1_SEQUENCE, &content)
     }
 
@@ -162,5 +201,13 @@ mod tests {
         let result =
             personalize_img4("RestoreKernelCache", &component(b"krnl"), b"ticket").unwrap();
         assert!(result.windows(4).any(|window| window == b"rkrn"));
+    }
+
+    #[test]
+    fn extracts_and_replaces_payload() {
+        let component = component(b"rdsk");
+        assert_eq!(extract_im4p_payload(&component).unwrap(), b"payload");
+        let replaced = replace_im4p_payload(&component, b"new payload").unwrap();
+        assert_eq!(extract_im4p_payload(&replaced).unwrap(), b"new payload");
     }
 }

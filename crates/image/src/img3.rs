@@ -134,6 +134,25 @@ impl Img3 {
             .any(|element| element.tag == Img3Tag::ECID)
     }
 
+    pub fn payload(&self) -> Result<&[u8], Img3Error> {
+        self.elements
+            .iter()
+            .find(|element| element.tag == Img3Tag::DATA)
+            .map(Img3Element::data)
+            .ok_or(Img3Error::MissingPayload)
+    }
+
+    pub fn with_payload(&self, payload: Vec<u8>) -> Result<Self, Img3Error> {
+        let mut image = self.clone();
+        let element = image
+            .elements
+            .iter_mut()
+            .find(|element| element.tag == Img3Tag::DATA)
+            .ok_or(Img3Error::MissingPayload)?;
+        *element = Img3Element::new(Img3Tag::DATA, payload);
+        Ok(image)
+    }
+
     pub fn personalize(&self, signature: &[u8]) -> Result<Self, Img3Error> {
         if self.is_personalized() {
             return Ok(self.clone());
@@ -262,6 +281,8 @@ pub enum Img3Error {
     InvalidElementDataSize { tag: Img3Tag, size: usize },
     #[error("IMG3 signature must contain ECID, SHSH, and CERT elements")]
     InvalidSignatureElements,
+    #[error("IMG3 has no DATA payload")]
+    MissingPayload,
 }
 
 #[cfg(test)]
@@ -279,6 +300,15 @@ mod tests {
         );
 
         assert_eq!(Img3::parse(&image.to_bytes()).unwrap(), image);
+        assert_eq!(image.payload().unwrap(), b"payload");
+        assert_eq!(
+            image
+                .with_payload(b"new".to_vec())
+                .unwrap()
+                .payload()
+                .unwrap(),
+            b"new"
+        );
     }
 
     #[test]

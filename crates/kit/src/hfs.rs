@@ -228,7 +228,7 @@ pub(crate) fn apply_mutations(
     Ok(())
 }
 
-async fn write_atomic(destination: PathBuf, data: Vec<u8>) -> Result<(), KitError> {
+pub(crate) async fn write_atomic(destination: PathBuf, data: Vec<u8>) -> Result<(), KitError> {
     tokio::task::spawn_blocking(move || {
         let parent = destination
             .parent()
