@@ -17,8 +17,8 @@ pub use files::{
     AfcPath, AfcPathError, DeviceFileInfo, DeviceFileKind, DeviceFiles, DeviceStorageInfo,
 };
 pub use normal::{
-    DeviceSyslog, MuxDevice, NormalDevice, NormalDeviceInfo, RawServiceConnection, ServiceError,
-    SystemMux,
+    DeviceSyslog, DirectMux, MuxDevice, NormalDevice, NormalDeviceInfo, PairingRecord,
+    RawServiceConnection, ServiceError, SystemMux,
 };
 pub use ssh::{
     HostKeyPolicy, RamdiskSsh, ScpPath, ScpPathError, SshCommandOutput, SshError, SshPassword,

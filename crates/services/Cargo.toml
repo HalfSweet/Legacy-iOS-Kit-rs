@@ -9,8 +9,10 @@ publish = false
 idevice = { version = "=0.1.65", default-features = false, features = ["afc", "diagnostics_relay", "pair", "ring", "syslog_relay", "usbmuxd"] }
 legacy-ios-core = { path = "../core" }
 legacy-ios-transport = { path = "../transport" }
+nusb = { version = "=0.2.7", features = ["tokio"] }
 plist = "=1.10.0"
 russh = { version = "=0.63.1", default-features = false, features = ["des", "dsa", "ring", "rsa"] }
+rusbmux = { version = "=0.2.0", default-features = false, features = ["nusb"] }
 serde.workspace = true
 thiserror.workspace = true
 time = "=0.3.47"

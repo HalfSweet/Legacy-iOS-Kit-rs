@@ -1,12 +1,16 @@
 use std::{
+    collections::HashMap,
     fmt,
+    future::Future,
+    hash::{Hash, Hasher},
     pin::Pin,
     sync::Arc,
     task::{Context, Poll},
 };
 
 use idevice::{
-    IdeviceService,
+    Idevice, IdeviceError, IdeviceService,
+    pairing_file::PairingFile,
     provider::IdeviceProvider,
     services::{
         diagnostics_relay::DiagnosticsRelayClient, lockdown::LockdownClient,
@@ -14,11 +18,16 @@ use idevice::{
     },
     usbmuxd::{Connection, UsbmuxdAddr},
 };
-use legacy_ios_core::{BoardConfig, Ecid, ProductType, Udid};
+use legacy_ios_core::{BoardConfig, DeviceMode, Ecid, ProductType, Udid};
+use legacy_ios_transport::classify_apple_mode;
 use plist::Dictionary;
+use rusbmux::{device::Device, provider::RusbmuxProvider, usb_backend::AnyDeviceInfo};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
-use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
+use tokio::{
+    io::{AsyncRead, AsyncWrite, ReadBuf},
+    sync::RwLock,
+};
 use tracing::{debug, info};
 
 use crate::plist_service::PropertyListService;
@@ -71,7 +80,7 @@ impl SystemMux {
                 NormalDevice {
                     udid,
                     provider: Arc::new(provider),
-                    system_mux: Some(self.address.clone()),
+                    pairing: PairingBackend::System(self.address.clone()),
                 }
             })
             .collect::<Vec<_>>();
@@ -89,9 +98,165 @@ impl SystemMux {
         Ok(NormalDevice {
             udid: udid.clone(),
             provider: Arc::new(provider),
-            system_mux: Some(self.address.clone()),
+            pairing: PairingBackend::System(self.address.clone()),
         })
     }
+}
+
+type PairingRecords = Arc<RwLock<HashMap<Udid, PairingFile>>>;
+
+#[derive(Clone, Default)]
+pub struct DirectMux {
+    pairing_records: PairingRecords,
+}
+
+impl fmt::Debug for DirectMux {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.debug_struct("DirectMux").finish_non_exhaustive()
+    }
+}
+
+impl DirectMux {
+    pub async fn list_devices(&self) -> Result<Vec<NormalDevice>, ServiceError> {
+        let mut devices = Vec::new();
+        for info in direct_device_infos().await? {
+            devices.push(self.open_device(info).await?);
+        }
+        debug!(
+            count = devices.len(),
+            "listed normal-mode devices through direct USB"
+        );
+        Ok(devices)
+    }
+
+    pub async fn find_device(&self, udid: &Udid) -> Result<NormalDevice, ServiceError> {
+        let info = direct_device_infos()
+            .await?
+            .find(|info| info.serial_number() == Some(udid.as_str()))
+            .ok_or(ServiceError::DeviceNotFound)?;
+        self.open_device(info).await
+    }
+
+    pub async fn import_pairing_record(
+        &self,
+        udid: Udid,
+        record: PairingRecord,
+    ) -> Option<PairingRecord> {
+        self.pairing_records
+            .write()
+            .await
+            .insert(udid, record.0)
+            .map(PairingRecord)
+    }
+
+    pub async fn pairing_record(&self, udid: &Udid) -> Option<PairingRecord> {
+        self.pairing_records
+            .read()
+            .await
+            .get(udid)
+            .cloned()
+            .map(PairingRecord)
+    }
+
+    async fn open_device(&self, info: nusb::DeviceInfo) -> Result<NormalDevice, ServiceError> {
+        let udid = Udid::new(
+            info.serial_number()
+                .ok_or(ServiceError::MissingUdid)?
+                .to_owned(),
+        );
+        let id = direct_device_id(info.id());
+        let device = Device::new_usb(AnyDeviceInfo::Nusb(info), id).await?;
+        let device = device
+            .as_usb()
+            .expect("new USB device must remain USB")
+            .clone();
+        let provider = DirectProvider {
+            inner: RusbmuxProvider::new(device, "legacy-ios-kit".into()),
+            pairing_records: Arc::clone(&self.pairing_records),
+            udid: udid.clone(),
+        };
+
+        Ok(NormalDevice {
+            udid,
+            provider: Arc::new(provider),
+            pairing: PairingBackend::Direct(Arc::clone(&self.pairing_records)),
+        })
+    }
+}
+
+#[derive(Clone)]
+pub struct PairingRecord(PairingFile);
+
+impl PairingRecord {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, ServiceError> {
+        Ok(Self(PairingFile::from_bytes(bytes)?))
+    }
+
+    pub fn to_bytes(&self) -> Result<Vec<u8>, ServiceError> {
+        Ok(self.0.clone().serialize()?)
+    }
+}
+
+impl fmt::Debug for PairingRecord {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("PairingRecord")
+            .finish_non_exhaustive()
+    }
+}
+
+struct DirectProvider {
+    inner: RusbmuxProvider,
+    pairing_records: PairingRecords,
+    udid: Udid,
+}
+
+impl fmt::Debug for DirectProvider {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("DirectProvider")
+            .finish_non_exhaustive()
+    }
+}
+
+impl IdeviceProvider for DirectProvider {
+    fn connect(
+        &self,
+        port: u16,
+    ) -> Pin<Box<dyn Future<Output = Result<Idevice, IdeviceError>> + Send>> {
+        self.inner.connect(port)
+    }
+
+    fn label(&self) -> &str {
+        self.inner.label()
+    }
+
+    fn get_pairing_file(
+        &self,
+    ) -> Pin<Box<dyn Future<Output = Result<PairingFile, IdeviceError>> + Send>> {
+        let pairing_records = Arc::clone(&self.pairing_records);
+        let udid = self.udid.clone();
+        Box::pin(async move {
+            pairing_records
+                .read()
+                .await
+                .get(&udid)
+                .cloned()
+                .ok_or(IdeviceError::NotFound)
+        })
+    }
+}
+
+async fn direct_device_infos() -> Result<impl Iterator<Item = nusb::DeviceInfo>, ServiceError> {
+    Ok(nusb::list_devices().await?.filter(|info| {
+        classify_apple_mode(info.vendor_id(), info.product_id()) == Some(DeviceMode::Normal)
+    }))
+}
+
+fn direct_device_id(id: nusb::DeviceId) -> u64 {
+    let mut hasher = std::hash::DefaultHasher::new();
+    id.hash(&mut hasher);
+    hasher.finish()
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -114,7 +279,22 @@ impl MuxDevice {
 pub struct NormalDevice {
     udid: Udid,
     provider: Arc<dyn IdeviceProvider>,
-    system_mux: Option<UsbmuxdAddr>,
+    pairing: PairingBackend,
+}
+
+#[derive(Clone)]
+enum PairingBackend {
+    System(UsbmuxdAddr),
+    Direct(PairingRecords),
+}
+
+impl fmt::Debug for PairingBackend {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::System(_) => formatter.write_str("System"),
+            Self::Direct(_) => formatter.write_str("Direct"),
+        }
+    }
 }
 
 impl NormalDevice {
@@ -187,12 +367,10 @@ impl NormalDevice {
     }
 
     pub async fn pair(&self) -> Result<(), ServiceError> {
-        let address = self
-            .system_mux
-            .as_ref()
-            .ok_or(ServiceError::PairStoreUnavailable)?;
-        let mut mux = address.connect(0).await?;
-        let buid = mux.get_buid().await?;
+        let buid = match &self.pairing {
+            PairingBackend::System(address) => address.connect(0).await?.get_buid().await?,
+            PairingBackend::Direct(_) => uuid::Uuid::new_v4().to_string().to_uppercase(),
+        };
         let mut lockdown = LockdownClient::connect(self.provider.as_ref()).await?;
         let mut pairing = lockdown
             .pair(
@@ -202,8 +380,19 @@ impl NormalDevice {
             )
             .await?;
         pairing.udid = Some(self.udid.to_string());
-        let serialized = pairing.serialize()?;
-        mux.save_pair_record(self.udid.as_str(), serialized).await?;
+        match &self.pairing {
+            PairingBackend::System(address) => {
+                let serialized = pairing.serialize()?;
+                address
+                    .connect(0)
+                    .await?
+                    .save_pair_record(self.udid.as_str(), serialized)
+                    .await?;
+            }
+            PairingBackend::Direct(records) => {
+                records.write().await.insert(self.udid.clone(), pairing);
+            }
+        }
         info!("paired normal-mode device");
         Ok(())
     }
@@ -382,8 +571,14 @@ pub enum ServiceError {
     UnexpectedValue(&'static str),
     #[error("iOS service connection did not expose a socket")]
     MissingSocket,
-    #[error("pairing record storage is unavailable for this transport")]
-    PairStoreUnavailable,
+    #[error("normal-mode device did not expose a UDID")]
+    MissingUdid,
+    #[error("normal-mode device was not found")]
+    DeviceNotFound,
+    #[error("USB access failed: {0}")]
+    Usb(#[from] nusb::Error),
+    #[error("direct USB multiplexing failed: {0}")]
+    DirectMux(#[from] rusbmux::error::RusbmuxError),
     #[error("device returned no diagnostics payload")]
     MissingDiagnostics,
     #[error("invalid IPA path")]
