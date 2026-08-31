@@ -54,6 +54,8 @@ pub enum KitError {
     Recovery(#[from] legacy_ios_transport::RecoveryError),
     #[error("bootrom exploit failed: {0}")]
     Limera1n(#[from] legacy_ios_exploits::Limera1nError),
+    #[error("checkm8 exploit failed: {0}")]
+    Checkm8(#[from] legacy_ios_exploits::Checkm8Error),
     #[error("automatic exploit is not implemented for {0}")]
     AutomaticExploitUnsupported(legacy_ios_core::Soc),
     #[error("automatic limera1n execution requires a payload")]
@@ -125,6 +127,7 @@ impl KitError {
             Self::RestoreExecution(_) => OperationPhase::Restoring,
             Self::Recovery(_) => OperationPhase::Booting,
             Self::Limera1n(_)
+            | Self::Checkm8(_)
             | Self::AutomaticExploitUnsupported(_)
             | Self::MissingLimera1nPayload
             | Self::PwnVerificationFailed
@@ -141,7 +144,7 @@ impl KitError {
                 Recoverability::ReconnectDevice
             }
             Self::Signing(_) | Self::Artifact(_) | Self::Io(_) => Recoverability::RetryImmediately,
-            Self::Recovery(_) | Self::Limera1n(_) | Self::RamdiskBoot(_) => {
+            Self::Recovery(_) | Self::Limera1n(_) | Self::Checkm8(_) | Self::RamdiskBoot(_) => {
                 Recoverability::ReenterDfu
             }
             Self::PwnVerificationFailed | Self::ExternalExploitTimeout => {

@@ -1612,10 +1612,13 @@ dependencies = [
 name = "legacy-ios-exploits"
 version = "0.1.0"
 dependencies = [
+ "hex",
+ "legacy-ios-assets",
  "legacy-ios-core",
  "legacy-ios-image",
  "legacy-ios-transport",
  "serde",
+ "sha2 0.10.9",
  "thiserror 2.0.20",
  "tokio",
  "tracing",
