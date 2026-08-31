@@ -50,6 +50,10 @@ pub struct DeviceFiles {
 }
 
 impl DeviceFiles {
+    pub(crate) fn new(client: AfcClient) -> Self {
+        Self { client }
+    }
+
     pub async fn list(&mut self, path: &AfcPath) -> Result<Vec<String>, ServiceError> {
         Ok(self
             .client
@@ -127,9 +131,7 @@ impl DeviceFiles {
 
 impl NormalDevice {
     pub async fn files(&self) -> Result<DeviceFiles, ServiceError> {
-        Ok(DeviceFiles {
-            client: AfcClient::connect(self.provider()).await?,
-        })
+        Ok(DeviceFiles::new(AfcClient::connect(self.provider()).await?))
     }
 }
 

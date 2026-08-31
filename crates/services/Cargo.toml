@@ -6,7 +6,7 @@ rust-version.workspace = true
 publish = false
 
 [dependencies]
-idevice = { version = "=0.1.65", default-features = false, features = ["afc", "diagnostics_relay", "pair", "ring", "syslog_relay", "usbmuxd"] }
+idevice = { version = "=0.1.65", default-features = false, features = ["afc", "diagnostics_relay", "house_arrest", "pair", "ring", "syslog_relay", "usbmuxd"] }
 legacy-ios-core = { path = "../core" }
 legacy-ios-transport = { path = "../transport" }
 nusb = { version = "=0.2.7", features = ["tokio"] }

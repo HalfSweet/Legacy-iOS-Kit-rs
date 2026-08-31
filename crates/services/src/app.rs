@@ -2,14 +2,17 @@ use std::path::Path;
 
 use idevice::{
     IdeviceService,
-    services::afc::{AfcClient, opcode::AfcFopenMode},
+    services::{
+        afc::{AfcClient, opcode::AfcFopenMode},
+        house_arrest::HouseArrestClient,
+    },
 };
 use plist::{Dictionary, Value};
 use serde::{Deserialize, Serialize};
 use tokio::io::AsyncWriteExt;
 use tracing::{debug, info};
 
-use crate::{NormalDevice, ServiceError, plist_service::PropertyListService};
+use crate::{DeviceFiles, NormalDevice, ServiceError, plist_service::PropertyListService};
 
 const INSTALLATION_PROXY: &str = "com.apple.mobile.installation_proxy";
 
@@ -129,6 +132,20 @@ impl NormalDevice {
         wait_for_operation(&mut installer, "uninstall").await?;
         info!(bundle_id, "uninstalled application");
         Ok(())
+    }
+
+    pub async fn app_container(&self, bundle_id: &str) -> Result<DeviceFiles, ServiceError> {
+        let client = HouseArrestClient::connect(self.provider()).await?;
+        Ok(DeviceFiles::new(
+            client.vend_container(bundle_id.to_owned()).await?,
+        ))
+    }
+
+    pub async fn app_documents(&self, bundle_id: &str) -> Result<DeviceFiles, ServiceError> {
+        let client = HouseArrestClient::connect(self.provider()).await?;
+        Ok(DeviceFiles::new(
+            client.vend_documents(bundle_id.to_owned()).await?,
+        ))
     }
 }
 
