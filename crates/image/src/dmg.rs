@@ -196,8 +196,17 @@ impl DmgImage {
                         return Err(DmgError::ChunkSizeMismatch);
                     }
                 }
+                CHUNK_LZFSE => {
+                    let compressed = chunk.data(&self.data)?;
+                    let start = output.len();
+                    lzfse_rust::decode_bytes(compressed, &mut output)
+                        .map_err(std::io::Error::from)?;
+                    if output.len() - start != expanded_size {
+                        return Err(DmgError::ChunkSizeMismatch);
+                    }
+                }
                 CHUNK_COMMENT | CHUNK_TERM => {}
-                CHUNK_ADC | CHUNK_LZFSE => {
+                CHUNK_ADC => {
                     return Err(DmgError::UnsupportedCompression(chunk.chunk_type));
                 }
                 value => return Err(DmgError::UnknownChunkType(value)),
@@ -499,6 +508,43 @@ mod tests {
                 chunks: vec![
                     BlkxChunk {
                         chunk_type: CHUNK_BZLIB,
+                        sector_number: 0,
+                        sector_count: 1,
+                        compressed_offset: 0,
+                        compressed_length: compressed.len() as u64,
+                    },
+                    BlkxChunk {
+                        chunk_type: CHUNK_TERM,
+                        sector_number: 1,
+                        sector_count: 0,
+                        compressed_offset: compressed.len() as u64,
+                        compressed_length: 0,
+                    },
+                ],
+            }],
+        };
+
+        assert_eq!(image.extract(0).unwrap(), expected);
+    }
+
+    #[test]
+    fn extracts_lzfse_blkx_chunk() {
+        let expected = vec![0x3c; SECTOR_SIZE];
+        let mut compressed = Vec::new();
+        lzfse_rust::encode_bytes(&expected, &mut compressed).unwrap();
+        let image = DmgImage {
+            data: compressed.clone(),
+            partitions: vec![DmgPartition {
+                name: "Apple_HFS".into(),
+                sectors: 1,
+            }],
+            tables: vec![BlkxTable {
+                sector_number: 0,
+                sector_count: 1,
+                checksum: crc32fast::hash(&expected),
+                chunks: vec![
+                    BlkxChunk {
+                        chunk_type: CHUNK_LZFSE,
                         sector_number: 0,
                         sector_count: 1,
                         compressed_offset: 0,
