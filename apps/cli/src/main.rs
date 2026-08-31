@@ -12,11 +12,12 @@ use clap::{ArgAction, Parser, Subcommand, ValueEnum};
 use legacy_ios_kit::{
     ActivationState, AfcPath, AppFilter, BackupOptions, BackupOutcome, BackupRestoreOptions,
     BasebandPolicy, BoardConfig, DeviceDiagnostics, DeviceFileInfo, DeviceInventory,
-    DeviceStorageInfo, DeviceSummary, Ecid, ExploitPolicy, FirmwareSummary, HostKeyPolicy,
-    InstalledApp, LegacyIosKit, OperationEvent, OperationHandle, OperationOutcome, ProductType,
-    RamdiskSsh, RecoveryDeviceInfo, RecoveryUploadResult, RemoteFirmwareSummary, RestoreBehavior,
-    RestoreExecutionRequest, RestorePlan, RestoreRequest, ScpPath, SepPolicy, ShshRequest,
-    ShshSummary, SigningTicket, SshCommandOutput, SshPassword, SshTarget, TicketPolicy, Udid,
+    DeviceStorageInfo, DeviceSummary, DmgFirmwareKey, Ecid, ExploitPolicy, FirmwareSummary,
+    HostKeyPolicy, InstalledApp, LegacyIosKit, OperationEvent, OperationHandle, OperationOutcome,
+    ProductType, RamdiskSsh, RecoveryDeviceInfo, RecoveryUploadResult, RemoteFirmwareSummary,
+    RestoreBehavior, RestoreExecutionRequest, RestorePlan, RestoreRequest, ScpPath, SepPolicy,
+    ShshRequest, ShshSummary, SigningTicket, SshCommandOutput, SshPassword, SshTarget,
+    TicketPolicy, Udid,
 };
 use tracing::level_filters::LevelFilter;
 use tracing::{debug, info, warn};
@@ -338,6 +339,15 @@ enum FirmwareCommand {
     Inspect { path: PathBuf },
     /// Inspect a remote IPSW by fetching only its ZIP directory and BuildManifest.
     InspectRemote { url: String },
+    /// Decrypt a FileVault v2 root filesystem DMG with its firmware key.
+    DecryptDmg {
+        source: PathBuf,
+        destination: PathBuf,
+        #[arg(long, value_name = "HEX")]
+        key: String,
+        #[arg(long)]
+        yes: bool,
+    },
     /// Build a custom IPSW by replacing or removing archive entries.
     Build {
         source: PathBuf,
@@ -855,6 +865,22 @@ async fn main() -> Result<()> {
                 .await
                 .context("failed to inspect remote firmware")?;
             write_remote_firmware(output, &summary)?;
+        }
+        Command::Firmware {
+            command:
+                FirmwareCommand::DecryptDmg {
+                    source,
+                    destination,
+                    key,
+                    yes,
+                },
+        } => {
+            confirm("write the decrypted disk image", yes)?;
+            let key = DmgFirmwareKey::from_hex(&key).context("invalid firmware DMG key")?;
+            kit.decrypt_firmware_dmg(source, destination, key)
+                .await
+                .context("failed to decrypt firmware DMG")?;
+            write_status(output, "decrypted-dmg")?;
         }
         Command::Firmware {
             command:
