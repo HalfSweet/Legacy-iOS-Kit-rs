@@ -377,7 +377,7 @@ enum RestoreCommand {
         #[arg(long, value_enum, default_value_t = ExploitArg::Auto)]
         exploit: ExploitArg,
     },
-    /// Execute a previously modeled restore using a provided ticket.
+    /// Execute a restore using a provided ticket or live TSS signing.
     Execute {
         #[arg(long)]
         device: ProductType,
