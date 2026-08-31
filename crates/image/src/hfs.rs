@@ -490,6 +490,86 @@ impl HfsImage {
         Ok(())
     }
 
+    pub fn move_entry(&mut self, source: &str, destination: &str) -> Result<(), HfsError> {
+        let (destination_parent_path, destination_name) = split_parent(destination)?;
+        let mut volume = self.volume()?;
+        if volume.exists(destination)? {
+            return Err(HfsError::EntryExists);
+        }
+        let source_stat = volume.stat(source)?;
+        let destination_parent = volume.stat(&destination_parent_path)?;
+        if destination_parent.kind != EntryKind::Directory {
+            return Err(HfsError::NotADirectory);
+        }
+        let mut tree = CatalogTree::read(&self.data)?;
+        if source_stat.kind == EntryKind::Directory {
+            let mut ancestor = destination_parent.cnid;
+            while ancestor >= 2 {
+                if ancestor == source_stat.cnid {
+                    return Err(HfsError::InvalidMove);
+                }
+                ancestor = catalog_thread_parent(tree.records(), ancestor)?;
+            }
+        }
+
+        let record_type = if source_stat.kind == EntryKind::Directory {
+            1
+        } else {
+            2
+        };
+        let thread_type = if record_type == 1 { 3 } else { 4 };
+        let source_index = tree
+            .records()
+            .iter()
+            .position(|record| {
+                let Ok(body) = record_body_offset(record) else {
+                    return false;
+                };
+                matches!(read_u16(record, body), Ok(value) if value == record_type)
+                    && matches!(read_u32(record, body + 8), Ok(value) if value == source_stat.cnid)
+            })
+            .ok_or(HfsError::CatalogRecordNotFound)?;
+        let source_body = record_body_offset(&tree.records()[source_index])?;
+        let source_parent = read_u32(&tree.records()[source_index], 2)?;
+        let source_record_body = tree.records()[source_index][source_body..].to_vec();
+        let thread_index = tree
+            .records()
+            .iter()
+            .position(|record| {
+                let Ok(body) = record_body_offset(record) else {
+                    return false;
+                };
+                matches!(read_u32(record, 2), Ok(value) if value == source_stat.cnid)
+                    && matches!(read_u16(record, body), Ok(value) if value == thread_type)
+            })
+            .ok_or(HfsError::CatalogRecordNotFound)?;
+
+        if source_parent != destination_parent.cnid {
+            update_folder_valence(tree.records_mut(), source_parent, -1)?;
+            update_folder_valence(tree.records_mut(), destination_parent.cnid, 1)?;
+        }
+        let mut removals = [source_index, thread_index];
+        removals.sort_unstable_by(|left, right| right.cmp(left));
+        for index in removals {
+            tree.records_mut().remove(index);
+        }
+        tree.insert(build_catalog_entry(
+            destination_parent.cnid,
+            &destination_name,
+            &source_record_body,
+        ))?;
+        tree.insert(build_catalog_entry(
+            source_stat.cnid,
+            "",
+            &build_thread_record(thread_type, destination_parent.cnid, &destination_name),
+        ))?;
+
+        let mut updated = self.data.clone();
+        tree.write(&mut updated)?;
+        self.data = updated;
+        Ok(())
+    }
+
     fn expand_file(
         &mut self,
         fork: usize,
@@ -664,6 +744,47 @@ fn record_fork_blocks(record: &[u8], fork: usize) -> Result<Vec<usize>, HfsError
         blocks.extend(start..start + count);
     }
     Ok(blocks)
+}
+
+fn catalog_thread_parent(records: &[Vec<u8>], cnid: u32) -> Result<u32, HfsError> {
+    records
+        .iter()
+        .find_map(|record| {
+            let body = record_body_offset(record).ok()?;
+            let record_type = read_u16(record, body).ok()?;
+            (matches!(record_type, 3 | 4) && read_u32(record, 2).ok() == Some(cnid))
+                .then(|| read_u32(record, body + 4))
+        })
+        .ok_or(HfsError::CatalogRecordNotFound)?
+}
+
+fn update_folder_valence(
+    records: &mut [Vec<u8>],
+    folder_id: u32,
+    delta: i8,
+) -> Result<(), HfsError> {
+    let record = records
+        .iter_mut()
+        .find(|record| {
+            let Ok(body) = record_body_offset(record) else {
+                return false;
+            };
+            matches!(read_u16(record, body), Ok(1))
+                && read_u32(record, body + 8).ok() == Some(folder_id)
+        })
+        .ok_or(HfsError::CatalogRecordNotFound)?;
+    let body = record_body_offset(record)?;
+    let current = read_u32(record, body + 4)?;
+    let value = if delta < 0 {
+        current
+            .checked_sub(delta.unsigned_abs().into())
+            .ok_or(HfsError::InvalidCatalogRecord)?
+    } else {
+        current
+            .checked_add(delta as u32)
+            .ok_or(HfsError::VolumeTooLarge)?
+    };
+    write_u32(record, body + 4, value)
 }
 
 fn plan_free_blocks(
@@ -1078,6 +1199,8 @@ pub enum HfsError {
     InvalidPath,
     #[error("HFS+ parent is not a directory")]
     NotADirectory,
+    #[error("HFS+ directory cannot be moved into its own descendant")]
+    InvalidMove,
 }
 
 #[cfg(test)]
@@ -1223,5 +1346,23 @@ mod tests {
         assert_eq!(volume.volume_header().free_blocks, 0);
         assert_eq!(volume.volume_header().next_catalog_id, 18);
         assert_eq!(image.data()[6 * BLOCK_SIZE], 0xff);
+    }
+
+    #[test]
+    fn moves_file_between_directories() {
+        let mut image = growable_image();
+        image.mkdir("/dir").unwrap();
+
+        image.move_entry("/payload", "/dir/renamed").unwrap();
+
+        let mut volume = image.volume().unwrap();
+        assert!(
+            volume
+                .list_directory("/")
+                .unwrap()
+                .iter()
+                .all(|entry| entry.name != "payload")
+        );
+        assert_eq!(volume.read_file("/dir/renamed").unwrap(), b"data");
     }
 }
