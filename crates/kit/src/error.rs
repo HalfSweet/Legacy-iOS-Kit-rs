@@ -28,6 +28,14 @@ pub enum KitError {
     Recovery(#[from] legacy_ios_transport::RecoveryError),
     #[error("bootrom exploit failed: {0}")]
     Limera1n(#[from] legacy_ios_exploits::Limera1nError),
+    #[error("automatic exploit is not implemented for {0}")]
+    AutomaticExploitUnsupported(legacy_ios_core::Soc),
+    #[error("automatic limera1n execution requires a payload")]
+    MissingLimera1nPayload,
+    #[error("the device did not report a pwned state after exploitation")]
+    PwnVerificationFailed,
+    #[error("timed out waiting for external pwn hardware")]
+    ExternalExploitTimeout,
     #[error("host I/O failed: {0}")]
     Io(#[from] std::io::Error),
     #[error("worker task failed: {0}")]
@@ -66,7 +74,11 @@ impl KitError {
             Self::Backup(_) => OperationPhase::TransferringFilesystem,
             Self::RestoreExecution(_) => OperationPhase::Restoring,
             Self::Recovery(_) => OperationPhase::Booting,
-            Self::Limera1n(_) => OperationPhase::Exploiting,
+            Self::Limera1n(_)
+            | Self::AutomaticExploitUnsupported(_)
+            | Self::MissingLimera1nPayload
+            | Self::PwnVerificationFailed
+            | Self::ExternalExploitTimeout => OperationPhase::Exploiting,
             Self::Task(_) | Self::VerificationTimeout | Self::VersionMismatch { .. } => {
                 OperationPhase::Verifying
             }
@@ -80,6 +92,9 @@ impl KitError {
             }
             Self::Signing(_) | Self::Io(_) => Recoverability::RetryImmediately,
             Self::Recovery(_) | Self::Limera1n(_) => Recoverability::ReenterDfu,
+            Self::PwnVerificationFailed | Self::ExternalExploitTimeout => {
+                Recoverability::ReenterDfu
+            }
             Self::Plist(_) | Self::Backup(_) | Self::RestoreExecution(_) | Self::Task(_) => {
                 Recoverability::RestartOperation
             }
@@ -89,6 +104,8 @@ impl KitError {
             | Self::RemoteFirmware(_)
             | Self::RestorePlan(_)
             | Self::RestorePreparation(_)
+            | Self::AutomaticExploitUnsupported(_)
+            | Self::MissingLimera1nPayload
             | Self::UnknownProduct(_)
             | Self::UnknownBoardConfig { .. }
             | Self::MissingDeviceSelector => Recoverability::NotRecoverable,
