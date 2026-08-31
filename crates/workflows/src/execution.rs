@@ -2,6 +2,7 @@ use std::fmt;
 
 use legacy_ios_firmware::{FirmwareArchive, FirmwareError, SigningTicket, TicketError};
 use legacy_ios_restore::PreparedRestoreData;
+use plist::Value;
 use thiserror::Error;
 
 use crate::{ComponentPersonalizer, DestructiveConsent, PersonalizationError, PlanId, RestorePlan};
@@ -21,6 +22,8 @@ pub struct RestorePreparation {
     boot_components: Vec<PreparedBootComponent>,
     restored_data: PreparedRestoreData,
     filesystem_path: String,
+    recovery_ticket: Option<Vec<u8>>,
+    build_major: u32,
 }
 
 impl RestorePreparation {
@@ -48,7 +51,19 @@ impl RestorePreparation {
             .board_config()
             .ok_or(RestorePreparationError::MissingBoardConfig)?;
         let identity = manifest.select_identity(board, plan.behavior())?.clone();
+        let build_major = plan
+            .build_id()
+            .chars()
+            .take_while(char::is_ascii_digit)
+            .collect::<String>()
+            .parse()
+            .map_err(|_| RestorePreparationError::InvalidBuildId)?;
         let filesystem_path = identity.component_path("OS")?.to_owned();
+        let recovery_ticket = ticket
+            .dictionary()
+            .get("APTicket")
+            .and_then(Value::as_data)
+            .map(ToOwned::to_owned);
         let personalizer =
             ComponentPersonalizer::new(archive, identity.clone(), ticket.dictionary().clone());
         let boot_components = BOOT_COMPONENTS
@@ -67,6 +82,8 @@ impl RestorePreparation {
             boot_components,
             restored_data,
             filesystem_path,
+            recovery_ticket,
+            build_major,
         })
     }
 
@@ -84,6 +101,14 @@ impl RestorePreparation {
 
     pub fn filesystem_path(&self) -> &str {
         &self.filesystem_path
+    }
+
+    pub fn recovery_ticket(&self) -> Option<&[u8]> {
+        self.recovery_ticket.as_deref()
+    }
+
+    pub const fn build_major(&self) -> u32 {
+        self.build_major
     }
 }
 
@@ -131,6 +156,8 @@ pub enum RestorePreparationError {
     MissingBoardConfig,
     #[error("firmware changed after restore planning")]
     FirmwareChanged,
+    #[error("firmware build identifier has no numeric major version")]
+    InvalidBuildId,
     #[error(transparent)]
     Firmware(#[from] FirmwareError),
     #[error(transparent)]
