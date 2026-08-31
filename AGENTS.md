@@ -70,7 +70,12 @@ The public library is `legacy-ios-kit`; the reference CLI is `lik`.
   target. Tests support design confidence; they do not drive needless APIs.
 - Keep network and hardware tests opt-in. Normal CI must not require Apple
   services, firmware downloads, or connected devices.
-- Run verification proportional to the change and report what was run.
+- Run focused or full tests after a substantial, coherent feature slice is
+  complete rather than after every small implementation step. During a feature,
+  use targeted checks only when they materially reduce risk or unblock the next
+  step.
+- Run verification proportional to the completed feature and report what was
+  run.
 
 ## Quality Gates
 
@@ -82,11 +87,16 @@ The public library is `legacy-ios-kit`; the reference CLI is `lik`.
 
 ## Commit Discipline
 
-- Commit every verified, fine-grained change using Conventional Commits.
+- Commit complete, meaningful feature slices using Conventional Commits. Avoid
+  one-commit-per-file, one-commit-per-crate, and mechanical micro-commits.
 - Use `type(scope): English imperative summary`, with types such as `feat`,
   `fix`, `refactor`, `test`, `docs`, `chore`, `build`, `ci`, and `perf`.
-- Keep one coherent topic per commit. Do not combine protocol code, CLI work,
-  infrastructure, or unrelated formatting.
-- Every intermediate commit must at least compile for its affected scope.
+- Keep one coherent feature or infrastructure topic per commit. A feature may
+  span protocol, library, facade, CLI, and focused tests when those pieces form
+  one complete user-visible capability; do not mix unrelated features or
+  incidental formatting.
+- Commit after the feature reaches a useful, reviewable boundary and its
+  relevant verification passes. Do not commit every intermediate implementation
+  step.
 - Check `git status --short` before committing and preserve unrelated user
   changes.
