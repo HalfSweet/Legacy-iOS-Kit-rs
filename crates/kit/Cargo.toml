@@ -27,3 +27,7 @@ uuid = { version = "=1.26.0", features = ["v4"] }
 
 [lints]
 workspace = true
+
+[dev-dependencies]
+hfsplus = { version = "=0.2.4", features = ["testutil"] }
+zip = { version = "=2.4.2", default-features = false, features = ["deflate"] }

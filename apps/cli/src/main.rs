@@ -11,13 +11,14 @@ use anyhow::{Context, Result, anyhow};
 use clap::{ArgAction, Parser, Subcommand, ValueEnum};
 use legacy_ios_kit::{
     ActivationState, AfcPath, AppFilter, BackupOptions, BackupOutcome, BackupPassword,
-    BackupRestoreOptions, BasebandPolicy, BoardConfig, DeviceDiagnostics, DeviceFileInfo,
-    DeviceInventory, DeviceStorageInfo, DeviceSummary, DmgFirmwareKey, Ecid, ExploitPolicy,
-    FirmwareSummary, HfsEntrySummary, HfsMutation, HfsStatSummary, HostKeyPolicy, InstalledApp,
-    LegacyIosKit, OperationEvent, OperationHandle, OperationOutcome, ProductType, RamdiskSsh,
-    RecoveryDeviceInfo, RecoveryUploadResult, RemoteFirmwareSummary, ResourceId, RestoreBehavior,
-    RestoreExecutionRequest, RestorePlan, RestoreRequest, ScpPath, SepPolicy, ShshRequest,
-    ShshSummary, SigningTicket, SshCommandOutput, SshPassword, SshTarget, TicketPolicy, Udid,
+    BackupRestoreOptions, BasebandPolicy, BoardConfig, CustomRootfsRequest, DeviceDiagnostics,
+    DeviceFileInfo, DeviceInventory, DeviceStorageInfo, DeviceSummary, DmgFirmwareKey, Ecid,
+    ExploitPolicy, FirmwareSummary, HfsEntrySummary, HfsMutation, HfsStatSummary, HostKeyPolicy,
+    InstalledApp, LegacyIosKit, OperationEvent, OperationHandle, OperationOutcome, ProductType,
+    RamdiskSsh, RecoveryDeviceInfo, RecoveryUploadResult, RemoteFirmwareSummary, ResourceId,
+    RestoreBehavior, RestoreExecutionRequest, RestorePlan, RestoreRequest, ScpPath, SepPolicy,
+    ShshRequest, ShshSummary, SigningTicket, SshCommandOutput, SshPassword, SshTarget,
+    TicketPolicy, Udid,
 };
 use tracing::level_filters::LevelFilter;
 use tracing::{debug, info, warn};
@@ -431,6 +432,37 @@ enum FirmwareCommand {
         replacements: Vec<String>,
         #[arg(long = "remove", value_name = "ENTRY")]
         removals: Vec<String>,
+        #[arg(long)]
+        yes: bool,
+    },
+    /// Modify the selected identity's root filesystem and rebuild the IPSW.
+    BuildRootfs {
+        source: PathBuf,
+        destination: PathBuf,
+        #[arg(long)]
+        board: BoardConfig,
+        #[arg(long, value_enum, default_value_t = RestoreBehaviorArg::Erase)]
+        behavior: RestoreBehaviorArg,
+        #[arg(long, value_name = "HEX")]
+        key: Option<String>,
+        #[arg(long)]
+        grow: Option<usize>,
+        #[arg(long = "add", value_name = "HFS_PATH=FILE")]
+        additions: Vec<String>,
+        #[arg(long = "remove", value_name = "HFS_PATH")]
+        removals: Vec<String>,
+        #[arg(long)]
+        recursive: bool,
+        #[arg(long = "mkdir", value_name = "HFS_PATH")]
+        directories: Vec<String>,
+        #[arg(long = "move", value_name = "SOURCE=DESTINATION")]
+        moves: Vec<String>,
+        #[arg(long = "chmod", value_name = "HFS_PATH=MODE")]
+        modes: Vec<String>,
+        #[arg(long = "chown", value_name = "HFS_PATH=UID:GID")]
+        owners: Vec<String>,
+        #[arg(long = "tar", value_name = "ARCHIVE")]
+        archives: Vec<PathBuf>,
         #[arg(long)]
         yes: bool,
     },
@@ -1386,6 +1418,103 @@ async fn main() -> Result<()> {
                 .build_custom_ipsw(source, destination, data, removals)
                 .await
                 .context("failed to build custom IPSW")?;
+            write_firmware(output, &summary)?;
+        }
+        Command::Firmware {
+            command:
+                FirmwareCommand::BuildRootfs {
+                    source,
+                    destination,
+                    board,
+                    behavior,
+                    key,
+                    grow,
+                    additions,
+                    removals,
+                    recursive,
+                    directories,
+                    moves,
+                    modes,
+                    owners,
+                    archives,
+                    yes,
+                },
+        } => {
+            confirm("write the custom root filesystem IPSW", yes)?;
+            let mut mutations = Vec::new();
+            if let Some(size) = grow {
+                mutations.push(HfsMutation::Grow { size });
+            }
+            for path in directories {
+                mutations.push(HfsMutation::CreateDirectory { path });
+            }
+            for addition in additions {
+                let (path, file) = addition
+                    .split_once('=')
+                    .ok_or_else(|| anyhow!("HFS addition must use HFS_PATH=FILE"))?;
+                let file = PathBuf::from(file);
+                let data = tokio::fs::read(&file)
+                    .await
+                    .with_context(|| format!("failed to read {}", file.display()))?;
+                mutations.push(HfsMutation::AddFile {
+                    path: path.to_owned(),
+                    data,
+                });
+            }
+            for path in removals {
+                mutations.push(HfsMutation::Remove { path, recursive });
+            }
+            for value in moves {
+                let (source, destination) = value
+                    .split_once('=')
+                    .ok_or_else(|| anyhow!("HFS move must use SOURCE=DESTINATION"))?;
+                mutations.push(HfsMutation::Move {
+                    source: source.to_owned(),
+                    destination: destination.to_owned(),
+                });
+            }
+            for value in modes {
+                let (path, mode) = value
+                    .split_once('=')
+                    .ok_or_else(|| anyhow!("HFS mode must use HFS_PATH=MODE"))?;
+                let mode = u16::from_str_radix(mode.trim_start_matches("0o"), 8)
+                    .context("HFS mode must be octal")?;
+                mutations.push(HfsMutation::Chmod {
+                    path: path.to_owned(),
+                    mode,
+                });
+            }
+            for value in owners {
+                let (path, owner) = value
+                    .split_once('=')
+                    .ok_or_else(|| anyhow!("HFS owner must use HFS_PATH=UID:GID"))?;
+                let (owner, group) = owner
+                    .split_once(':')
+                    .ok_or_else(|| anyhow!("HFS owner must use UID:GID"))?;
+                mutations.push(HfsMutation::Chown {
+                    path: path.to_owned(),
+                    owner: owner.parse().context("HFS owner must be an integer")?,
+                    group: group.parse().context("HFS group must be an integer")?,
+                });
+            }
+            for archive in archives {
+                mutations.push(HfsMutation::Untar {
+                    archive: tokio::fs::read(&archive)
+                        .await
+                        .with_context(|| format!("failed to read {}", archive.display()))?,
+                });
+            }
+            let mut request =
+                CustomRootfsRequest::new(source, destination, board, behavior.into(), mutations);
+            if let Some(key) = key {
+                request = request.with_firmware_key(
+                    DmgFirmwareKey::from_hex(&key).context("invalid firmware DMG key")?,
+                );
+            }
+            let summary = kit
+                .build_custom_rootfs_ipsw(request)
+                .await
+                .context("failed to build custom root filesystem IPSW")?;
             write_firmware(output, &summary)?;
         }
         Command::Restore {

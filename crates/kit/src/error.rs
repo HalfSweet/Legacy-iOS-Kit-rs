@@ -66,6 +66,8 @@ pub enum KitError {
     UnknownProduct(legacy_ios_core::ProductType),
     #[error("unknown resource {0}")]
     UnknownResource(legacy_ios_assets::ResourceId),
+    #[error("root filesystem DMG has no HFS+ partition")]
+    MissingHfsPartition,
     #[error("board config {board_config} does not belong to {product_type}")]
     UnknownBoardConfig {
         product_type: legacy_ios_core::ProductType,
@@ -89,6 +91,7 @@ impl KitError {
             | Self::RestorePreparation(_)
             | Self::UnknownProduct(_)
             | Self::UnknownResource(_)
+            | Self::MissingHfsPartition
             | Self::UnknownBoardConfig { .. }
             | Self::MissingDeviceSelector => OperationPhase::Planning,
             Self::EraseConsentMismatch => OperationPhase::Preflight,
@@ -150,6 +153,7 @@ impl KitError {
             | Self::MissingSigningDeviceInfo(_)
             | Self::UnknownProduct(_)
             | Self::UnknownResource(_)
+            | Self::MissingHfsPartition
             | Self::UnknownBoardConfig { .. }
             | Self::MissingDeviceSelector => Recoverability::NotRecoverable,
             Self::EraseConsentMismatch => Recoverability::NotRecoverable,

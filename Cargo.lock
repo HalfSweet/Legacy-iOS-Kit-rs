@@ -1668,6 +1668,7 @@ name = "legacy-ios-kit"
 version = "0.1.0"
 dependencies = [
  "futures-util",
+ "hfsplus",
  "legacy-ios-assets",
  "legacy-ios-core",
  "legacy-ios-exploits",
@@ -1685,6 +1686,7 @@ dependencies = [
  "tokio-util",
  "tracing",
  "uuid",
+ "zip",
 ]
 
 [[package]]

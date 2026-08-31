@@ -19,7 +19,9 @@ pub use device::{
 };
 pub use erase::{EraseConsent, ErasePlan};
 pub use error::KitError;
-pub use firmware::{FirmwareIdentitySummary, FirmwareSummary, RemoteFirmwareSummary};
+pub use firmware::{
+    CustomRootfsRequest, FirmwareIdentitySummary, FirmwareSummary, RemoteFirmwareSummary,
+};
 pub use hfs::{HfsEntrySummary, HfsKind, HfsMutation, HfsStatSummary};
 pub use lease::DeviceLease;
 pub use legacy_ios_assets::{Redistribution, ResourceId, ResourceRecord};
@@ -171,6 +173,13 @@ impl LegacyIosKit {
         mutations: Vec<HfsMutation>,
     ) -> Result<(), KitError> {
         hfs::edit(source.into(), destination.into(), mutations).await
+    }
+
+    pub async fn build_custom_rootfs_ipsw(
+        &self,
+        request: CustomRootfsRequest,
+    ) -> Result<FirmwareSummary, KitError> {
+        firmware::build_custom_rootfs(request).await
     }
 
     pub fn convert_onboard_dump(&self, dump: &[u8]) -> Result<SigningTicket, KitError> {

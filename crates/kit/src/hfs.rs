@@ -9,7 +9,7 @@ use serde::Serialize;
 
 use crate::KitError;
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub enum HfsMutation {
     Grow {
         size: usize,
@@ -41,6 +41,22 @@ pub enum HfsMutation {
     Untar {
         archive: Vec<u8>,
     },
+}
+
+impl fmt::Debug for HfsMutation {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let name = match self {
+            Self::Grow { .. } => "Grow",
+            Self::AddFile { .. } => "AddFile",
+            Self::Remove { .. } => "Remove",
+            Self::CreateDirectory { .. } => "CreateDirectory",
+            Self::Move { .. } => "Move",
+            Self::Chmod { .. } => "Chmod",
+            Self::Chown { .. } => "Chown",
+            Self::Untar { .. } => "Untar",
+        };
+        formatter.debug_struct(name).finish_non_exhaustive()
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
@@ -182,26 +198,34 @@ pub(crate) async fn edit(
     let data = tokio::fs::read(source).await?;
     let data = tokio::task::spawn_blocking(move || {
         let mut image = HfsImage::parse(data)?;
-        for mutation in mutations {
-            match mutation {
-                HfsMutation::Grow { size } => image.grow(size)?,
-                HfsMutation::AddFile { path, data } => image.add_file(&path, &data)?,
-                HfsMutation::Remove { path, recursive } => image.remove(&path, recursive)?,
-                HfsMutation::CreateDirectory { path } => image.mkdir(&path)?,
-                HfsMutation::Move {
-                    source,
-                    destination,
-                } => image.move_entry(&source, &destination)?,
-                HfsMutation::Chmod { path, mode } => image.chmod(&path, mode)?,
-                HfsMutation::Chown { path, owner, group } => image.chown(&path, owner, group)?,
-                HfsMutation::Untar { archive } => image.untar(&archive)?,
-            }
-        }
+        apply_mutations(&mut image, mutations)?;
         Ok::<_, legacy_ios_image::HfsError>(image.into_bytes())
     })
     .await
     .map_err(|error| KitError::Task(error.to_string()))??;
     write_atomic(destination, data).await
+}
+
+pub(crate) fn apply_mutations(
+    image: &mut HfsImage,
+    mutations: Vec<HfsMutation>,
+) -> Result<(), legacy_ios_image::HfsError> {
+    for mutation in mutations {
+        match mutation {
+            HfsMutation::Grow { size } => image.grow(size)?,
+            HfsMutation::AddFile { path, data } => image.add_file(&path, &data)?,
+            HfsMutation::Remove { path, recursive } => image.remove(&path, recursive)?,
+            HfsMutation::CreateDirectory { path } => image.mkdir(&path)?,
+            HfsMutation::Move {
+                source,
+                destination,
+            } => image.move_entry(&source, &destination)?,
+            HfsMutation::Chmod { path, mode } => image.chmod(&path, mode)?,
+            HfsMutation::Chown { path, owner, group } => image.chown(&path, owner, group)?,
+            HfsMutation::Untar { archive } => image.untar(&archive)?,
+        }
+    }
+    Ok(())
 }
 
 async fn write_atomic(destination: PathBuf, data: Vec<u8>) -> Result<(), KitError> {
