@@ -16,6 +16,27 @@ pub struct SigningTicket {
 }
 
 impl SigningTicket {
+    pub fn from_img4_ticket(
+        root_ticket: Vec<u8>,
+        generator: Option<String>,
+    ) -> Result<Self, TicketError> {
+        if root_ticket.is_empty() {
+            return Err(TicketError::MissingRootTicket);
+        }
+        let mut dictionary = Dictionary::new();
+        dictionary.insert("ApImg4Ticket".into(), Value::Data(root_ticket.clone()));
+        if let Some(generator) = &generator {
+            dictionary.insert("generator".into(), generator.clone().into());
+        }
+        Ok(Self {
+            dictionary,
+            root_ticket,
+            ecid: None,
+            ap_nonce: None,
+            generator,
+        })
+    }
+
     pub fn open(path: &Path) -> Result<Self, TicketError> {
         let file = File::open(path)?;
         if file.metadata()?.len() > MAX_TICKET_SIZE {
@@ -86,6 +107,32 @@ impl SigningTicket {
         }
         Ok(())
     }
+
+    pub async fn save(&self, path: impl Into<std::path::PathBuf>) -> Result<(), TicketError> {
+        let dictionary = self.dictionary.clone();
+        let path = path.into();
+        tokio::task::spawn_blocking(move || save_dictionary(&dictionary, &path))
+            .await
+            .map_err(|error| TicketError::Task(error.to_string()))?
+    }
+}
+
+fn save_dictionary(dictionary: &Dictionary, path: &Path) -> Result<(), TicketError> {
+    use std::io::Write as _;
+
+    let parent = path.parent().unwrap_or_else(|| Path::new("."));
+    std::fs::create_dir_all(parent)?;
+    let mut temporary = tempfile::Builder::new()
+        .prefix("shsh-")
+        .tempfile_in(parent)?;
+    plist::to_writer_xml(&mut temporary, dictionary)?;
+    temporary.flush()?;
+    temporary.as_file().sync_all()?;
+    temporary
+        .into_temp_path()
+        .persist(path)
+        .map_err(|error| error.error)?;
+    Ok(())
 }
 
 fn parse_ecid(value: &Value) -> Option<Ecid> {
@@ -109,6 +156,8 @@ pub enum TicketError {
     MissingRootTicket,
     #[error("signing ticket belongs to another ECID")]
     EcidMismatch,
+    #[error("signing ticket worker task failed: {0}")]
+    Task(String),
 }
 
 #[cfg(test)]
