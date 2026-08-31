@@ -320,6 +320,8 @@ enum RestoreCommand {
         #[arg(long, value_enum, default_value_t = ExploitArg::AlreadyPwned)]
         exploit: ExploitArg,
         #[arg(long)]
+        no_baseband: bool,
+        #[arg(long)]
         flash_version_1: bool,
         #[arg(long)]
         yes: bool,
@@ -811,6 +813,7 @@ async fn main() -> Result<()> {
                     work_dir,
                     behavior,
                     exploit,
+                    no_baseband,
                     flash_version_1,
                     yes,
                 },
@@ -821,7 +824,11 @@ async fn main() -> Result<()> {
                 firmware,
                 behavior: behavior.into(),
                 ticket: TicketPolicy::Provided(ticket.clone()),
-                baseband: BasebandPolicy::None,
+                baseband: if no_baseband {
+                    BasebandPolicy::None
+                } else {
+                    BasebandPolicy::Auto
+                },
                 sep: SepPolicy::Auto,
                 exploit: exploit.into(),
             })?;
