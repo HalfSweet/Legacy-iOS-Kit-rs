@@ -19,8 +19,8 @@ pub use firmware::{FirmwareIdentitySummary, FirmwareSummary, RemoteFirmwareSumma
 pub use lease::DeviceLease;
 pub use legacy_ios_core::{
     BoardConfig, BuildId, Capability, CapabilitySet, ConnectionId, DeviceIdentity, DeviceMode,
-    DeviceSelector, DeviceSnapshot, Ecid, IosVersion, OperationEvent, OperationId, ProductType,
-    Recoverability, Soc, Udid,
+    DeviceSelector, DeviceSnapshot, Ecid, IosVersion, OperationEvent, OperationId,
+    OperationOutcome, ProductType, Recoverability, Soc, Udid,
 };
 pub use legacy_ios_firmware::{RestoreBehavior, SigningTicket, TicketError};
 pub use legacy_ios_services::{
