@@ -9,6 +9,7 @@ use thiserror::Error;
 const VOLUME_HEADER_SIZE: usize = 512;
 const TOTAL_BLOCKS_OFFSET: usize = 44;
 const FREE_BLOCKS_OFFSET: usize = 48;
+const NEXT_ALLOCATION_OFFSET: usize = 52;
 const ALLOCATION_FILE_OFFSET: usize = 112;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -82,31 +83,21 @@ impl HfsImage {
             return Err(HfsError::NotAFile);
         }
         let fork = record + 88;
-        let block_size = usize::try_from(self.volume()?.volume_header().block_size)
-            .map_err(|_| HfsError::CatalogOffsetTooLarge)?;
+        let header = self.volume()?.volume_header().clone();
+        let block_size =
+            usize::try_from(header.block_size).map_err(|_| HfsError::CatalogOffsetTooLarge)?;
         let total_blocks = usize::try_from(read_u32(&self.data, fork + 12)?)
             .map_err(|_| HfsError::CatalogOffsetTooLarge)?;
         let capacity = total_blocks
             .checked_mul(block_size)
             .ok_or(HfsError::CatalogOffsetTooLarge)?;
         if contents.len() > capacity {
-            return Err(HfsError::FileCapacityExceeded {
-                capacity,
-                requested: contents.len(),
-            });
+            self.expand_file(fork, contents.len().div_ceil(block_size), &header)?;
+            return self.write_file(path, contents);
         }
 
         let mut extents = Vec::new();
-        let mut described_blocks = 0_usize;
-        for index in 0..8 {
-            let extent = fork + 16 + index * 8;
-            let start_block = usize::try_from(read_u32(&self.data, extent)?)
-                .map_err(|_| HfsError::CatalogOffsetTooLarge)?;
-            let block_count = usize::try_from(read_u32(&self.data, extent + 4)?)
-                .map_err(|_| HfsError::CatalogOffsetTooLarge)?;
-            if block_count == 0 {
-                break;
-            }
+        for (start_block, block_count) in inline_extents(&self.data, fork, total_blocks)? {
             let extent_size = block_count
                 .checked_mul(block_size)
                 .ok_or(HfsError::CatalogOffsetTooLarge)?;
@@ -119,16 +110,7 @@ impl HfsImage {
             if end > self.data.len() {
                 return Err(HfsError::InvalidCatalogRecord);
             }
-            described_blocks = described_blocks
-                .checked_add(block_count)
-                .ok_or(HfsError::InvalidCatalogRecord)?;
-            if described_blocks > total_blocks {
-                return Err(HfsError::InvalidCatalogRecord);
-            }
             extents.push((offset, end));
-        }
-        if described_blocks != total_blocks {
-            return Err(HfsError::ExtentsOverflowUnsupported);
         }
 
         let mut source = contents;
@@ -222,6 +204,122 @@ impl HfsImage {
         Ok(())
     }
 
+    fn expand_file(
+        &mut self,
+        fork: usize,
+        required_blocks: usize,
+        header: &VolumeHeader,
+    ) -> Result<(), HfsError> {
+        let current_blocks = usize::try_from(read_u32(&self.data, fork + 12)?)
+            .map_err(|_| HfsError::CatalogOffsetTooLarge)?;
+        let blocks_needed = required_blocks - current_blocks;
+        if usize::try_from(header.free_blocks).map_err(|_| HfsError::CatalogOffsetTooLarge)?
+            < blocks_needed
+        {
+            return Err(HfsError::VolumeFull);
+        }
+        let block_size =
+            usize::try_from(header.block_size).map_err(|_| HfsError::CatalogOffsetTooLarge)?;
+        let volume_blocks =
+            usize::try_from(header.total_blocks).map_err(|_| HfsError::CatalogOffsetTooLarge)?;
+        let volume_size = volume_blocks
+            .checked_mul(block_size)
+            .ok_or(HfsError::VolumeTooLarge)?;
+        if volume_size > self.data.len() {
+            return Err(HfsError::InvalidCatalogRecord);
+        }
+        let mut blocks = Vec::with_capacity(blocks_needed);
+        let mut candidate =
+            usize::try_from(header.next_allocation).map_err(|_| HfsError::CatalogOffsetTooLarge)?;
+        for _ in 0..volume_blocks {
+            if candidate != volume_blocks - 1
+                && !allocation_block_used(
+                    &self.data,
+                    &header.allocation_file,
+                    block_size,
+                    candidate,
+                )?
+            {
+                blocks.push(candidate);
+                if blocks.len() == blocks_needed {
+                    break;
+                }
+            }
+            candidate = (candidate + 1) % volume_blocks;
+        }
+        if blocks.len() != blocks_needed {
+            return Err(HfsError::VolumeFull);
+        }
+
+        let mut extents = inline_extents(&self.data, fork, current_blocks)?;
+        for block in &blocks {
+            if let Some((start, count)) = extents.last_mut()
+                && *start + *count == *block
+            {
+                *count += 1;
+            } else {
+                extents.push((*block, 1));
+            }
+        }
+        if extents.len() > 8 {
+            return Err(HfsError::ExtentsOverflowUnsupported);
+        }
+
+        for block in &blocks {
+            set_allocation_block(
+                &mut self.data,
+                &header.allocation_file,
+                block_size,
+                *block,
+                true,
+            )?;
+            let offset = block
+                .checked_mul(block_size)
+                .ok_or(HfsError::CatalogOffsetTooLarge)?;
+            self.data[offset..offset + block_size].fill(0);
+        }
+        write_u32(
+            &mut self.data,
+            fork + 12,
+            u32::try_from(required_blocks).map_err(|_| HfsError::VolumeTooLarge)?,
+        )?;
+        for index in 0..8 {
+            let offset = fork + 16 + index * 8;
+            let (start, count) = extents.get(index).copied().unwrap_or((0, 0));
+            write_u32(
+                &mut self.data,
+                offset,
+                u32::try_from(start).map_err(|_| HfsError::VolumeTooLarge)?,
+            )?;
+            write_u32(
+                &mut self.data,
+                offset + 4,
+                u32::try_from(count).map_err(|_| HfsError::VolumeTooLarge)?,
+            )?;
+        }
+
+        let primary = VOLUME_HEADER_OFFSET as usize;
+        write_u32(
+            &mut self.data,
+            primary + FREE_BLOCKS_OFFSET,
+            header.free_blocks
+                - u32::try_from(blocks_needed).map_err(|_| HfsError::VolumeTooLarge)?,
+        )?;
+        write_u32(
+            &mut self.data,
+            primary + NEXT_ALLOCATION_OFFSET,
+            u32::try_from((blocks[blocks.len() - 1] + 1) % volume_blocks)
+                .map_err(|_| HfsError::VolumeTooLarge)?,
+        )?;
+        let alternate = volume_blocks
+            .checked_mul(block_size)
+            .and_then(|offset| offset.checked_sub(VOLUME_HEADER_OFFSET as usize))
+            .ok_or(HfsError::VolumeTooLarge)?;
+        let volume_header = self.data[primary..primary + VOLUME_HEADER_SIZE].to_vec();
+        self.data[alternate..alternate + VOLUME_HEADER_SIZE].copy_from_slice(&volume_header);
+        Ok(())
+    }
+
     pub fn walk(&self) -> Result<Vec<HfsEntry>, HfsError> {
         Ok(self
             .volume()?
@@ -272,6 +370,36 @@ impl HfsImage {
     }
 }
 
+fn inline_extents(
+    data: &[u8],
+    fork: usize,
+    total_blocks: usize,
+) -> Result<Vec<(usize, usize)>, HfsError> {
+    let mut extents = Vec::new();
+    let mut described_blocks = 0_usize;
+    for index in 0..8 {
+        let offset = fork + 16 + index * 8;
+        let start = usize::try_from(read_u32(data, offset)?)
+            .map_err(|_| HfsError::CatalogOffsetTooLarge)?;
+        let count = usize::try_from(read_u32(data, offset + 4)?)
+            .map_err(|_| HfsError::CatalogOffsetTooLarge)?;
+        if count == 0 {
+            break;
+        }
+        described_blocks = described_blocks
+            .checked_add(count)
+            .ok_or(HfsError::InvalidCatalogRecord)?;
+        if described_blocks > total_blocks {
+            return Err(HfsError::InvalidCatalogRecord);
+        }
+        extents.push((start, count));
+    }
+    if described_blocks != total_blocks {
+        return Err(HfsError::ExtentsOverflowUnsupported);
+    }
+    Ok(extents)
+}
+
 fn fork_byte_offset(
     fork: &ForkData,
     block_size: usize,
@@ -301,6 +429,17 @@ fn set_allocation_block(
         *byte &= !mask;
     }
     Ok(())
+}
+
+fn allocation_block_used(
+    data: &[u8],
+    fork: &ForkData,
+    block_size: usize,
+    block: usize,
+) -> Result<bool, HfsError> {
+    let offset = fork_byte_offset(fork, block_size, block / 8)?;
+    let byte = *data.get(offset).ok_or(HfsError::InvalidCatalogRecord)?;
+    Ok(byte & (1 << (7 - block % 8)) != 0)
 }
 
 fn catalog_body_offset(record: &[u8]) -> Result<usize, HfsError> {
@@ -435,10 +574,10 @@ pub enum HfsError {
     CatalogOffsetTooLarge,
     #[error("HFS+ entry is not a file")]
     NotAFile,
-    #[error("HFS+ file requires {requested} bytes but its extents hold {capacity} bytes")]
-    FileCapacityExceeded { capacity: usize, requested: usize },
     #[error("HFS+ extents overflow updates are not implemented")]
     ExtentsOverflowUnsupported,
+    #[error("HFS+ volume has insufficient free blocks")]
+    VolumeFull,
     #[error("HFS+ volumes cannot be shrunk")]
     CannotShrink,
     #[error("HFS+ volume is too large")]
@@ -452,6 +591,26 @@ mod tests {
     use hfsplus::testutil::HfsPlusImageBuilder;
 
     use super::*;
+
+    fn growable_image() -> HfsImage {
+        const BLOCK_SIZE: usize = 4096;
+        let mut builder = HfsPlusImageBuilder::new();
+        builder.add_file("payload", b"data", 0o644);
+        let mut data = builder.build();
+        data.resize(8 * BLOCK_SIZE, 0);
+        let primary = VOLUME_HEADER_OFFSET as usize;
+        write_u32(&mut data, primary + TOTAL_BLOCKS_OFFSET, 8).unwrap();
+        write_u32(&mut data, primary + FREE_BLOCKS_OFFSET, 1).unwrap();
+        write_u64(&mut data, primary + ALLOCATION_FILE_OFFSET, 1).unwrap();
+        write_u32(&mut data, primary + ALLOCATION_FILE_OFFSET + 12, 1).unwrap();
+        write_u32(&mut data, primary + ALLOCATION_FILE_OFFSET + 16, 6).unwrap();
+        write_u32(&mut data, primary + ALLOCATION_FILE_OFFSET + 20, 1).unwrap();
+        data[6 * BLOCK_SIZE] = 0xfb;
+        let alternate = 8 * BLOCK_SIZE - VOLUME_HEADER_OFFSET as usize;
+        let volume_header = data[primary..primary + VOLUME_HEADER_SIZE].to_vec();
+        data[alternate..alternate + VOLUME_HEADER_SIZE].copy_from_slice(&volume_header);
+        HfsImage::parse(data).unwrap()
+    }
 
     #[test]
     fn updates_catalog_permissions_in_place() {
@@ -484,22 +643,8 @@ mod tests {
     #[test]
     fn grows_volume_headers_and_allocation_map() {
         const BLOCK_SIZE: usize = 4096;
-        let mut builder = HfsPlusImageBuilder::new();
-        builder.add_file("payload", b"data", 0o644);
-        let mut data = builder.build();
-        data.resize(8 * BLOCK_SIZE, 0);
+        let mut image = growable_image();
         let primary = VOLUME_HEADER_OFFSET as usize;
-        write_u32(&mut data, primary + TOTAL_BLOCKS_OFFSET, 8).unwrap();
-        write_u32(&mut data, primary + FREE_BLOCKS_OFFSET, 1).unwrap();
-        write_u64(&mut data, primary + ALLOCATION_FILE_OFFSET, 1).unwrap();
-        write_u32(&mut data, primary + ALLOCATION_FILE_OFFSET + 12, 1).unwrap();
-        write_u32(&mut data, primary + ALLOCATION_FILE_OFFSET + 16, 6).unwrap();
-        write_u32(&mut data, primary + ALLOCATION_FILE_OFFSET + 20, 1).unwrap();
-        data[6 * BLOCK_SIZE] = 0xfb;
-        let alternate = 8 * BLOCK_SIZE - VOLUME_HEADER_OFFSET as usize;
-        let volume_header = data[primary..primary + VOLUME_HEADER_SIZE].to_vec();
-        data[alternate..alternate + VOLUME_HEADER_SIZE].copy_from_slice(&volume_header);
-        let mut image = HfsImage::parse(data).unwrap();
 
         image.grow(12 * BLOCK_SIZE).unwrap();
 
@@ -515,5 +660,18 @@ mod tests {
                 ..12 * BLOCK_SIZE - VOLUME_HEADER_OFFSET as usize + VOLUME_HEADER_SIZE],
             &image.data()[primary..primary + VOLUME_HEADER_SIZE]
         );
+    }
+
+    #[test]
+    fn expands_file_into_free_allocation_blocks() {
+        const BLOCK_SIZE: usize = 4096;
+        let mut image = growable_image();
+        let replacement = vec![0x6d; 5000];
+
+        image.write_file("/payload", &replacement).unwrap();
+
+        assert_eq!(image.read("/payload").unwrap(), replacement);
+        assert_eq!(image.volume().unwrap().volume_header().free_blocks, 0);
+        assert_eq!(image.data()[6 * BLOCK_SIZE], 0xff);
     }
 }
