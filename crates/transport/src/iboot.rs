@@ -26,6 +26,47 @@ const KIS_INDEX_BOOT_IMAGE: u16 = 0x103;
 const KIS_CHUNK_SIZE: usize = 0x4000;
 const KIS_DEVICE_INFO_SIZE: usize = 0x300;
 
+/// Result of a control transfer that may legitimately stall or time out
+/// during bootrom exploit heap grooming.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ControlTransferOutcome {
+    Ok,
+    Stall,
+    TimedOut,
+}
+
+/// Parameters of a raw control transfer used by bootrom exploits.
+#[derive(Clone, Copy, Debug)]
+pub struct ExploitControlRequest {
+    pub control_type: ControlType,
+    pub recipient: Recipient,
+    pub request: u8,
+    pub value: u16,
+    pub index: u16,
+}
+
+impl ExploitControlRequest {
+    pub const fn new(control_type: ControlType, recipient: Recipient, request: u8) -> Self {
+        Self {
+            control_type,
+            recipient,
+            request,
+            value: 0,
+            index: 0,
+        }
+    }
+
+    pub const fn with_value(mut self, value: u16) -> Self {
+        self.value = value;
+        self
+    }
+
+    pub const fn with_index(mut self, index: u16) -> Self {
+        self.index = index;
+        self
+    }
+}
+
 pub struct IbootClient {
     device: Device,
     interface: Interface,
@@ -222,6 +263,72 @@ impl IbootClient {
                 timeout,
             )
             .await?)
+    }
+
+    /// Send a DFU-mode control transfer, reporting stall and timeout
+    /// conditions instead of failing on them.
+    pub async fn exploit_control_out_observe(
+        &self,
+        request: ExploitControlRequest,
+        data: &[u8],
+        timeout: Duration,
+    ) -> Result<ControlTransferOutcome, RecoveryError> {
+        if self.mode != DeviceMode::Dfu {
+            return Err(RecoveryError::ExploitRequiresDfu(self.mode));
+        }
+        match self
+            .interface
+            .control_out(
+                ControlOut {
+                    control_type: request.control_type,
+                    recipient: request.recipient,
+                    request: request.request,
+                    value: request.value,
+                    index: request.index,
+                    data,
+                },
+                timeout,
+            )
+            .await
+        {
+            Ok(()) => Ok(ControlTransferOutcome::Ok),
+            Err(TransferError::Stall) => Ok(ControlTransferOutcome::Stall),
+            Err(TransferError::Cancelled) => Ok(ControlTransferOutcome::TimedOut),
+            Err(error) => Err(error.into()),
+        }
+    }
+
+    /// Read a DFU-mode control transfer, reporting stall and timeout
+    /// conditions instead of failing on them.
+    pub async fn exploit_control_in_observe(
+        &self,
+        request: ExploitControlRequest,
+        length: u16,
+        timeout: Duration,
+    ) -> Result<(ControlTransferOutcome, Vec<u8>), RecoveryError> {
+        if self.mode != DeviceMode::Dfu {
+            return Err(RecoveryError::ExploitRequiresDfu(self.mode));
+        }
+        match self
+            .interface
+            .control_in(
+                ControlIn {
+                    control_type: request.control_type,
+                    recipient: request.recipient,
+                    request: request.request,
+                    value: request.value,
+                    index: request.index,
+                    length,
+                },
+                timeout,
+            )
+            .await
+        {
+            Ok(data) => Ok((ControlTransferOutcome::Ok, data)),
+            Err(TransferError::Stall) => Ok((ControlTransferOutcome::Stall, Vec::new())),
+            Err(TransferError::Cancelled) => Ok((ControlTransferOutcome::TimedOut, Vec::new())),
+            Err(error) => Err(error.into()),
+        }
     }
 
     async fn upload(&mut self, data: &[u8], finish_dfu: bool) -> Result<(), RecoveryError> {

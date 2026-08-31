@@ -12,9 +12,12 @@ pub use host::{
     HostRequirement, HostRequirementCode, UsbAccess, UsbHostDevice, UsbHostDiagnostics,
     diagnose_usb_host,
 };
-pub use iboot::{IbootClient, RecoveryError, UploadResult};
+pub use iboot::{
+    ControlTransferOutcome, ExploitControlRequest, IbootClient, RecoveryError, UploadResult,
+};
 pub use locator::{
     APPLE_VENDOR_ID, DeviceLocator, DeviceWatch, NusbDeviceLocator, ObservedUsbDevice,
     TransportError, UsbDeviceEvent, UsbDeviceId, classify_apple_mode,
 };
+pub use nusb::transfer::{ControlType, Recipient};
 pub use recovery::{RecoveryDeviceInfo, parse_iboot_serial};
