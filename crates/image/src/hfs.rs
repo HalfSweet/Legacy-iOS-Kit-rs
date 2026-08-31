@@ -55,7 +55,11 @@ impl HfsImage {
         let stat = self.volume()?.stat(path)?;
         Ok(HfsStat {
             cnid: stat.cnid,
-            kind: stat.kind.into(),
+            kind: if stat.permissions.mode & 0o170000 == 0o120000 {
+                HfsEntryKind::Symlink
+            } else {
+                stat.kind.into()
+            },
             size: stat.size,
             owner: stat.permissions.owner_id,
             group: stat.permissions.group_id,
@@ -490,6 +494,45 @@ impl HfsImage {
         Ok(())
     }
 
+    pub fn add_symlink(&mut self, path: &str, target: &str) -> Result<(), HfsError> {
+        self.add_file(path, target.as_bytes())?;
+        let permissions = self.catalog_record_offset(path)? + 32;
+        write_u16(&mut self.data, permissions + 10, 0o120777)
+    }
+
+    pub fn untar(&mut self, archive: &[u8]) -> Result<(), HfsError> {
+        let entries = parse_tar(archive)?;
+        let mut updated = self.clone();
+        for entry in entries {
+            let exists = updated.volume()?.exists(&entry.path)?;
+            if exists {
+                let kind = updated.volume()?.stat(&entry.path)?.kind;
+                if kind == EntryKind::Directory && entry.kind == TarEntryKind::Directory {
+                    updated.chmod(&entry.path, entry.mode)?;
+                    updated.chown(&entry.path, entry.owner, entry.group)?;
+                    continue;
+                }
+                if kind == EntryKind::Directory || entry.kind == TarEntryKind::Directory {
+                    return Err(HfsError::EntryExists);
+                }
+                updated.remove_file(&entry.path)?;
+            }
+            match entry.kind {
+                TarEntryKind::File => updated.add_file(&entry.path, &entry.data)?,
+                TarEntryKind::Directory => updated.mkdir(&entry.path)?,
+                TarEntryKind::Symlink => {
+                    let target = std::str::from_utf8(&entry.data)
+                        .map_err(|_| HfsError::InvalidTarArchive)?;
+                    updated.add_symlink(&entry.path, target)?;
+                }
+            }
+            updated.chmod(&entry.path, entry.mode)?;
+            updated.chown(&entry.path, entry.owner, entry.group)?;
+        }
+        *self = updated;
+        Ok(())
+    }
+
     pub fn move_entry(&mut self, source: &str, destination: &str) -> Result<(), HfsError> {
         let (destination_parent_path, destination_name) = split_parent(destination)?;
         let mut volume = self.volume()?;
@@ -856,6 +899,139 @@ fn record_fork_blocks(record: &[u8], fork: usize) -> Result<Vec<usize>, HfsError
         blocks.extend(start..start + count);
     }
     Ok(blocks)
+}
+
+#[derive(Clone, Copy, Eq, PartialEq)]
+enum TarEntryKind {
+    File,
+    Directory,
+    Symlink,
+}
+
+struct TarEntry {
+    path: String,
+    kind: TarEntryKind,
+    mode: u16,
+    owner: u32,
+    group: u32,
+    data: Vec<u8>,
+}
+
+fn parse_tar(archive: &[u8]) -> Result<Vec<TarEntry>, HfsError> {
+    let mut entries = Vec::new();
+    let mut offset = 0_usize;
+    while offset < archive.len() {
+        let header = archive
+            .get(offset..offset + 512)
+            .ok_or(HfsError::InvalidTarArchive)?;
+        if header.iter().all(|byte| *byte == 0) {
+            break;
+        }
+        let expected_checksum = tar_number(&header[148..156])?;
+        let actual_checksum = header
+            .iter()
+            .enumerate()
+            .map(|(index, byte)| {
+                if (148..156).contains(&index) {
+                    u64::from(b' ')
+                } else {
+                    u64::from(*byte)
+                }
+            })
+            .sum::<u64>();
+        if expected_checksum != actual_checksum {
+            return Err(HfsError::InvalidTarArchive);
+        }
+        let name = tar_string(&header[..100])?;
+        let prefix = tar_string(&header[345..500])?;
+        let source_path = if prefix.is_empty() {
+            name
+        } else {
+            format!("{prefix}/{name}")
+        };
+        let path = tar_path(&source_path)?;
+        let mode = u16::try_from(tar_number(&header[100..108])?)
+            .map_err(|_| HfsError::InvalidTarArchive)?;
+        let owner = u32::try_from(tar_number(&header[108..116])?)
+            .map_err(|_| HfsError::InvalidTarArchive)?;
+        let group = u32::try_from(tar_number(&header[116..124])?)
+            .map_err(|_| HfsError::InvalidTarArchive)?;
+        let size = usize::try_from(tar_number(&header[124..136])?)
+            .map_err(|_| HfsError::InvalidTarArchive)?;
+        let kind = match header[156] {
+            0 | b'0' => TarEntryKind::File,
+            b'5' => TarEntryKind::Directory,
+            b'2' => TarEntryKind::Symlink,
+            value => return Err(HfsError::UnsupportedTarEntry(value)),
+        };
+        let data_offset = offset + 512;
+        let data = if kind == TarEntryKind::Symlink {
+            tar_string(&header[157..257])?.into_bytes()
+        } else {
+            archive
+                .get(data_offset..data_offset + size)
+                .ok_or(HfsError::InvalidTarArchive)?
+                .to_vec()
+        };
+        entries.push(TarEntry {
+            path,
+            kind,
+            mode,
+            owner,
+            group,
+            data,
+        });
+        let padded_size = size
+            .checked_add(511)
+            .map(|value| value / 512 * 512)
+            .ok_or(HfsError::InvalidTarArchive)?;
+        offset = data_offset
+            .checked_add(padded_size)
+            .ok_or(HfsError::InvalidTarArchive)?;
+    }
+    Ok(entries)
+}
+
+fn tar_string(field: &[u8]) -> Result<String, HfsError> {
+    let end = field
+        .iter()
+        .position(|byte| *byte == 0)
+        .unwrap_or(field.len());
+    std::str::from_utf8(&field[..end])
+        .map(ToOwned::to_owned)
+        .map_err(|_| HfsError::InvalidTarArchive)
+}
+
+fn tar_number(field: &[u8]) -> Result<u64, HfsError> {
+    let end = field
+        .iter()
+        .position(|byte| *byte == 0)
+        .unwrap_or(field.len());
+    let value = std::str::from_utf8(&field[..end])
+        .map_err(|_| HfsError::InvalidTarArchive)?
+        .trim();
+    if value.is_empty() {
+        return Ok(0);
+    }
+    u64::from_str_radix(value, 8).map_err(|_| HfsError::InvalidTarArchive)
+}
+
+fn tar_path(path: &str) -> Result<String, HfsError> {
+    if path.starts_with('/') {
+        return Err(HfsError::InvalidTarPath);
+    }
+    let mut components = Vec::new();
+    for component in path.split('/') {
+        match component {
+            "" | "." => {}
+            ".." => return Err(HfsError::InvalidTarPath),
+            value => components.push(value),
+        }
+    }
+    if components.is_empty() {
+        return Err(HfsError::InvalidTarPath);
+    }
+    Ok(format!("/{}", components.join("/")))
 }
 
 fn catalog_thread_parent(records: &[Vec<u8>], cnid: u32) -> Result<u32, HfsError> {
@@ -1351,6 +1527,12 @@ pub enum HfsError {
     DirectoryNotEmpty,
     #[error("HFS+ root directory cannot be removed")]
     CannotRemoveRoot,
+    #[error("tar archive is invalid")]
+    InvalidTarArchive,
+    #[error("tar archive path is unsafe")]
+    InvalidTarPath,
+    #[error("tar entry type {0:#04x} is unsupported")]
+    UnsupportedTarEntry(u8),
 }
 
 #[cfg(test)]
@@ -1377,6 +1559,38 @@ mod tests {
         let volume_header = data[primary..primary + VOLUME_HEADER_SIZE].to_vec();
         data[alternate..alternate + VOLUME_HEADER_SIZE].copy_from_slice(&volume_header);
         HfsImage::parse(data).unwrap()
+    }
+
+    fn append_tar_entry(
+        archive: &mut Vec<u8>,
+        name: &str,
+        entry_type: u8,
+        data: &[u8],
+        link: &str,
+        metadata: (u32, u32, u32),
+    ) {
+        fn octal(field: &mut [u8], value: u64) {
+            let encoded = format!("{:0width$o}\0", value, width = field.len() - 1);
+            field.copy_from_slice(encoded.as_bytes());
+        }
+
+        let mut header = [0_u8; 512];
+        header[..name.len()].copy_from_slice(name.as_bytes());
+        let (mode, owner, group) = metadata;
+        octal(&mut header[100..108], u64::from(mode));
+        octal(&mut header[108..116], u64::from(owner));
+        octal(&mut header[116..124], u64::from(group));
+        octal(&mut header[124..136], data.len() as u64);
+        header[148..156].fill(b' ');
+        header[156] = entry_type;
+        header[157..157 + link.len()].copy_from_slice(link.as_bytes());
+        header[257..263].copy_from_slice(b"ustar\0");
+        let checksum = header.iter().map(|byte| u64::from(*byte)).sum::<u64>();
+        let checksum = format!("{checksum:06o}\0 ");
+        header[148..156].copy_from_slice(checksum.as_bytes());
+        archive.extend_from_slice(&header);
+        archive.extend_from_slice(data);
+        archive.resize(archive.len().next_multiple_of(512), 0);
     }
 
     #[test]
@@ -1531,5 +1745,46 @@ mod tests {
         assert_eq!(volume.volume_header().folder_count, 1);
         assert_eq!(volume.volume_header().free_blocks, 2);
         assert_eq!(image.data()[6 * BLOCK_SIZE], 0xf3);
+    }
+
+    #[test]
+    fn extracts_tar_entries_with_metadata() {
+        const BLOCK_SIZE: usize = 4096;
+        let mut image = growable_image();
+        image.grow(16 * BLOCK_SIZE).unwrap();
+        let mut archive = Vec::new();
+        append_tar_entry(&mut archive, "usr/", b'5', &[], "", (0o755, 0, 0));
+        append_tar_entry(
+            &mut archive,
+            "usr/tool",
+            b'0',
+            b"hello",
+            "",
+            (0o755, 501, 20),
+        );
+        append_tar_entry(
+            &mut archive,
+            "usr/link",
+            b'2',
+            &[],
+            "tool",
+            (0o777, 501, 20),
+        );
+        archive.extend_from_slice(&[0; 1024]);
+
+        image.untar(&archive).unwrap();
+
+        {
+            let mut volume = image.volume().unwrap();
+            assert_eq!(volume.read_file("/usr/tool").unwrap(), b"hello");
+            assert_eq!(volume.read_file("/usr/link").unwrap(), b"tool");
+            let stat = volume.stat("/usr/tool").unwrap();
+            assert_eq!(stat.permissions.mode, 0o100755);
+            assert_eq!(stat.permissions.owner_id, 501);
+            assert_eq!(stat.permissions.group_id, 20);
+        }
+        let link = image.stat("/usr/link").unwrap();
+        assert_eq!(link.mode(), 0o120777);
+        assert_eq!(link.kind(), HfsEntryKind::Symlink);
     }
 }
