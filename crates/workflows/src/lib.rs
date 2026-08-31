@@ -7,6 +7,7 @@ mod boot;
 mod execution;
 mod personalization;
 mod restore;
+mod runner;
 
 pub use baseband::{BasebandError, BasebandFirmware};
 pub use boot::{RestoreBootError, RestoreBootOutcome, boot_restore};
@@ -15,4 +16,7 @@ pub use personalization::{ComponentPersonalizer, PersonalizationError};
 pub use restore::{
     BasebandPolicy, DestructiveConsent, ExploitPolicy, PlanId, RestoreComponent, RestorePlan,
     RestorePlanError, RestoreRequest, RestoreStep, RestoreStepKind, SepPolicy, TicketPolicy,
+};
+pub use runner::{
+    RestoreExecutionError, RestoreExecutionOutcome, RestoreExecutionProgress, run_restore,
 };
