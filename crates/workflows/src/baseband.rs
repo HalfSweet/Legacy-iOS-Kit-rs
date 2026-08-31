@@ -113,7 +113,15 @@ pub struct BasebandResolver {
 
 impl BasebandResolver {
     pub fn new(plan: &RestorePlan, tss: TssClient) -> Result<Self, BasebandRequestError> {
-        let archive = FirmwareArchive::open(plan.firmware())?;
+        Self::from_firmware(plan, plan.firmware(), tss)
+    }
+
+    pub fn from_firmware(
+        plan: &RestorePlan,
+        firmware: &std::path::Path,
+        tss: TssClient,
+    ) -> Result<Self, BasebandRequestError> {
+        let archive = FirmwareArchive::open(firmware)?;
         let manifest = archive.build_manifest()?;
         let board = plan
             .device()

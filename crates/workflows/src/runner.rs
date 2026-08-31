@@ -34,9 +34,11 @@ where
     let baseband = match plan.baseband_policy() {
         BasebandPolicy::Auto => Some(Arc::new(BasebandResolver::new(plan, tss.clone())?)),
         BasebandPolicy::None => None,
-        BasebandPolicy::Provided(_) => {
-            return Err(RestoreExecutionError::ProvidedBasebandUnsupported);
-        }
+        BasebandPolicy::Provided(path) => Some(Arc::new(BasebandResolver::from_firmware(
+            plan,
+            path,
+            tss.clone(),
+        )?)),
     };
     if matches!(plan.exploit_policy(), ExploitPolicy::Auto) {
         return Err(RestoreExecutionError::ExploitNotResolved);
@@ -135,8 +137,6 @@ pub enum RestoreExecutionError {
     PreparationMismatch,
     #[error("restore execution requires an ECID")]
     MissingEcid,
-    #[error("provided baseband firmware execution is not implemented")]
-    ProvidedBasebandUnsupported,
     #[error("automatic exploit policy must be resolved before restore execution")]
     ExploitNotResolved,
     #[error(transparent)]
