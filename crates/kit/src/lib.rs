@@ -104,7 +104,12 @@ impl LegacyIosKit {
     }
 
     pub fn execute_restore(&self, request: RestoreExecutionRequest) -> OperationHandle {
-        restore_execution::spawn(self.devices.clone(), self.leases.clone(), request)
+        restore_execution::spawn(
+            self.devices.clone(),
+            self.leases.clone(),
+            self.tss.clone(),
+            request,
+        )
     }
 
     pub async fn save_shsh(

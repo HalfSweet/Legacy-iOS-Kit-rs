@@ -11,7 +11,7 @@ use legacy_ios_core::{
     CancellationSafety, OperationEvent, OperationKind, OperationOutcome, OperationPhase, Progress,
     ProgressUnit,
 };
-use legacy_ios_firmware::SigningTicket;
+use legacy_ios_firmware::{SigningTicket, TssClient};
 use legacy_ios_restore::RestoreOptions;
 use legacy_ios_workflows::{
     BasebandPolicy, DestructiveConsent, RestoreExecutionProgress, RestorePlan, RestorePreparation,
@@ -57,11 +57,12 @@ impl RestoreExecutionRequest {
 pub(crate) fn spawn(
     devices: DeviceManager,
     leases: DeviceLeaseRegistry,
+    tss: TssClient,
     request: RestoreExecutionRequest,
 ) -> OperationHandle {
     let (emitter, handle) = OperationHandle::channel(128);
     tokio::spawn(async move {
-        match execute(&devices, &leases, &emitter, request).await {
+        match execute(&devices, &leases, &tss, &emitter, request).await {
             Ok(Some(outcome)) => {
                 emitter.emit(OperationEvent::Completed { outcome }).await;
             }
@@ -75,6 +76,7 @@ pub(crate) fn spawn(
 async fn execute(
     devices: &DeviceManager,
     leases: &DeviceLeaseRegistry,
+    tss: &TssClient,
     emitter: &OperationEmitter,
     request: RestoreExecutionRequest,
 ) -> Result<Option<OperationOutcome>, KitError> {
@@ -135,6 +137,7 @@ async fn execute(
     run_restore(
         &plan,
         &preparation,
+        tss,
         &request.work_directory,
         &options,
         move |value| {
