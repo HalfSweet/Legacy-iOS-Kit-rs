@@ -67,6 +67,14 @@ impl AppConfig {
             .map_err(|error| anyhow!("invalid log level: {error}"))
             .map(|value| value.unwrap_or(LevelFilter::INFO))
     }
+
+    pub(crate) fn pairing_dir(&self) -> Result<PathBuf> {
+        let root = match &self.storage.data_dir {
+            Some(path) => path.clone(),
+            None => project_dirs()?.data_dir().to_owned(),
+        };
+        Ok(root.join("pairing"))
+    }
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -93,7 +101,10 @@ pub(crate) struct NetworkConfig {
 }
 
 fn default_path() -> Result<PathBuf> {
-    let directories = ProjectDirs::from("dev", "Legacy-iOS-Kit", "legacy-ios-kit")
-        .ok_or_else(|| anyhow!("unable to determine configuration directory"))?;
-    Ok(directories.config_dir().join("config.toml"))
+    Ok(project_dirs()?.config_dir().join("config.toml"))
+}
+
+fn project_dirs() -> Result<ProjectDirs> {
+    ProjectDirs::from("dev", "Legacy-iOS-Kit", "legacy-ios-kit")
+        .ok_or_else(|| anyhow!("unable to determine application directories"))
 }

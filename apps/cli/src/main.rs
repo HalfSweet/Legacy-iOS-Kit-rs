@@ -491,7 +491,9 @@ async fn main() -> Result<()> {
     let config = AppConfig::load(cli.config.as_deref())?;
     let output = cli.output.or(config.output).unwrap_or_default();
     init_tracing(&cli, &config)?;
-    let kit = LegacyIosKit::new().with_normal_backend(config.transport.normal_backend);
+    let kit = LegacyIosKit::new()
+        .with_normal_backend(config.transport.normal_backend)
+        .with_pairing_store(config.pairing_dir()?);
     let kit = match config.network.tss_endpoint.as_deref() {
         Some(endpoint) => kit
             .with_tss_endpoint(endpoint)
