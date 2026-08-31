@@ -113,6 +113,18 @@ enum RamdiskCommand {
         #[arg(long, default_value_t = 1024 * 1024 * 1024)]
         max_size: u64,
     },
+    /// Dump and convert the onboard IMG4 signing ticket.
+    DumpOnboard {
+        destination: PathBuf,
+        #[arg(long, default_value = "/dev/rdisk1")]
+        disk: ScpPath,
+        #[arg(long)]
+        device_id: Option<u32>,
+        #[arg(long, default_value = "root")]
+        username: String,
+        #[arg(long)]
+        host_key: Option<String>,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -972,6 +984,23 @@ async fn main() -> Result<()> {
                 .await
                 .with_context(|| format!("failed to write {}", destination.display()))?;
             write_status(output, "pulled-ramdisk-file")?;
+        }
+        Command::Ramdisk {
+            command:
+                RamdiskCommand::DumpOnboard {
+                    destination,
+                    disk,
+                    device_id,
+                    username,
+                    host_key,
+                },
+        } => {
+            let ssh = connect_ramdisk_ssh(&kit, device_id, &username, host_key).await?;
+            let dump = ssh.read_prefix(&disk, 256, 0x4000).await?;
+            ssh.disconnect().await?;
+            let ticket = kit.convert_onboard_dump(&dump)?;
+            ticket.save(&destination).await?;
+            write_status(output, "saved-onboard-ticket")?;
         }
         Command::Shsh {
             command:
