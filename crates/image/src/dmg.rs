@@ -205,10 +205,11 @@ impl DmgImage {
                         return Err(DmgError::ChunkSizeMismatch);
                     }
                 }
-                CHUNK_COMMENT | CHUNK_TERM => {}
                 CHUNK_ADC => {
-                    return Err(DmgError::UnsupportedCompression(chunk.chunk_type));
+                    let compressed = chunk.data(&self.data)?;
+                    output.extend_from_slice(&decode_adc(compressed, expanded_size)?);
                 }
+                CHUNK_COMMENT | CHUNK_TERM => {}
                 value => return Err(DmgError::UnknownChunkType(value)),
             }
         }
@@ -224,6 +225,60 @@ impl DmgImage {
         }
         Ok(output)
     }
+}
+
+fn decode_adc(input: &[u8], expected_size: usize) -> Result<Vec<u8>, DmgError> {
+    let mut output = Vec::with_capacity(expected_size);
+    let mut cursor = 0;
+    while cursor < input.len() {
+        let tag = input[cursor];
+        cursor += 1;
+        if tag & 0x80 != 0 {
+            let length = usize::from(tag & 0x7f) + 1;
+            let end = cursor
+                .checked_add(length)
+                .ok_or(DmgError::InvalidAdcStream)?;
+            let literal = input.get(cursor..end).ok_or(DmgError::InvalidAdcStream)?;
+            if output.len() + length > expected_size {
+                return Err(DmgError::ChunkSizeMismatch);
+            }
+            output.extend_from_slice(literal);
+            cursor = end;
+            continue;
+        }
+
+        let (length, offset) = if tag & 0x40 != 0 {
+            let encoded = input
+                .get(cursor..cursor + 2)
+                .ok_or(DmgError::InvalidAdcStream)?;
+            cursor += 2;
+            (
+                usize::from(tag & 0x3f) + 4,
+                usize::from(u16::from_be_bytes([encoded[0], encoded[1]])),
+            )
+        } else {
+            let low = *input.get(cursor).ok_or(DmgError::InvalidAdcStream)?;
+            cursor += 1;
+            (
+                usize::from((tag & 0x3c) >> 2) + 3,
+                (usize::from(tag & 0x03) << 8) | usize::from(low),
+            )
+        };
+        let distance = offset + 1;
+        if distance > output.len() {
+            return Err(DmgError::InvalidAdcStream);
+        }
+        if output.len() + length > expected_size {
+            return Err(DmgError::ChunkSizeMismatch);
+        }
+        for _ in 0..length {
+            output.push(output[output.len() - distance]);
+        }
+    }
+    if output.len() != expected_size {
+        return Err(DmgError::ChunkSizeMismatch);
+    }
+    Ok(output)
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -463,6 +518,8 @@ pub enum DmgError {
     InvalidChunkRange,
     #[error("DMG chunk expanded to an unexpected size")]
     ChunkSizeMismatch,
+    #[error("DMG ADC chunk is invalid")]
+    InvalidAdcStream,
     #[error("DMG partition expanded to an unexpected size")]
     PartitionSizeMismatch,
     #[error("DMG checksum mismatch: expected {expected:#010x}, got {actual:#010x}")]
@@ -545,6 +602,46 @@ mod tests {
                 chunks: vec![
                     BlkxChunk {
                         chunk_type: CHUNK_LZFSE,
+                        sector_number: 0,
+                        sector_count: 1,
+                        compressed_offset: 0,
+                        compressed_length: compressed.len() as u64,
+                    },
+                    BlkxChunk {
+                        chunk_type: CHUNK_TERM,
+                        sector_number: 1,
+                        sector_count: 0,
+                        compressed_offset: compressed.len() as u64,
+                        compressed_length: 0,
+                    },
+                ],
+            }],
+        };
+
+        assert_eq!(image.extract(0).unwrap(), expected);
+    }
+
+    #[test]
+    fn extracts_adc_blkx_chunk() {
+        let expected = b"ABCD".repeat(SECTOR_SIZE / 4);
+        let mut compressed = vec![0x83, b'A', b'B', b'C', b'D', 0x34, 0x03];
+        for _ in 0..7 {
+            compressed.extend_from_slice(&[0x7f, 0x00, 0x03]);
+        }
+        compressed.extend_from_slice(&[0x53, 0x00, 0x03]);
+        let image = DmgImage {
+            data: compressed.clone(),
+            partitions: vec![DmgPartition {
+                name: "Apple_HFS".into(),
+                sectors: 1,
+            }],
+            tables: vec![BlkxTable {
+                sector_number: 0,
+                sector_count: 1,
+                checksum: crc32fast::hash(&expected),
+                chunks: vec![
+                    BlkxChunk {
+                        chunk_type: CHUNK_ADC,
                         sector_number: 0,
                         sector_count: 1,
                         compressed_offset: 0,
