@@ -6,8 +6,8 @@ use legacy_ios_core::{
 };
 use legacy_ios_services::{
     ActivationState, AppFilter, BackupOptions, BackupOutcome, BackupRestoreOptions, DeviceFiles,
-    DeviceSyslog, HostKeyPolicy, InstalledApp, NormalBackend, NormalMux, RamdiskSsh, SshPassword,
-    SshTarget, SystemMux,
+    DeviceSyslog, HostKeyPolicy, InstalledApp, NormalBackend, NormalDevice, NormalMux, RamdiskSsh,
+    SshPassword, SshTarget, SystemMux,
 };
 use legacy_ios_transport::{
     DeviceLocator, NusbDeviceLocator, ObservedUsbDevice, parse_iboot_serial,
@@ -15,13 +15,14 @@ use legacy_ios_transport::{
 use serde::{Deserialize, Serialize};
 use tracing::warn;
 
-use crate::{KitError, OperationHandle};
+use crate::{KitError, OperationHandle, PairingStore};
 
 #[derive(Clone, Debug, Default)]
 pub struct DeviceManager {
     bootloader: NusbDeviceLocator,
     normal: NormalMux,
     ramdisk: SystemMux,
+    pairing_store: Option<PairingStore>,
 }
 
 impl DeviceManager {
@@ -30,11 +31,21 @@ impl DeviceManager {
             bootloader: NusbDeviceLocator,
             normal: NormalMux::new(backend),
             ramdisk: SystemMux::default(),
+            pairing_store: None,
         }
+    }
+
+    pub fn with_pairing_store(mut self, store: PairingStore) -> Self {
+        self.pairing_store = Some(store);
+        self
     }
 
     pub const fn normal_backend(&self) -> NormalBackend {
         self.normal.backend()
+    }
+
+    pub fn set_normal_backend(&mut self, backend: NormalBackend) {
+        self.normal = NormalMux::new(backend);
     }
 
     pub fn watch_bootloader(&self) -> Result<OperationHandle, KitError> {
@@ -127,21 +138,26 @@ impl DeviceManager {
 
     pub async fn pair(&self, udid: &Udid) -> Result<(), KitError> {
         self.normal.find_device(udid).await?.pair().await?;
+        if let Some(store) = &self.pairing_store
+            && let Some(record) = self.normal.pairing_record(udid).await
+        {
+            store.save(udid, &record).await?;
+        }
         Ok(())
     }
 
     pub async fn battery_info(&self, udid: &Udid) -> Result<DeviceDiagnostics, KitError> {
-        let values = self.normal.find_device(udid).await?.battery_info().await?;
+        let values = self.find_normal(udid).await?.battery_info().await?;
         Ok(DeviceDiagnostics { values })
     }
 
     pub async fn restart(&self, udid: &Udid) -> Result<(), KitError> {
-        self.normal.find_device(udid).await?.restart().await?;
+        self.find_normal(udid).await?.restart().await?;
         Ok(())
     }
 
     pub async fn shutdown(&self, udid: &Udid) -> Result<(), KitError> {
-        self.normal.find_device(udid).await?.shutdown().await?;
+        self.find_normal(udid).await?.shutdown().await?;
         Ok(())
     }
 
@@ -150,26 +166,16 @@ impl DeviceManager {
         udid: &Udid,
         filter: AppFilter,
     ) -> Result<Vec<InstalledApp>, KitError> {
-        Ok(self
-            .normal
-            .find_device(udid)
-            .await?
-            .list_apps(filter)
-            .await?)
+        Ok(self.find_normal(udid).await?.list_apps(filter).await?)
     }
 
     pub async fn install_ipa(&self, udid: &Udid, ipa: &std::path::Path) -> Result<(), KitError> {
-        self.normal
-            .find_device(udid)
-            .await?
-            .install_ipa(ipa)
-            .await?;
+        self.find_normal(udid).await?.install_ipa(ipa).await?;
         Ok(())
     }
 
     pub async fn uninstall_app(&self, udid: &Udid, bundle_id: &str) -> Result<(), KitError> {
-        self.normal
-            .find_device(udid)
+        self.find_normal(udid)
             .await?
             .uninstall_app(bundle_id)
             .await?;
@@ -177,20 +183,16 @@ impl DeviceManager {
     }
 
     pub async fn enter_recovery(&self, udid: &Udid) -> Result<(), KitError> {
-        self.normal
-            .find_device(udid)
-            .await?
-            .enter_recovery()
-            .await?;
+        self.find_normal(udid).await?.enter_recovery().await?;
         Ok(())
     }
 
     pub async fn syslog(&self, udid: &Udid) -> Result<DeviceSyslog, KitError> {
-        Ok(self.normal.find_device(udid).await?.syslog().await?)
+        Ok(self.find_normal(udid).await?.syslog().await?)
     }
 
     pub async fn files(&self, udid: &Udid) -> Result<DeviceFiles, KitError> {
-        Ok(self.normal.find_device(udid).await?.files().await?)
+        Ok(self.find_normal(udid).await?.files().await?)
     }
 
     pub async fn backup(
@@ -200,8 +202,7 @@ impl DeviceManager {
         options: BackupOptions,
     ) -> Result<BackupOutcome, KitError> {
         Ok(self
-            .normal
-            .find_device(udid)
+            .find_normal(udid)
             .await?
             .backup(destination, options)
             .await?)
@@ -215,8 +216,7 @@ impl DeviceManager {
         options: BackupRestoreOptions,
     ) -> Result<BackupOutcome, KitError> {
         Ok(self
-            .normal
-            .find_device(udid)
+            .find_normal(udid)
             .await?
             .restore_backup(root, source_identifier, options)
             .await?)
@@ -233,17 +233,25 @@ impl DeviceManager {
     }
 
     pub async fn activation_state(&self, udid: &Udid) -> Result<ActivationState, KitError> {
-        Ok(self
-            .normal
-            .find_device(udid)
-            .await?
-            .activation_state()
-            .await?)
+        Ok(self.find_normal(udid).await?.activation_state().await?)
     }
 
     pub async fn deactivate(&self, udid: &Udid) -> Result<(), KitError> {
-        self.normal.find_device(udid).await?.deactivate().await?;
+        self.find_normal(udid).await?.deactivate().await?;
         Ok(())
+    }
+
+    async fn find_normal(&self, udid: &Udid) -> Result<NormalDevice, KitError> {
+        let device = self.normal.find_device(udid).await?;
+        if let Some(store) = &self.pairing_store
+            && self.normal.pairing_record(udid).await.is_none()
+            && let Some(record) = store.load(udid).await?
+        {
+            self.normal
+                .import_pairing_record(udid.clone(), record)
+                .await;
+        }
+        Ok(device)
     }
 }
 

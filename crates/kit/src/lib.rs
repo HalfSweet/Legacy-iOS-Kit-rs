@@ -7,6 +7,7 @@ mod error;
 mod firmware;
 mod lease;
 mod operation;
+mod pairing;
 mod recovery;
 mod restore_execution;
 mod shsh;
@@ -35,6 +36,7 @@ pub use legacy_ios_workflows::{
     RestorePlanError, RestoreRequest, RestoreStep, RestoreStepKind, SepPolicy, TicketPolicy,
 };
 pub use operation::OperationHandle;
+pub use pairing::PairingStore;
 pub use recovery::{RecoveryDevice, RecoveryManager, RecoveryUploadResult};
 pub use restore_execution::RestoreExecutionRequest;
 pub use shsh::{ShshRequest, ShshSummary};
@@ -57,7 +59,12 @@ impl LegacyIosKit {
     }
 
     pub fn with_normal_backend(mut self, backend: NormalBackend) -> Self {
-        self.devices = DeviceManager::with_normal_backend(backend);
+        self.devices.set_normal_backend(backend);
+        self
+    }
+
+    pub fn with_pairing_store(mut self, root: impl Into<std::path::PathBuf>) -> Self {
+        self.devices = self.devices.with_pairing_store(PairingStore::new(root));
         self
     }
 
