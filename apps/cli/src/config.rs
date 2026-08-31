@@ -56,6 +56,49 @@ impl AppConfig {
         if let Ok(log) = env::var("LIK_LOG") {
             config.log = Some(log);
         }
+        if let Some(path) = env::var_os("LIK_CACHE_DIR") {
+            config.storage.cache_dir = Some(path.into());
+        }
+        if let Some(path) = env::var_os("LIK_DATA_DIR") {
+            config.storage.data_dir = Some(path.into());
+        }
+        if let Some(path) = env::var_os("LIK_WORK_DIR") {
+            config.storage.work_dir = Some(path.into());
+        }
+        if let Some(path) = env::var_os("LIK_FIRMWARE_DIR") {
+            config.storage.firmware_dir = Some(path.into());
+        }
+        if let Ok(backend) = env::var("LIK_NORMAL_BACKEND") {
+            config.transport.normal_backend = match backend.as_str() {
+                "auto" => NormalBackend::Auto,
+                "system" => NormalBackend::System,
+                "direct" => NormalBackend::Direct,
+                _ => {
+                    return Err(anyhow!(
+                        "LIK_NORMAL_BACKEND must be auto, system, or direct"
+                    ));
+                }
+            };
+        }
+        if let Ok(value) = env::var("LIK_FIRMWARE_CATALOG") {
+            config.network.firmware_catalog = Some(value);
+        }
+        if let Ok(value) = env::var("LIK_TSS_ENDPOINT") {
+            config.network.tss_endpoint = Some(value);
+        }
+        if let Ok(value) = env::var("LIK_RESOURCE_BASE") {
+            config.network.resource_base = Some(value);
+        }
+        if let Ok(value) = env::var("LIK_DOWNLOAD_CONCURRENCY") {
+            config.network.download_concurrency = Some(
+                value
+                    .parse()
+                    .context("LIK_DOWNLOAD_CONCURRENCY must be a positive integer")?,
+            );
+            if config.network.download_concurrency == Some(0) {
+                return Err(anyhow!("LIK_DOWNLOAD_CONCURRENCY must be positive"));
+            }
+        }
         Ok(config)
     }
 
@@ -83,6 +126,7 @@ pub(crate) struct StorageConfig {
     pub(crate) cache_dir: Option<PathBuf>,
     pub(crate) data_dir: Option<PathBuf>,
     pub(crate) work_dir: Option<PathBuf>,
+    pub(crate) firmware_dir: Option<PathBuf>,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
