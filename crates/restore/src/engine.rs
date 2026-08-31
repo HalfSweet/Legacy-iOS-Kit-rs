@@ -244,6 +244,8 @@ pub enum RestoreRunError {
     Connect(#[from] RestoredConnectError),
     #[error(transparent)]
     Asr(#[from] AsrError),
+    #[error("restore data provider failed")]
+    DataProvider(#[source] Box<dyn std::error::Error + Send + Sync>),
     #[error("restore failed with AMR error {0}")]
     Amr(u64),
     #[error("restore failed with device status {0}")]
@@ -254,6 +256,12 @@ pub enum RestoreRunError {
     SystemImage(String),
     #[error("restored requested a separate data port without a configured connector")]
     DataPortNotConfigured,
+}
+
+impl RestoreRunError {
+    pub fn data_provider(error: impl std::error::Error + Send + Sync + 'static) -> Self {
+        Self::DataProvider(Box::new(error))
+    }
 }
 
 #[cfg(test)]
