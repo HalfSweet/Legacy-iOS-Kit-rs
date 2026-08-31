@@ -12,11 +12,11 @@ use clap::{ArgAction, Parser, Subcommand, ValueEnum};
 use legacy_ios_kit::{
     AfcPath, AppFilter, BackupOptions, BackupOutcome, BackupRestoreOptions, BasebandPolicy,
     BoardConfig, DeviceDiagnostics, DeviceFileInfo, DeviceInventory, DeviceStorageInfo,
-    DeviceSummary, Ecid, ExploitPolicy, FirmwareSummary, InstalledApp, LegacyIosKit,
+    DeviceSummary, Ecid, ExploitPolicy, FirmwareSummary, HostKeyPolicy, InstalledApp, LegacyIosKit,
     OperationEvent, OperationHandle, OperationOutcome, ProductType, RecoveryDeviceInfo,
     RecoveryUploadResult, RemoteFirmwareSummary, RestoreBehavior, RestoreExecutionRequest,
-    RestorePlan, RestoreRequest, SepPolicy, ShshRequest, ShshSummary, SigningTicket, TicketPolicy,
-    Udid,
+    RestorePlan, RestoreRequest, SepPolicy, ShshRequest, ShshSummary, SigningTicket,
+    SshCommandOutput, SshPassword, SshTarget, TicketPolicy, Udid,
 };
 use tracing::level_filters::LevelFilter;
 use tracing::{debug, info, warn};
@@ -60,6 +60,10 @@ enum Command {
         #[command(subcommand)]
         command: FirmwareCommand,
     },
+    Ramdisk {
+        #[command(subcommand)]
+        command: RamdiskCommand,
+    },
     Restore {
         #[command(subcommand)]
         command: RestoreCommand,
@@ -67,6 +71,21 @@ enum Command {
     Shsh {
         #[command(subcommand)]
         command: ShshCommand,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+enum RamdiskCommand {
+    /// Execute a command over SSH through the system USB mux.
+    Ssh {
+        #[arg(long)]
+        device_id: Option<u32>,
+        #[arg(long, default_value = "root")]
+        username: String,
+        #[arg(long)]
+        host_key: Option<String>,
+        #[arg(required = true, num_args = 1.., trailing_var_arg = true)]
+        command: Vec<String>,
     },
 }
 
@@ -866,6 +885,45 @@ async fn main() -> Result<()> {
             }
             consume_operation(output, kit.execute_restore(request)).await?;
         }
+        Command::Ramdisk {
+            command:
+                RamdiskCommand::Ssh {
+                    device_id,
+                    username,
+                    host_key,
+                    command,
+                },
+        } => {
+            let password = SshPassword::new(
+                rpassword::prompt_password("SSH password: ")
+                    .context("failed to read SSH password")?,
+            );
+            let target = device_id.map_or(SshTarget::OnlyUsbDevice, SshTarget::DeviceId);
+            let host_key = host_key.map_or_else(
+                || {
+                    warn!("accepting ephemeral ramdisk SSH host key");
+                    HostKeyPolicy::AcceptEphemeral
+                },
+                HostKeyPolicy::Sha256,
+            );
+            let ssh = kit
+                .devices()
+                .ramdisk_ssh(target, &username, &password, host_key)
+                .await
+                .context("failed to connect to ramdisk SSH")?;
+            let result = ssh
+                .execute(&command.join(" "))
+                .await
+                .context("ramdisk SSH command failed")?;
+            ssh.disconnect().await?;
+            write_ssh_output(output, &result)?;
+            if !result.success() {
+                return Err(anyhow!(
+                    "remote command exited with status {:?}",
+                    result.exit_status()
+                ));
+            }
+        }
         Command::Shsh {
             command:
                 ShshCommand::Save {
@@ -940,6 +998,29 @@ fn write_config(format: OutputFormat, config: &AppConfig) -> Result<()> {
             writeln!(output)?;
         }
         OutputFormat::Human => write!(output, "{}", toml::to_string_pretty(config)?)?,
+    }
+    Ok(())
+}
+
+fn write_ssh_output(format: OutputFormat, result: &SshCommandOutput) -> Result<()> {
+    match format {
+        OutputFormat::Json => {
+            let stdout = io::stdout();
+            let mut output = stdout.lock();
+            serde_json::to_writer(
+                &mut output,
+                &serde_json::json!({
+                    "stdout": String::from_utf8_lossy(result.stdout()),
+                    "stderr": String::from_utf8_lossy(result.stderr()),
+                    "exit_status": result.exit_status(),
+                }),
+            )?;
+            writeln!(output)?;
+        }
+        OutputFormat::Human => {
+            io::stdout().lock().write_all(result.stdout())?;
+            io::stderr().lock().write_all(result.stderr())?;
+        }
     }
     Ok(())
 }
