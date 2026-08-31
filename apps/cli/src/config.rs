@@ -6,6 +6,7 @@ use std::{
 
 use anyhow::{Context, Result, anyhow};
 use directories::ProjectDirs;
+use legacy_ios_kit::NormalBackend;
 use serde::{Deserialize, Serialize};
 use tracing::level_filters::LevelFilter;
 
@@ -74,15 +75,6 @@ pub(crate) struct StorageConfig {
     pub(crate) cache_dir: Option<PathBuf>,
     pub(crate) data_dir: Option<PathBuf>,
     pub(crate) work_dir: Option<PathBuf>,
-}
-
-#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize)]
-#[serde(rename_all = "kebab-case")]
-pub(crate) enum NormalBackend {
-    #[default]
-    Auto,
-    System,
-    Direct,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]

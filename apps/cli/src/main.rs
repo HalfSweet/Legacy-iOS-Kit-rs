@@ -246,7 +246,7 @@ impl From<AppFilterArg> for AppFilter {
 enum DeviceCommand {
     /// List normal, Recovery, DFU, WTF, and KIS devices.
     List,
-    /// Pair a normal-mode device and persist its pairing record in the system mux.
+    /// Pair a normal-mode device through the configured backend.
     Pair { udid: Udid },
     /// Read battery diagnostics from a paired normal-mode device.
     Battery { udid: Udid },
@@ -491,11 +491,12 @@ async fn main() -> Result<()> {
     let config = AppConfig::load(cli.config.as_deref())?;
     let output = cli.output.or(config.output).unwrap_or_default();
     init_tracing(&cli, &config)?;
+    let kit = LegacyIosKit::new().with_normal_backend(config.transport.normal_backend);
     let kit = match config.network.tss_endpoint.as_deref() {
-        Some(endpoint) => LegacyIosKit::new()
+        Some(endpoint) => kit
             .with_tss_endpoint(endpoint)
             .context("invalid configured TSS endpoint")?,
-        None => LegacyIosKit::new(),
+        None => kit,
     };
 
     match cli.command {
