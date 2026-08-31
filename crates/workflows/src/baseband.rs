@@ -190,6 +190,8 @@ fn required_unsigned(
 
 #[derive(Debug, Error)]
 pub enum BasebandRequestError {
+    #[error("baseband updates are disabled for this restore")]
+    Disabled,
     #[error("restore plan has no board config")]
     MissingBoardConfig,
     #[error("restore plan has no ECID")]

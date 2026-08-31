@@ -4,20 +4,23 @@ use std::{
     time::Duration,
 };
 
-use legacy_ios_firmware::{FirmwareArchive, FirmwareError};
+use legacy_ios_firmware::{FirmwareArchive, FirmwareError, TssClient};
 use legacy_ios_restore::{
-    ASR_PORT, AsrClient, AsrProgress, RestoreOptions, RestoreProgress, RestoreRunError,
-    RestoredConnectError, RestoredConnector, run_restored_session,
+    ASR_PORT, AsrClient, AsrProgress, DataRequest, DataType, DispatchAction, RestoreOptions,
+    RestoreProgress, RestoreRunError, RestoredConnectError, RestoredConnector,
+    run_restored_session_with_dispatcher,
 };
 use thiserror::Error;
 
 use crate::{
-    BasebandPolicy, ExploitPolicy, RestoreBootError, RestorePlan, RestorePreparation, boot_restore,
+    BasebandPolicy, BasebandRequestError, BasebandResolver, ExploitPolicy, RestoreBootError,
+    RestorePlan, RestorePreparation, boot_restore,
 };
 
 pub async fn run_restore<P>(
     plan: &RestorePlan,
     preparation: &RestorePreparation,
+    tss: &TssClient,
     work_directory: &Path,
     options: &RestoreOptions,
     progress: P,
@@ -28,9 +31,13 @@ where
     if plan.id() != preparation.plan_id() {
         return Err(RestoreExecutionError::PreparationMismatch);
     }
-    if !matches!(plan.baseband_policy(), BasebandPolicy::None) {
-        return Err(RestoreExecutionError::BasebandNotPrepared);
-    }
+    let baseband = match plan.baseband_policy() {
+        BasebandPolicy::Auto => Some(Arc::new(BasebandResolver::new(plan, tss.clone())?)),
+        BasebandPolicy::None => None,
+        BasebandPolicy::Provided(_) => {
+            return Err(RestoreExecutionError::ProvidedBasebandUnsupported);
+        }
+    };
     if matches!(plan.exploit_policy(), ExploitPolicy::Auto) {
         return Err(RestoreExecutionError::ExploitNotResolved);
     }
@@ -52,11 +59,29 @@ where
     let asr_progress = progress.clone();
     let restored_progress = progress.clone();
     let filesystem_for_asr = filesystem.clone();
+    let prepared_data = Arc::new(preparation.restored_data().clone());
 
-    run_restored_session(
+    run_restored_session_with_dispatcher(
         &mut restored,
         options,
-        preparation.restored_data(),
+        move |request: DataRequest| {
+            let baseband = baseband.clone();
+            let prepared_data = prepared_data.clone();
+            async move {
+                if matches!(request.data_type(), DataType::Baseband) {
+                    let resolver = baseband.ok_or_else(|| {
+                        RestoreRunError::data_provider(BasebandRequestError::Disabled)
+                    })?;
+                    let response = resolver
+                        .resolve(&request)
+                        .await
+                        .map_err(RestoreRunError::data_provider)?;
+                    Ok(DispatchAction::Send(response))
+                } else {
+                    Ok(prepared_data.dispatch(request.data_type())?)
+                }
+            }
+        },
         move |port| {
             let data_connector = data_connector.clone();
             let filesystem = filesystem_for_asr.clone();
@@ -110,12 +135,14 @@ pub enum RestoreExecutionError {
     PreparationMismatch,
     #[error("restore execution requires an ECID")]
     MissingEcid,
-    #[error("baseband data must be resolved before restore execution")]
-    BasebandNotPrepared,
+    #[error("provided baseband firmware execution is not implemented")]
+    ProvidedBasebandUnsupported,
     #[error("automatic exploit policy must be resolved before restore execution")]
     ExploitNotResolved,
     #[error(transparent)]
     Firmware(#[from] FirmwareError),
+    #[error(transparent)]
+    Baseband(#[from] BasebandRequestError),
     #[error(transparent)]
     Boot(#[from] RestoreBootError),
     #[error(transparent)]
