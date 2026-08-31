@@ -1055,6 +1055,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e712f64ec3850b98572bffac52e2c6f282b29fe6c5fa6d42334b30be438d95c1"
 
 [[package]]
+name = "hfsplus"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5b3bb07e5acba3feb1c57eede7b9cb325e1738f181a676c1ee5439467dcaade8"
+dependencies = [
+ "byteorder",
+ "thiserror 2.0.20",
+]
+
+[[package]]
 name = "hkdf"
 version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1500,6 +1510,7 @@ dependencies = [
  "crc32fast",
  "flate2",
  "hex",
+ "hfsplus",
  "legacy-ios-core",
  "plist",
  "thiserror 2.0.20",

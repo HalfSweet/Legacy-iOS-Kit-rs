@@ -5,6 +5,7 @@
 mod crypto;
 mod dmg;
 mod fls;
+mod hfs;
 mod img3;
 mod img4;
 mod mbn;
@@ -14,6 +15,7 @@ mod patch;
 pub use crypto::{CryptoError, decrypt_cbc, encrypt_cbc};
 pub use dmg::{DmgError, DmgImage, DmgPartition, DmgPartitionInput};
 pub use fls::{FlsError, FlsFile};
+pub use hfs::{HfsEntry, HfsEntryKind, HfsError, HfsImage, HfsStat};
 pub use img3::{Img3, Img3Element, Img3Error, Img3Tag};
 pub use img4::{Img4Error, personalize_img4};
 pub use mbn::{MbnError, MbnFile, MbnFormat};
