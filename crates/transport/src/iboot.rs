@@ -11,7 +11,9 @@ use nusb::{
 use thiserror::Error;
 use tracing::{debug, trace};
 
-use crate::{RecoveryDeviceInfo, classify_apple_mode, parse_iboot_serial};
+use crate::{
+    RecoveryDeviceInfo, classify_apple_mode, parse_iboot_serial, recovery::parse_kis_serial,
+};
 
 const CONTROL_TIMEOUT: Duration = Duration::from_secs(10);
 const KIS_PORTAL_CONFIG: u8 = 0x01;
@@ -19,8 +21,10 @@ const KIS_PORTAL_RSM: u8 = 0x10;
 const KIS_INDEX_UPLOAD: u16 = 0x0d;
 const KIS_INDEX_ENABLE_A: u16 = 0x0a;
 const KIS_INDEX_ENABLE_B: u16 = 0x14;
+const KIS_INDEX_GET_INFO: u16 = 0x100;
 const KIS_INDEX_BOOT_IMAGE: u16 = 0x103;
 const KIS_CHUNK_SIZE: usize = 0x4000;
+const KIS_DEVICE_INFO_SIZE: usize = 0x300;
 
 pub struct IbootClient {
     device: Device,
@@ -50,7 +54,9 @@ impl IbootClient {
                     (device_info, mode, parsed)
                 })
             })
-            .filter(|(_, _, info)| selector.is_none_or(|ecid| info.ecid() == Some(ecid)))
+            .filter(|(_, mode, info)| {
+                selector.is_none_or(|ecid| *mode == DeviceMode::Kis || info.ecid() == Some(ecid))
+            })
             .collect::<Vec<_>>();
 
         let (device_info, mode, info) = match candidates.len() {
@@ -70,12 +76,20 @@ impl IbootClient {
         }
         let interface = device.claim_interface(0).await?;
 
-        Ok(Self {
+        let mut client = Self {
             device,
             interface,
             mode,
             info,
-        })
+        };
+        if mode == DeviceMode::Kis {
+            client.initialize_kis().await?;
+            client.info = client.kis_device_info().await?;
+            if selector.is_some_and(|ecid| client.info.ecid() != Some(ecid)) {
+                return Err(RecoveryError::NoDevice);
+            }
+        }
+        Ok(client)
     }
 
     pub const fn mode(&self) -> DeviceMode {
@@ -251,10 +265,7 @@ impl IbootClient {
     }
 
     async fn upload_kis(&self, data: &[u8], boot: bool) -> Result<(), RecoveryError> {
-        self.kis_write32(KIS_PORTAL_CONFIG, KIS_INDEX_ENABLE_A, 0x21)
-            .await?;
-        self.kis_write32(KIS_PORTAL_CONFIG, KIS_INDEX_ENABLE_B, 0x01)
-            .await?;
+        self.initialize_kis().await?;
 
         let mut address = 0_u64;
         for (index, chunk) in data.chunks(KIS_CHUNK_SIZE).enumerate() {
@@ -269,6 +280,27 @@ impl IbootClient {
                 .await?;
         }
         Ok(())
+    }
+
+    async fn initialize_kis(&self) -> Result<(), RecoveryError> {
+        self.kis_write32(KIS_PORTAL_CONFIG, KIS_INDEX_ENABLE_A, 0x21)
+            .await?;
+        self.kis_write32(KIS_PORTAL_CONFIG, KIS_INDEX_ENABLE_B, 0x01)
+            .await
+    }
+
+    async fn kis_device_info(&self) -> Result<RecoveryDeviceInfo, RecoveryError> {
+        let request = kis_request_header(
+            KIS_PORTAL_RSM,
+            KIS_INDEX_GET_INFO,
+            0,
+            0,
+            (KIS_DEVICE_INFO_SIZE / 4) as u16,
+        )?;
+        let reply = self
+            .kis_request(KIS_PORTAL_RSM, request, 12 + KIS_DEVICE_INFO_SIZE + 8)
+            .await?;
+        parse_kis_info_reply(&reply)
     }
 
     async fn kis_write32(&self, portal: u8, index: u16, value: u32) -> Result<(), RecoveryError> {
@@ -672,6 +704,47 @@ fn kis_upload_request(address: u64, data: &[u8]) -> Result<Vec<u8>, RecoveryErro
     Ok(request)
 }
 
+fn parse_kis_info_reply(reply: &[u8]) -> Result<RecoveryDeviceInfo, RecoveryError> {
+    let status = u32::from_le_bytes(
+        reply
+            .get(12 + KIS_DEVICE_INFO_SIZE + 4..12 + KIS_DEVICE_INFO_SIZE + 8)
+            .ok_or(RecoveryError::InvalidKisReply)?
+            .try_into()
+            .map_err(|_| RecoveryError::InvalidKisReply)?,
+    );
+    if status != 0 {
+        return Err(RecoveryError::KisRequestRejected { status });
+    }
+    let payload = reply
+        .get(12..12 + KIS_DEVICE_INFO_SIZE)
+        .ok_or(RecoveryError::InvalidKisReply)?;
+    let serial_index = *payload.get(80).ok_or(RecoveryError::InvalidKisReply)?;
+    let nonce_index = u32::from_le_bytes(
+        payload[24..28]
+            .try_into()
+            .map_err(|_| RecoveryError::InvalidKisReply)?,
+    );
+    let serial = kis_string(payload, u32::from(serial_index))?;
+    let nonces = kis_string(payload, nonce_index)?;
+    Ok(parse_kis_serial(&serial, &nonces))
+}
+
+fn kis_string(payload: &[u8], word_offset: u32) -> Result<String, RecoveryError> {
+    let offset = usize::try_from(word_offset)
+        .ok()
+        .and_then(|offset| offset.checked_mul(4))
+        .ok_or(RecoveryError::InvalidKisReply)?;
+    let length = usize::from(*payload.get(offset).ok_or(RecoveryError::InvalidKisReply)?);
+    if payload.get(offset + 1) != Some(&3) || !length.is_multiple_of(2) {
+        return Err(RecoveryError::InvalidKisReply);
+    }
+    let descriptor = payload
+        .get(offset + 2..offset + 2 + length)
+        .ok_or(RecoveryError::InvalidKisReply)?;
+    let bytes = descriptor.iter().step_by(2).copied().collect::<Vec<_>>();
+    String::from_utf8(bytes).map_err(|_| RecoveryError::InvalidKisReply)
+}
+
 #[derive(Debug, Error)]
 pub enum RecoveryError {
     #[error("no Apple device was found in Recovery, DFU, WTF, or KIS mode")]
@@ -757,5 +830,39 @@ mod tests {
         assert_eq!(&request[12..20], &0x1122_3344_5566_7788_u64.to_le_bytes());
         assert_eq!(&request[20..24], &3_u32.to_le_bytes());
         assert_eq!(&request[24..], &[1, 2, 3]);
+    }
+
+    #[test]
+    fn reads_kis_string_descriptor() {
+        let mut payload = vec![0; 32];
+        payload[8] = 8;
+        payload[9] = 3;
+        payload[10..18].copy_from_slice(&[b'T', 0, b'E', 0, b'S', 0, b'T', 0]);
+
+        assert_eq!(kis_string(&payload, 2).unwrap(), "TEST");
+    }
+
+    #[test]
+    fn parses_kis_device_info_reply() {
+        fn write_descriptor(payload: &mut [u8], word_offset: usize, value: &str) {
+            let offset = word_offset * 4;
+            payload[offset] = (value.len() * 2) as u8;
+            payload[offset + 1] = 3;
+            for (index, byte) in value.bytes().enumerate() {
+                payload[offset + 2 + index * 2] = byte;
+            }
+        }
+
+        let mut reply = vec![0; 12 + KIS_DEVICE_INFO_SIZE + 8];
+        let payload = &mut reply[12..12 + KIS_DEVICE_INFO_SIZE];
+        payload[80] = 32;
+        payload[24..28].copy_from_slice(&64_u32.to_le_bytes());
+        write_descriptor(payload, 32, "CPID:8010 ECID:1234 SRTG:[iBoot-test]");
+        write_descriptor(payload, 64, "NONC:0011 SNON:2233");
+
+        let info = parse_kis_info_reply(&reply).unwrap();
+        assert_eq!(info.ecid(), Some(Ecid::new(0x1234)));
+        assert_eq!(info.ap_nonce(), Some([0x00, 0x11].as_slice()));
+        assert_eq!(info.sep_nonce(), Some([0x22, 0x33].as_slice()));
     }
 }

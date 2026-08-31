@@ -100,6 +100,10 @@ pub fn parse_iboot_serial(serial: &str) -> RecoveryDeviceInfo {
     }
 }
 
+pub(crate) fn parse_kis_serial(serial: &str, nonces: &str) -> RecoveryDeviceInfo {
+    parse_iboot_serial(&format!("{serial} {nonces}"))
+}
+
 fn field_value<'a>(source: &'a str, tag: &str) -> Option<&'a str> {
     let value = source
         .split_whitespace()
@@ -164,5 +168,17 @@ mod tests {
 
         assert_eq!(info.cpid(), None);
         assert_eq!(info.effective_cpid(), 0x8900);
+    }
+
+    #[test]
+    fn merges_kis_nonce_descriptor() {
+        let info = parse_kis_serial(
+            "CPID:8010 ECID:1234 SRTG:[iBoot-test]",
+            "NONC:0011 SNON:2233",
+        );
+
+        assert_eq!(info.ecid(), Some(Ecid::new(0x1234)));
+        assert_eq!(info.ap_nonce(), Some([0x00, 0x11].as_slice()));
+        assert_eq!(info.sep_nonce(), Some([0x22, 0x33].as_slice()));
     }
 }
