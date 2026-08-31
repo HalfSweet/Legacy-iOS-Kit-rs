@@ -80,6 +80,7 @@ pub struct RestorePlan {
 
 impl RestorePlan {
     pub fn resolve(request: RestoreRequest) -> Result<Self, RestorePlanError> {
+        let mut request = request;
         let selector = request
             .device
             .selector()
@@ -89,6 +90,9 @@ impl RestorePlan {
             .ok_or_else(|| {
                 RestorePlanError::UnknownDevice(request.device.product_type().clone())
             })?;
+        if !profile.has_baseband() && matches!(request.baseband, BasebandPolicy::Auto) {
+            request.baseband = BasebandPolicy::None;
+        }
         let board_config = request
             .device
             .board_config()
