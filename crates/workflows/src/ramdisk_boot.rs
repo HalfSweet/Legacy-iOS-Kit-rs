@@ -4,7 +4,6 @@ use std::time::Duration;
 use legacy_ios_core::{DeviceMode, Ecid};
 use legacy_ios_firmware::SigningTicket;
 use legacy_ios_transport::{IbootClient, RecoveryError, UploadResult};
-use plist::Value;
 use sha2::Digest as _;
 use thiserror::Error;
 use tokio::time::Instant;
@@ -79,14 +78,6 @@ impl RamdiskBootPreparation {
 
 fn ticket_payload(data: &[u8]) -> Result<Vec<u8>, RamdiskPreparationError> {
     let ticket = SigningTicket::from_reader(std::io::Cursor::new(data))?;
-    if let Some(data) = ticket
-        .dictionary()
-        .get("APTicket")
-        .or_else(|| ticket.dictionary().get("ApImg4Ticket"))
-        .and_then(Value::as_data)
-    {
-        return Ok(data.to_owned());
-    }
     Ok(ticket.root_ticket().to_vec())
 }
 
@@ -212,6 +203,7 @@ enum ChainState {
     SentIbecDfu,
     SentIbecRecovery,
     SentGo,
+    ReconnectAfterGo,
     RecoveryPhase,
     Done,
 }
@@ -230,6 +222,7 @@ impl RamdiskBootChain {
             pending.push_back(RamdiskBootAction::Command("ticket".into()));
         }
         pending.push_back(RamdiskBootAction::UploadRecovery(RAMDISK));
+        pending.push_back(RamdiskBootAction::Command("getenv ramdisk-delay".into()));
         pending.push_back(RamdiskBootAction::Command("ramdisk".into()));
         pending.push_back(RamdiskBootAction::Settle(RAMDISK_SETTLE));
         pending.push_back(RamdiskBootAction::UploadRecovery(DEVICE_TREE));
@@ -288,6 +281,10 @@ impl RamdiskBootChain {
                     self.state = ChainState::RecoveryPhase;
                 }
                 ChainState::SentGo => {
+                    self.state = ChainState::ReconnectAfterGo;
+                    return Ok(RamdiskBootAction::Command("go".into()));
+                }
+                ChainState::ReconnectAfterGo => {
                     self.state = ChainState::RecoveryPhase;
                     return Ok(RamdiskBootAction::Reconnect);
                 }
@@ -368,6 +365,16 @@ mod tests {
     }
 
     #[test]
+    fn prefers_img4_root_ticket_when_ticket_contains_legacy_data() {
+        let ticket = br#"<?xml version="1.0"?><plist version="1.0"><dict>
+<key>APTicket</key><data>AQ==</data>
+<key>ApImg4Ticket</key><data>Ag==</data>
+</dict></plist>"#;
+
+        assert_eq!(ticket_payload(ticket).unwrap(), [2]);
+    }
+
+    #[test]
     fn boots_64_bit_chain_from_dfu() {
         let mut chain = RamdiskBootChain::new(true, true, true, "rd=md0".into());
 
@@ -382,10 +389,12 @@ mod tests {
             vec![
                 RamdiskBootAction::UploadDfu(IBSS),
                 RamdiskBootAction::UploadRecovery(IBEC),
+                RamdiskBootAction::Command("go".into()),
                 RamdiskBootAction::Reconnect,
                 RamdiskBootAction::UploadRecovery(APTICKET),
                 RamdiskBootAction::Command("ticket".into()),
                 RamdiskBootAction::UploadRecovery(RAMDISK),
+                RamdiskBootAction::Command("getenv ramdisk-delay".into()),
                 RamdiskBootAction::Command("ramdisk".into()),
                 RamdiskBootAction::Settle(RAMDISK_SETTLE),
                 RamdiskBootAction::UploadRecovery(DEVICE_TREE),
@@ -410,6 +419,7 @@ mod tests {
             actions,
             vec![
                 RamdiskBootAction::UploadRecovery(RAMDISK),
+                RamdiskBootAction::Command("getenv ramdisk-delay".into()),
                 RamdiskBootAction::Command("ramdisk".into()),
                 RamdiskBootAction::Settle(RAMDISK_SETTLE),
                 RamdiskBootAction::UploadRecovery(DEVICE_TREE),
@@ -456,6 +466,17 @@ mod tests {
             error,
             RamdiskBootError::ExpectedRecovery(DeviceMode::Dfu)
         ));
+    }
+
+    #[test]
+    fn sends_go_before_reconnecting_recovery_ibec() {
+        let mut chain = RamdiskBootChain::new(true, false, false, "rd=md0".into());
+
+        let actions = drive(&mut chain, &[DeviceMode::Recovery, DeviceMode::Recovery]).unwrap();
+
+        assert_eq!(actions[0], RamdiskBootAction::UploadRecovery(IBEC));
+        assert_eq!(actions[1], RamdiskBootAction::Command("go".into()));
+        assert_eq!(actions[2], RamdiskBootAction::Reconnect);
     }
 
     #[test]
