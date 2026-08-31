@@ -1,4 +1,7 @@
-use std::path::{Component, Path, PathBuf};
+use std::{
+    fmt,
+    path::{Component, Path, PathBuf},
+};
 
 use plist::{Dictionary, Value};
 use serde::Serialize;
@@ -8,6 +11,7 @@ use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
 };
 use tracing::{debug, info, trace};
+use zeroize::Zeroize;
 
 use crate::{NormalDevice, RawServiceConnection, ServiceError};
 
@@ -36,13 +40,14 @@ pub struct BackupOutcome {
     bytes: u64,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct BackupRestoreOptions {
     reboot: bool,
     copy_backup: bool,
     preserve_settings: bool,
     system_files: bool,
     remove_items_not_restored: bool,
+    password: Option<BackupPassword>,
 }
 
 impl Default for BackupRestoreOptions {
@@ -53,6 +58,7 @@ impl Default for BackupRestoreOptions {
             preserve_settings: true,
             system_files: false,
             remove_items_not_restored: false,
+            password: None,
         }
     }
 }
@@ -78,7 +84,12 @@ impl BackupRestoreOptions {
         self
     }
 
-    fn dictionary(self) -> Dictionary {
+    pub fn with_password(mut self, password: BackupPassword) -> Self {
+        self.password = Some(password);
+        self
+    }
+
+    fn dictionary(&self) -> Dictionary {
         let mut options = Dictionary::new();
         options.insert("RestoreShouldReboot".into(), self.reboot.into());
         options.insert("RestoreDontCopyBackup".into(), (!self.copy_backup).into());
@@ -91,7 +102,37 @@ impl BackupRestoreOptions {
             "RemoveItemsNotRestored".into(),
             self.remove_items_not_restored.into(),
         );
+        if let Some(password) = &self.password {
+            options.insert("Password".into(), password.as_str().into());
+        }
         options
+    }
+}
+
+#[derive(Clone, Eq, PartialEq)]
+pub struct BackupPassword(String);
+
+impl BackupPassword {
+    pub fn new(value: impl Into<String>) -> Self {
+        Self(value.into())
+    }
+
+    fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl fmt::Debug for BackupPassword {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("BackupPassword")
+            .finish_non_exhaustive()
+    }
+}
+
+impl Drop for BackupPassword {
+    fn drop(&mut self) {
+        self.0.zeroize();
     }
 }
 
@@ -142,6 +183,25 @@ impl NormalDevice {
         let mut protocol = MobileBackup2::connect(stream).await?;
         protocol
             .start_erase(work_directory, self.udid().as_str())
+            .await
+    }
+
+    pub async fn change_backup_password(
+        &self,
+        work_directory: &Path,
+        old: Option<&BackupPassword>,
+        new: Option<&BackupPassword>,
+    ) -> Result<BackupOutcome, BackupError> {
+        fs::create_dir_all(work_directory).await?;
+        let stream = self.connect_service(MOBILEBACKUP2).await?;
+        let mut protocol = MobileBackup2::connect(stream).await?;
+        protocol
+            .start_change_password(
+                work_directory,
+                self.udid().as_str(),
+                old.map(BackupPassword::as_str),
+                new.map(BackupPassword::as_str),
+            )
             .await
     }
 }
@@ -251,6 +311,33 @@ impl MobileBackup2 {
             return Err(remote_error(&response));
         }
         self.exchange(root, "erase").await
+    }
+
+    async fn start_change_password(
+        &mut self,
+        root: &Path,
+        target_identifier: &str,
+        old: Option<&str>,
+        new: Option<&str>,
+    ) -> Result<BackupOutcome, BackupError> {
+        let mut request = Dictionary::new();
+        request.insert("TargetIdentifier".into(), target_identifier.into());
+        if let Some(old) = old {
+            request.insert("OldPassword".into(), old.into());
+        }
+        if let Some(new) = new {
+            request.insert("NewPassword".into(), new.into());
+        }
+        self.link
+            .send_process_message("ChangePassword", request)
+            .await?;
+        let response = self.link.receive_process_message().await?;
+        if response.contains_key("ErrorCode")
+            && response.get("ErrorCode").and_then(unsigned) != Some(0)
+        {
+            return Err(remote_error(&response));
+        }
+        self.exchange(root, "change-password").await
     }
 
     async fn exchange(

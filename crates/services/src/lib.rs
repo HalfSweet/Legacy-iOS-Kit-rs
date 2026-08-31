@@ -12,7 +12,7 @@ mod ssh;
 
 pub use activation::ActivationState;
 pub use app::{AppFilter, InstalledApp};
-pub use backup::{BackupError, BackupOptions, BackupOutcome, BackupRestoreOptions};
+pub use backup::{BackupError, BackupOptions, BackupOutcome, BackupPassword, BackupRestoreOptions};
 pub use files::{
     AfcPath, AfcPathError, DeviceFileInfo, DeviceFileKind, DeviceFiles, DeviceStorageInfo,
 };
