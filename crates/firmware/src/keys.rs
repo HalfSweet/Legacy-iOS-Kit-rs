@@ -152,7 +152,9 @@ fn decode_iv(value: &str) -> Result<[u8; 16], FirmwareKeyError> {
 
 fn decode_key(value: &str) -> Result<Vec<u8>, FirmwareKeyError> {
     let key = hex::decode(value)?;
-    if !matches!(key.len(), 16 | 24 | 32) {
+    // 16/24/32 bytes are AES keys; 36 bytes is a rootfs vfdecrypt key
+    // (16-byte AES key followed by a 20-byte HMAC key).
+    if !matches!(key.len(), 16 | 24 | 32 | 36) {
         return Err(FirmwareKeyError::InvalidKeyMaterial);
     }
     Ok(key)
@@ -206,6 +208,17 @@ mod tests {
         assert_eq!(ibss.key().map(<[u8]>::len), Some(32));
         assert!(set.key("GlyphPlugin").unwrap().key().is_none());
         assert!(set.key("RootFS").is_none());
+    }
+
+    #[test]
+    fn accepts_rootfs_vfdecrypt_key() {
+        let rootfs_key = "00".repeat(36);
+        let set = FirmwareKeySet::parse(
+            format!(r#"{{"keys":[{{"image":"RootFS","filename":"rootfs.dmg","iv":null,"key":"{rootfs_key}","kbag":null}}]}}"#)
+                .as_bytes(),
+        )
+        .unwrap();
+        assert_eq!(set.key("RootFS").unwrap().key().map(<[u8]>::len), Some(36));
     }
 
     #[test]
