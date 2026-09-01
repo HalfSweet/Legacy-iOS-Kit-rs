@@ -1397,7 +1397,9 @@ enum RestoreCommand {
         yes: bool,
     },
     /// Restore a foreign classic custom IPSW (`restore_customipsw`):
-    /// ticket-free on every supported classic device.
+    /// ticket-free on every supported classic device, including iOS 2.x
+    /// targets (S5L8900 enters stock WTF mode via buttons; old-bootrom
+    /// iPod2,1 enters pwned DFU).
     CustomIpsw {
         #[arg(long)]
         device: ProductType,

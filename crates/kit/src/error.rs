@@ -106,7 +106,7 @@ pub enum KitError {
     )]
     ClassicRestoreUnsupportedDevice(String),
     #[error(
-        "classic restores support iOS 3.x/4.x targets, found {0}; iPhone2,1 5.x/6.x restores go through `lik restore execute`"
+        "classic restores support iOS 2.x (foreign custom IPSWs only) and 3.x/4.x targets, found {0}; iPhone2,1 5.x/6.x restores go through `lik restore execute`"
     )]
     ClassicRestoreUnsupportedVersion(String),
     #[error("the device identity has no board config")]

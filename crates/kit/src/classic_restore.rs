@@ -1,7 +1,10 @@
 //! Restore-side execution for classic custom IPSWs, porting the
 //! `device_proc 1`/`4`-old branches of upstream's `restore_deviceprepare`
 //! (6500-6563) and `restore_prepare` (6574-6652) plus the S5L8900/old-device
-//! parts of `restore_latest custom` (6336-6363) and idevicerestore's
+//! parts of `restore_latest custom` (6336-6363), the 2.x foreign entry of
+//! `restore_customipsw` (11455-11472: S5L8900 targets other than 3.1.3 enter
+//! stock WTF mode via buttons and idevicerestore's MODE_WTF handling sends
+//! the target IPSW's own `WTF.s5l8900xall.RELEASE.dfu`), and idevicerestore's
 //! `recovery_enter_restore` boot chain (LukeZGD/idevicerestore
 //! `src/recovery.c`).
 //!
@@ -11,6 +14,10 @@
 //!   ([`crate::pwnage`]); on 4.x targets send the custom IPSW's patched WTF 2
 //!   to reach DFU-real, then the custom iBSS; on 3.1.3 reach DFU-real with
 //!   the pwnage WTF and send the custom iBSS.
+//! - proc 1 iOS 2.x foreign restores ([`ClassicBootSequence::WtfThenIbss`]):
+//!   the user button-enters stock WTF mode, the target IPSW's unpatched WTF
+//!   is sent over DFU, and the custom iBSS (unsigned on the S5L8900) boots to
+//!   recovery after the device re-enumerates in DFU/WTF.
 //! - proc 4 old (S5L8720 iPod2,1, S5L8920 iPhone2,1) iOS 3.x/4.2.x custom
 //!   restores with a per-component SHSH blob (`restore_idevicerestore -ew`):
 //!   pwned DFU (24kpwn marker, or limera1n on the S5L8920), personalized iBSS,
@@ -18,23 +25,27 @@
 //!   device tree + `devicetree`, kernelcache, `setenv boot-args
 //!   rd=md0 nand-enable-reformat=1 -progress` on build major >= 8, `bootx`).
 //! - Foreign custom IPSWs (`restore_customipsw`: whited00r/GeekGrade) restore
-//!   ticket-free on both device classes (`idevicerestore -e -c`, no `-w`).
+//!   ticket-free on both device classes (`idevicerestore -e -c`, no `-w`),
+//!   including iPod2,1 old-bootrom 2.x targets (pwned DFU, raw iBSS).
 //!
 //! Engine compatibility: the restore engine's restored session (mux port
-//! 62078, QueryType/QueryValue handshake, StartRestore, DataRequest/StatusMsg
-//! loop with protocol < 14 progress adaptation) speaks the protocol old
-//! ramdisks implement, so the session-level pieces ([`RestoredConnector`],
+//! 62078, QueryType/QueryValue handshake with the pre-iOS 3 HardwareInfo
+//! skip, StartRestore, DataRequest/StatusMsg loop with protocol < 14
+//! progress adaptation and FlashVersion1 NOR responses) speaks the protocol
+//! old ramdisks implement, so the session-level pieces ([`RestoredConnector`],
 //! [`run_restored_session_with_dispatcher`], [`AsrClient`]) are reused
 //! directly. The workflow-level `run_restore`/`boot_restore`/`RestorePlan`
 //! are deliberately not reused: 3.1.3 IPSWs have no BuildManifest, old 4.x
 //! blobs are per-component `Blob` dicts without a root APTicket, and the
 //! patched old iBSS does not set the PWND marker `boot_restore` requires.
-//! Old devices have no FDR, SEP, or boot nonce; baseband data requests error
-//! out like the workflow runner with baseband disabled. The
-//! RestoreLogo/`setpicture` step and idevicerestore's pre-bootx USB control
-//! transfer are skipped (cosmetic / not exposed by the transport); the
-//! restored QueryValue/HardwareInfo handshake on old ramdisks is
-//! hardware-unverified.
+//! Old devices have no FDR, SEP, or boot nonce. Baseband data requests are
+//! answered with a live baseband TSS ticket when the foreign IPSW carries a
+//! signable baseband firmware (BuildManifest `BasebandFirmware`); otherwise
+//! the restore fails with upstream's retry advice (restore.sh:11442-11446).
+//! The RestoreLogo/`setpicture` step and idevicerestore's pre-bootx USB
+//! control transfer are skipped (cosmetic / not exposed by the transport);
+//! the 2.x WTF button entry, the 2.x ramdisk handshake, and the live
+//! baseband TSS path are hardware-unverified.
 
 use std::{
     fmt,
@@ -52,13 +63,14 @@ use legacy_ios_core::{
     Ecid, IosVersion, OperationEvent, OperationKind, OperationOutcome, OperationPhase, Progress,
     ProgressUnit, Soc,
 };
-use legacy_ios_firmware::{BuildIdentity, FirmwareArchive, RestoreBehavior};
+use legacy_ios_firmware::{BuildIdentity, FirmwareArchive, RestoreBehavior, TssClient};
 use legacy_ios_image::Img3;
 use legacy_ios_restore::{
-    ASR_PORT, AsrClient, DataRequest, PreparedRestoreData, RestoreOptions, RestoredConnector,
-    run_restored_session_with_dispatcher,
+    ASR_PORT, AsrClient, DataRequest, DataType, DispatchAction, PreparedRestoreData,
+    RestoreOptions, RestoreRunError, RestoredConnector, run_restored_session_with_dispatcher,
 };
 use legacy_ios_transport::{IbootClient, RecoveryError, UploadResult};
+use legacy_ios_workflows::{BasebandRequestError, BasebandResolver};
 use plist::{Dictionary, Value};
 use tracing::{debug, info};
 
@@ -87,6 +99,11 @@ pub enum ClassicBootSequence {
     /// S5L8900 3.x targets: pwned DFU-real via the pwnage WTF, then the
     /// custom iBSS to recovery (`restore_latest custom`'s 3.1.3 branch).
     DfuThenIbss,
+    /// S5L8900 2.x foreign targets: stock WTF mode entered by button press
+    /// (`device_dfuhelper norec WTFreal`, restore.sh:1946-1975), the target
+    /// IPSW's own unpatched WTF to DFU-real, then the custom iBSS to
+    /// recovery (idevicerestore MODE_WTF + `dfu_enter_recovery`).
+    WtfThenIbss,
     /// iPod2,1/iPhone2,1: pwned DFU (24kpwn/limera1n), personalized iBSS to
     /// recovery (`restore_idevicerestore -ew`).
     PwnedDfu,
@@ -97,6 +114,7 @@ impl ClassicBootSequence {
         match self {
             Self::WtfRealThenIbss => "wtf-real-ibss",
             Self::DfuThenIbss => "dfu-ibss",
+            Self::WtfThenIbss => "wtf-ibss",
             Self::PwnedDfu => "pwned-dfu",
         }
     }
@@ -302,6 +320,7 @@ pub(crate) fn plan(request: ClassicRestoreRequest) -> Result<ClassicRestorePlan,
         .ok_or(KitError::ClassicRestoreMissingBoardConfig)?;
 
     let archive = FirmwareArchive::open(&request.firmware)?;
+    let entries = archive.entry_names()?;
     let manifest = archive.build_manifest().ok();
     let (version, build, identity, paths) = match &manifest {
         Some(manifest) => {
@@ -324,14 +343,12 @@ pub(crate) fn plan(request: ClassicRestoreRequest) -> Result<ClassicRestorePlan,
                 paths,
             )
         }
-        None if soc == Soc::S5l8900 => {
-            let (version, build, paths) = restore_plist_paths(&archive, &board)?;
-            (version, build, None, paths)
-        }
+        // 2.x and 3.x IPSWs carry Restore.plist instead of a BuildManifest;
+        // idevicerestore synthesizes the build identity from the all_flash
+        // manifest in that case (idevicerestore.c:867-1072).
         None => {
-            return Err(KitError::ClassicRestoreMissingComponent(
-                "BuildManifest.plist".to_owned(),
-            ));
+            let (version, build, paths) = restore_plist_paths(&archive, &board, &entries)?;
+            (version, build, None, paths)
         }
     };
 
@@ -340,11 +357,21 @@ pub(crate) fn plan(request: ClassicRestoreRequest) -> Result<ClassicRestorePlan,
         .split('.')
         .next()
         .and_then(|major| major.parse::<u32>().ok());
-    if !matches!(major, Some(3 | 4)) {
+    // iOS 2.x targets exist only as foreign custom IPSWs (the classic
+    // builder does not support them), and only on the S5L8900 (WTF entry)
+    // and the old-bootrom S5L8720 (pwned DFU); the S5L8920 has no 2.x IPSW.
+    let supported = matches!(major, Some(3 | 4))
+        || (major == Some(2) && request.foreign && soc != Soc::S5l8920);
+    if !supported {
         return Err(KitError::ClassicRestoreUnsupportedVersion(format!(
-            "{} {}",
+            "{} {}{}",
             device.product_type(),
-            version
+            version,
+            if major == Some(2) {
+                " (iOS 2.x targets require a foreign custom IPSW and an S5L8900 or old-bootrom iPod2,1)"
+            } else {
+                ""
+            },
         )));
     }
     let build_major = build
@@ -364,11 +391,15 @@ pub(crate) fn plan(request: ClassicRestoreRequest) -> Result<ClassicRestorePlan,
 
     let sequence = match soc {
         Soc::S5l8900 if major == Some(4) => ClassicBootSequence::WtfRealThenIbss,
+        Soc::S5l8900 if major == Some(2) => ClassicBootSequence::WtfThenIbss,
         Soc::S5l8900 => ClassicBootSequence::DfuThenIbss,
         _ => ClassicBootSequence::PwnedDfu,
     };
     let mut paths = paths;
-    if sequence == ClassicBootSequence::WtfRealThenIbss {
+    if matches!(
+        sequence,
+        ClassicBootSequence::WtfRealThenIbss | ClassicBootSequence::WtfThenIbss
+    ) {
         paths.wtf2 = Some("Firmware/dfu/WTF.s5l8900xall.RELEASE.dfu".to_owned());
     }
 
@@ -428,7 +459,6 @@ pub(crate) fn plan(request: ClassicRestoreRequest) -> Result<ClassicRestorePlan,
     required.extend(paths.wtf2.iter().cloned());
     required.extend(nor.iter().map(|(_, path)| path.clone()));
     required.extend(loaded_by_iboot.iter().map(|(_, path)| path.clone()));
-    let entries = archive.entry_names()?;
     for path in required {
         if !entries.contains(&path) {
             return Err(KitError::ClassicRestoreMissingComponent(path));
@@ -481,11 +511,17 @@ fn component_path(identity: &BuildIdentity, component: &'static str) -> Result<S
         .map_err(|_| KitError::ClassicRestoreMissingComponent(component.to_owned()))
 }
 
-/// Version/build and fixed component paths of a 3.x S5L8900 IPSW, which
-/// carries `Restore.plist` instead of a BuildManifest.
+/// Version/build and fixed component paths of a 2.x/3.x IPSW, which carries
+/// `Restore.plist` instead of a BuildManifest. idevicerestore synthesizes
+/// the build identity of such IPSWs from the
+/// `Firmware/all_flash/all_flash.{model}.production` text manifest with an
+/// m68ap → n45ap fallback for the iPhone1,1 (idevicerestore.c:895-926); the
+/// same candidate probing is applied here, with and without the
+/// `.production` suffix.
 fn restore_plist_paths(
     archive: &FirmwareArchive,
     board: &BoardConfig,
+    entries: &[String],
 ) -> Result<(IosVersion, BuildId, ClassicPaths), KitError> {
     let bytes = archive.read_entry("Restore.plist")?;
     let value = plist::Value::from_reader(Cursor::new(bytes))?;
@@ -507,13 +543,76 @@ fn restore_plist_paths(
         }
         value.as_string().map(str::to_owned).ok_or_else(missing)
     };
-    let board = board.as_str();
-    let all_flash = format!("Firmware/all_flash/all_flash.{board}ap");
+
+    let mut classes = vec![format!("{}ap", board.as_str())];
+    if board.as_str() == "m68" {
+        classes.push("n45ap".to_owned());
+    }
+    let mut selected = None;
+    'classes: for class in &classes {
+        for suffix in [".production", ""] {
+            let directory = format!("Firmware/all_flash/all_flash.{class}{suffix}");
+            let manifest_path = format!("{directory}/manifest");
+            if entries.contains(&manifest_path) {
+                let data = archive.read_entry(&manifest_path)?;
+                let manifest = String::from_utf8(data)
+                    .map_err(|_| KitError::ClassicRestoreMissingComponent(manifest_path.clone()))?;
+                selected = Some((class.clone(), directory, manifest));
+                break 'classes;
+            }
+        }
+    }
+    let (class, directory, manifest) = selected.ok_or_else(|| {
+        KitError::ClassicRestoreMissingComponent(format!(
+            "Firmware/all_flash/all_flash.{}ap(.production) manifest",
+            board.as_str()
+        ))
+    })?;
+
+    // LLB/DeviceTree come from the manifest lines; when the manifest lacks
+    // them, probe the fixed old-IPSW file names (with and without .RELEASE).
+    let component = |prefix: &str, candidates: [String; 2]| -> Result<String, KitError> {
+        if let Some(filename) = manifest
+            .lines()
+            .map(|line| line.trim_end_matches('\r'))
+            .find(|line| {
+                line.strip_prefix(prefix)
+                    .is_some_and(|rest| rest.starts_with('.'))
+            })
+        {
+            return Ok(format!("{directory}/{filename}"));
+        }
+        candidates
+            .iter()
+            .find(|path| entries.contains(*path))
+            .cloned()
+            .ok_or_else(|| {
+                KitError::ClassicRestoreMissingComponent(format!(
+                    "{prefix} ({} or {})",
+                    candidates[0], candidates[1]
+                ))
+            })
+    };
+    let llb = component(
+        "LLB",
+        [
+            format!("{directory}/LLB.{class}.RELEASE.img3"),
+            format!("{directory}/LLB.{class}.img3"),
+        ],
+    )?;
+    let device_tree = component(
+        "DeviceTree",
+        [
+            format!("{directory}/DeviceTree.{class}.img3"),
+            format!("{directory}/DeviceTree.{class}.RELEASE.img3"),
+        ],
+    )?;
+
     let paths = ClassicPaths {
-        ibss: format!("Firmware/dfu/iBSS.{board}ap.RELEASE.dfu"),
+        ibss: format!("Firmware/dfu/iBSS.{class}.RELEASE.dfu"),
         wtf2: None,
-        llb: format!("{all_flash}/LLB.{board}ap.RELEASE.img3"),
-        device_tree: format!("{all_flash}/DeviceTree.{board}ap.img3"),
+        llb,
+        device_tree,
         kernel_cache: get(&["RestoreKernelCaches", "Release"])?,
         ramdisk: get(&["RestoreRamDisks", "User"])?,
         rootfs: get(&["SystemRestoreImages", "User"])?,
@@ -762,8 +861,8 @@ async fn execute(
         .extract_entry_to(&plan.paths.rootfs, &filesystem)
         .await?;
 
-    // The device must reach DFU (S5L8900 also accepts pwned WTF) before the
-    // pwn stage; upstream pauses with DFU instructions here.
+    // The device must reach the entry mode of the boot sequence before the
+    // pwn stage; upstream pauses with DFU/WTF instructions here.
     emitter
         .emit(OperationEvent::ActionRequired {
             id: ActionId::new(1),
@@ -776,10 +875,24 @@ async fn execute(
         ClassicBootSequence::WtfRealThenIbss | ClassicBootSequence::DfuThenIbss => {
             &[DeviceMode::Dfu, DeviceMode::Wtf]
         }
+        ClassicBootSequence::WtfThenIbss => &[DeviceMode::Wtf],
         ClassicBootSequence::PwnedDfu => &[DeviceMode::Dfu],
     };
-    let Some(client) =
-        await_iboot(ecid, initial_modes, DEVICE_WAIT_TIMEOUT, "DFU", emitter).await?
+    // S5L8900 bootrom-stage devices (stock WTF/DFU-real) do not expose an
+    // ECID in the USB serial, so the WTF entry waits without a selector, like
+    // upstream, which skips the ECID check for CPID 0x8900.
+    let (selector, entry_mode) = match plan.sequence {
+        ClassicBootSequence::WtfThenIbss => (None, "WTF"),
+        _ => (Some(ecid), "DFU"),
+    };
+    let Some(client) = await_iboot(
+        selector,
+        initial_modes,
+        DEVICE_WAIT_TIMEOUT,
+        entry_mode,
+        emitter,
+    )
+    .await?
     else {
         drop(lease);
         return Ok(None);
@@ -790,6 +903,7 @@ async fn execute(
     let Some(mut client) = (match plan.sequence {
         ClassicBootSequence::WtfRealThenIbss => wtf_real_chain(client, &plan, &boot, emitter).await,
         ClassicBootSequence::DfuThenIbss => dfu_real_chain(client, &plan, &boot, emitter).await,
+        ClassicBootSequence::WtfThenIbss => wtf_ibss_chain(client, &boot, emitter).await,
         ClassicBootSequence::PwnedDfu => pwned_dfu_chain(client, &plan, &boot, emitter).await,
     })?
     else {
@@ -833,6 +947,7 @@ async fn execute(
     let cancellation_deferred = Arc::new(AtomicBool::new(false));
     let options = RestoreOptions::erase().without_baseband();
     let prepared = boot.restored_data;
+    let baseband = classic_baseband_resolver(&plan).map(Arc::new);
     let asr_emitter = emitter.clone();
     let restored_emitter = emitter.clone();
     let asr_deferred = cancellation_deferred.clone();
@@ -841,7 +956,21 @@ async fn execute(
         &options,
         move |request: DataRequest| {
             let prepared = prepared.clone();
-            async move { Ok(prepared.dispatch(&request)?) }
+            let baseband = baseband.clone();
+            async move {
+                if matches!(request.data_type(), DataType::Baseband) {
+                    let resolver = baseband
+                        .ok_or(ClassicBasebandError::Unavailable)
+                        .map_err(RestoreRunError::data_provider)?;
+                    let response = resolver
+                        .resolve(&request)
+                        .await
+                        .map_err(ClassicBasebandError::from)
+                        .map_err(RestoreRunError::data_provider)?;
+                    return Ok(DispatchAction::Send(response));
+                }
+                Ok(prepared.dispatch(&request)?)
+            }
         },
         move |port| {
             let data_connector = data_connector.clone();
@@ -933,6 +1062,46 @@ fn note_cancellation(emitter: &OperationEmitter, deferred: &AtomicBool) {
     }
 }
 
+/// Live baseband ticket resolver of a foreign classic restore, armed when the
+/// custom IPSW's build identity carries a signable `BasebandFirmware`
+/// (BuildManifest-bearing foreign IPSWs). Restore.plist-only IPSWs (2.x/3.x)
+/// have no baseband firmware entry — upstream cannot produce one either, and
+/// the iPhone 2G/3G baseband is flashed post-restore from the rootfs.
+fn classic_baseband_resolver(plan: &ClassicRestorePlan) -> Option<BasebandResolver> {
+    if !plan.foreign || !plan.device.product_type().as_str().starts_with("iPhone1,") {
+        return None;
+    }
+    let ecid = plan.device.ecid()?;
+    let archive = FirmwareArchive::open(&plan.firmware).ok()?;
+    let identity = archive
+        .build_manifest()
+        .ok()?
+        .select_identity(&plan.board, RestoreBehavior::Erase)
+        .ok()?
+        .clone();
+    match BasebandResolver::from_identity(archive, identity, TssClient::new(), ecid) {
+        Ok(resolver) => Some(resolver),
+        Err(error) => {
+            debug!(%error, "custom IPSW has no signable baseband firmware");
+            None
+        }
+    }
+}
+
+/// Baseband failures of a classic restore, carrying upstream's retry advice
+/// ("the second restore may fail due to baseband", restore.sh:11442-11446).
+#[derive(Debug, thiserror::Error)]
+enum ClassicBasebandError {
+    #[error(
+        "the custom IPSW carries no signable baseband firmware; retry the restore — iPhone 2G/3G restores can fail on baseband the first time and succeed once the baseband is flashed"
+    )]
+    Unavailable,
+    #[error(
+        "live baseband TSS request failed: {0}; retry the restore — iPhone 2G/3G restores can fail on baseband the first time and succeed on a second attempt"
+    )]
+    Request(#[from] BasebandRequestError),
+}
+
 /// Personalized boot/restore components and the restored-session data of a
 /// classic restore.
 struct ClassicBootData {
@@ -990,6 +1159,19 @@ fn prepare_boot_data(plan: &ClassicRestorePlan) -> Result<ClassicBootData, KitEr
             "all_flash NOR images".to_owned(),
         ));
     }
+    // FlashVersion1 requests (old devices) expect NorImageData as a
+    // component-keyed dictionary without the iBoot-first ordering
+    // (idevicerestore restore.c:1748-1804); prepare both forms.
+    let nor_version_1 = {
+        let mut response = Dictionary::new();
+        response.insert("LlbImageData".into(), Value::Data(llb.clone()));
+        let keyed = images
+            .iter()
+            .map(|(component, data)| (component.clone(), Value::Data(data.clone())))
+            .collect::<Dictionary>();
+        response.insert("NorImageData".into(), keyed.into());
+        response
+    };
     // NOR data sends iBoot first, like the workflow personalizer.
     images.sort_by_key(|(component, _)| !component.starts_with("iBoot"));
     let mut nor = Dictionary::new();
@@ -1006,7 +1188,8 @@ fn prepare_boot_data(plan: &ClassicRestorePlan) -> Result<ClassicBootData, KitEr
     let restored_data = PreparedRestoreData::default()
         .with_kernel_cache(kernel_cache.clone())
         .with_device_tree(device_tree.clone())
-        .with_nor(nor);
+        .with_nor(nor)
+        .with_nor_version_1(nor_version_1);
 
     Ok(ClassicBootData {
         wtf2,
@@ -1042,7 +1225,7 @@ async fn wtf_real_chain(
             // The pwned device lands in WTF (or, on a re-send, DFU-real);
             // both accept the WTF 2 upload.
             let Some(client) = await_iboot(
-                ecid,
+                Some(ecid),
                 &[DeviceMode::Dfu, DeviceMode::Wtf],
                 REENUMERATION_TIMEOUT,
                 "DFU",
@@ -1073,7 +1256,7 @@ async fn wtf_real_chain(
     let Some(client) = upload_and_await(
         client,
         boot.wtf2.as_deref().expect("WTF 2 path resolved at plan"),
-        ecid,
+        Some(ecid),
         &[DeviceMode::Dfu],
         "DFU",
         emitter,
@@ -1082,7 +1265,7 @@ async fn wtf_real_chain(
     else {
         return Ok(None);
     };
-    send_ibss(client, boot, ecid, emitter).await
+    send_ibss(client, boot, Some(ecid), emitter).await
 }
 
 /// S5L8900 3.1.3 chain: reach pwned DFU-real via the pwnage WTF, then the
@@ -1107,7 +1290,7 @@ async fn dfu_real_chain(
         if client.mode() == DeviceMode::Dfu {
             pwnage::pwn_wtf(Some(ecid), plan.cache_root.clone()).await?;
             let Some(reconnected) = await_iboot(
-                ecid,
+                Some(ecid),
                 &[DeviceMode::Dfu, DeviceMode::Wtf],
                 REENUMERATION_TIMEOUT,
                 "DFU",
@@ -1128,9 +1311,15 @@ async fn dfu_real_chain(
             // device_s5l8900xall: re-send the pwned WTF to reach DFU-real.
             info!("sending the pwned WTF image to reach DFU-real");
             let payload = pwnage::pwnage_payload(plan.cache_root.clone()).await?;
-            let Some(reconnected) =
-                upload_and_await(client, &payload, ecid, &[DeviceMode::Dfu], "DFU", emitter)
-                    .await?
+            let Some(reconnected) = upload_and_await(
+                client,
+                &payload,
+                Some(ecid),
+                &[DeviceMode::Dfu],
+                "DFU",
+                emitter,
+            )
+            .await?
             else {
                 return Ok(None);
             };
@@ -1144,7 +1333,7 @@ async fn dfu_real_chain(
             CancellationSafety::UnsafeUntilPhaseEnds,
         ))
         .await;
-    send_ibss(client, boot, ecid, emitter).await
+    send_ibss(client, boot, Some(ecid), emitter).await
 }
 
 /// iPod2,1/iPhone2,1 chain: require a pwned DFU (24kpwn marker, else
@@ -1190,14 +1379,47 @@ async fn pwned_dfu_chain(
             CancellationSafety::UnsafeUntilPhaseEnds,
         ))
         .await;
-    send_ibss(client, boot, ecid, emitter).await
+    send_ibss(client, boot, Some(ecid), emitter).await
+}
+
+/// S5L8900 2.x foreign chain (idevicerestore MODE_WTF, idevicerestore.c:
+/// 406-492): the user has button-entered stock WTF mode; send the target
+/// IPSW's own unpatched WTF, wait for DFU-real/WTF re-enumeration, then send
+/// the custom iBSS (`dfu_enter_recovery`, unpersonalized in custom mode).
+/// Returns the recovery-mode client, `None` when cancelled.
+async fn wtf_ibss_chain(
+    client: IbootClient,
+    boot: &ClassicBootData,
+    emitter: &OperationEmitter,
+) -> Result<Option<IbootClient>, KitError> {
+    debug_assert_eq!(client.mode(), DeviceMode::Wtf);
+    emitter
+        .emit(phase(
+            OperationPhase::Booting,
+            CancellationSafety::UnsafeUntilPhaseEnds,
+        ))
+        .await;
+    info!("sending the IPSW's WTF image");
+    let Some(client) = upload_and_await(
+        client,
+        boot.wtf2.as_deref().expect("WTF path resolved at plan"),
+        None,
+        &[DeviceMode::Dfu, DeviceMode::Wtf],
+        "DFU",
+        emitter,
+    )
+    .await?
+    else {
+        return Ok(None);
+    };
+    send_ibss(client, boot, None, emitter).await
 }
 
 /// Send the (personalized) iBSS and wait for recovery mode.
 async fn send_ibss(
     client: IbootClient,
     boot: &ClassicBootData,
-    ecid: Ecid,
+    ecid: Option<Ecid>,
     emitter: &OperationEmitter,
 ) -> Result<Option<IbootClient>, KitError> {
     info!("sending iBSS");
@@ -1217,7 +1439,7 @@ async fn send_ibss(
 async fn upload_and_await(
     client: IbootClient,
     data: &[u8],
-    ecid: Ecid,
+    ecid: Option<Ecid>,
     modes: &[DeviceMode],
     timeout_mode: &'static str,
     emitter: &OperationEmitter,
@@ -1236,7 +1458,7 @@ async fn upload_and_await(
 
 /// Poll for the device in one of `modes`, returning `None` on cancellation.
 async fn await_iboot(
-    ecid: Ecid,
+    ecid: Option<Ecid>,
     modes: &[DeviceMode],
     timeout: Duration,
     timeout_mode: &'static str,
@@ -1247,7 +1469,7 @@ async fn await_iboot(
         if emitter.is_cancelled() {
             return Ok(None);
         }
-        match IbootClient::open(Some(ecid)).await {
+        match IbootClient::open(ecid).await {
             Ok(client) if modes.contains(&client.mode()) => return Ok(Some(client)),
             Ok(_) | Err(RecoveryError::NoDevice) => {}
             Err(error) => return Err(error.into()),
@@ -1306,6 +1528,13 @@ fn dfu_steps(plan: &ClassicRestorePlan) -> Vec<String> {
         ClassicBootSequence::DfuThenIbss => vec![
             "Put the device into DFU mode to continue.".to_owned(),
             "The restore pwns the device with Pwnage 2.0 (WTF), then boots the custom iBSS."
+                .to_owned(),
+        ],
+        ClassicBootSequence::WtfThenIbss => vec![
+            "Put the device into WTF mode to continue.".to_owned(),
+            "Hold TOP and HOME for 10 seconds (8 seconds if the device is in Recovery mode), then release TOP and keep holding HOME for 13 more seconds."
+                .to_owned(),
+            "The restore then sends the IPSW's own WTF image, followed by the custom iBSS."
                 .to_owned(),
         ],
         ClassicBootSequence::PwnedDfu => vec![
@@ -1377,6 +1606,135 @@ mod tests {
         assert_eq!(plan.version().as_str(), "3.1.3");
         assert_eq!(plan.build_id().as_str(), "7E18");
         assert_eq!(plan.build_major, 7);
+    }
+
+    #[test]
+    fn iphone2g_221_foreign_uses_the_wtf_chain() {
+        let ipsw = restore_plist_ipsw_layout(
+            "m68ap",
+            "2.2.1",
+            "5H11",
+            "kernelcache.release.s5l8900x",
+            false,
+        );
+        let request = ClassicRestoreRequest::new(
+            device("iPhone1,1", Soc::S5l8900, "m68"),
+            ipsw.path().to_owned(),
+            "cache",
+        )
+        .with_foreign(true);
+        let plan = plan(request).unwrap();
+        assert_eq!(plan.sequence(), ClassicBootSequence::WtfThenIbss);
+        assert_eq!(plan.version().as_str(), "2.2.1");
+        assert_eq!(plan.build_id().as_str(), "5H11");
+        assert_eq!(plan.build_major, 5);
+        assert!(plan.foreign());
+        assert_eq!(
+            plan.paths.wtf2.as_deref(),
+            Some("Firmware/dfu/WTF.s5l8900xall.RELEASE.dfu")
+        );
+    }
+
+    #[test]
+    fn s5l8900_2x_requires_a_foreign_ipsw() {
+        let ipsw = restore_plist_ipsw_layout(
+            "n82ap",
+            "2.2.1",
+            "5H11",
+            "kernelcache.release.s5l8900x",
+            false,
+        );
+        let request = ClassicRestoreRequest::new(
+            device("iPhone1,2", Soc::S5l8900, "n82"),
+            ipsw.path().to_owned(),
+            "cache",
+        );
+        assert!(matches!(
+            plan(request),
+            Err(KitError::ClassicRestoreUnsupportedVersion(_))
+        ));
+    }
+
+    #[test]
+    fn ipod2_221_foreign_uses_the_pwned_dfu_chain() {
+        let ipsw = restore_plist_ipsw_layout(
+            "n72ap",
+            "2.2.1",
+            "5H11",
+            "kernelcache.release.s5l8720x",
+            true,
+        );
+        let request = ClassicRestoreRequest::new(
+            device("iPod2,1", Soc::S5l8720, "n72"),
+            ipsw.path().to_owned(),
+            "cache",
+        )
+        .with_foreign(true);
+        let plan = plan(request).unwrap();
+        assert_eq!(plan.sequence(), ClassicBootSequence::PwnedDfu);
+        assert_eq!(plan.version().as_str(), "2.2.1");
+        assert!(plan.foreign());
+    }
+
+    #[test]
+    fn iphone3gs_has_no_2x_target() {
+        let ipsw = manifest_ipsw("iPhone2,1", "n88ap", "2.2.1", "5H11");
+        let request = ClassicRestoreRequest::new(
+            device("iPhone2,1", Soc::S5l8920, "n88"),
+            ipsw.path().to_owned(),
+            "cache",
+        )
+        .with_foreign(true);
+        assert!(matches!(
+            plan(request),
+            Err(KitError::ClassicRestoreUnsupportedVersion(_))
+        ));
+    }
+
+    #[test]
+    fn restore_plist_ipsw_with_production_suffix_parses() {
+        let ipsw = restore_plist_ipsw_layout(
+            "m68ap",
+            "3.1.3",
+            "7E18",
+            "kernelcache.release.s5l8900x",
+            true,
+        );
+        let request = ClassicRestoreRequest::new(
+            device("iPhone1,1", Soc::S5l8900, "m68"),
+            ipsw.path().to_owned(),
+            "cache",
+        );
+        let plan = plan(request).unwrap();
+        assert_eq!(plan.sequence(), ClassicBootSequence::DfuThenIbss);
+        assert_eq!(
+            plan.paths.llb,
+            "Firmware/all_flash/all_flash.m68ap.production/LLB.m68ap.RELEASE.img3"
+        );
+        assert_eq!(
+            plan.paths.device_tree,
+            "Firmware/all_flash/all_flash.m68ap.production/DeviceTree.m68ap.img3"
+        );
+    }
+
+    #[test]
+    fn iphone1_1_falls_back_to_the_n45ap_all_flash_directory() {
+        let ipsw = restore_plist_ipsw_layout(
+            "n45ap",
+            "2.2.1",
+            "5H11",
+            "kernelcache.release.s5l8900x",
+            true,
+        );
+        let request = ClassicRestoreRequest::new(
+            device("iPhone1,1", Soc::S5l8900, "m68"),
+            ipsw.path().to_owned(),
+            "cache",
+        )
+        .with_foreign(true);
+        let plan = plan(request).unwrap();
+        assert_eq!(plan.sequence(), ClassicBootSequence::WtfThenIbss);
+        assert_eq!(plan.paths.ibss, "Firmware/dfu/iBSS.n45ap.RELEASE.dfu");
     }
 
     #[test]
@@ -1507,7 +1865,11 @@ mod tests {
         writer
             .start_file("Restore.plist", SimpleFileOptions::default())
             .unwrap();
-        writer.write_all(RESTORE_PLIST.as_bytes()).unwrap();
+        writer
+            .write_all(
+                restore_plist_xml("3.1.3", "7E18", "kernelcache.release.s5l8900x").as_bytes(),
+            )
+            .unwrap();
         writer.finish().unwrap();
         let request = ClassicRestoreRequest::new(
             device("iPhone1,1", Soc::S5l8900, "m68"),
@@ -1640,32 +2002,48 @@ mod tests {
         file
     }
 
-    const RESTORE_PLIST: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
+    fn restore_plist_xml(version: &str, build: &str, kernel: &str) -> String {
+        format!(
+            r#"<?xml version="1.0" encoding="UTF-8"?>
 <plist version="1.0"><dict>
-<key>ProductVersion</key><string>3.1.3</string>
-<key>ProductBuildVersion</key><string>7E18</string>
+<key>ProductVersion</key><string>{version}</string>
+<key>ProductBuildVersion</key><string>{build}</string>
 <key>RestoreRamDisks</key><dict><key>User</key><string>018-6494-014.dmg</string></dict>
 <key>SystemRestoreImages</key><dict><key>User</key><string>018-6488-015.dmg</string></dict>
-<key>RestoreKernelCaches</key><dict><key>Release</key><string>kernelcache.release.s5l8900x</string></dict>
-</dict></plist>"#;
+<key>RestoreKernelCaches</key><dict><key>Release</key><string>{kernel}</string></dict>
+</dict></plist>"#
+        )
+    }
 
-    /// A 3.1.3-style IPSW with Restore.plist and the fixed S5L8900 paths.
-    fn restore_plist_ipsw(board_class: &str) -> NamedTempFile {
+    /// A 2.x/3.x-style IPSW with Restore.plist and the fixed old paths; with
+    /// `production` the all_flash directory carries the real IPSWs'
+    /// `.production` suffix.
+    fn restore_plist_ipsw_layout(
+        board_class: &str,
+        version: &str,
+        build: &str,
+        kernel: &str,
+        production: bool,
+    ) -> NamedTempFile {
         let file = NamedTempFile::new().unwrap();
         let mut writer = ZipWriter::new(file.reopen().unwrap());
         writer
             .start_file("Restore.plist", SimpleFileOptions::default())
             .unwrap();
-        writer.write_all(RESTORE_PLIST.as_bytes()).unwrap();
-        let all_flash = format!("Firmware/all_flash/all_flash.{board_class}");
+        writer
+            .write_all(restore_plist_xml(version, build, kernel).as_bytes())
+            .unwrap();
+        let suffix = if production { ".production" } else { "" };
+        let all_flash = format!("Firmware/all_flash/all_flash.{board_class}{suffix}");
         for name in [
             format!("Firmware/dfu/iBSS.{board_class}.RELEASE.dfu"),
+            "Firmware/dfu/WTF.s5l8900xall.RELEASE.dfu".to_owned(),
             format!("{all_flash}/LLB.{board_class}.RELEASE.img3"),
             format!("{all_flash}/DeviceTree.{board_class}.img3"),
             format!("{all_flash}/iBoot.{board_class}.RELEASE.img3"),
             "018-6494-014.dmg".to_owned(),
             "018-6488-015.dmg".to_owned(),
-            "kernelcache.release.s5l8900x".to_owned(),
+            kernel.to_owned(),
         ] {
             writer
                 .start_file(name, SimpleFileOptions::default())
@@ -1688,5 +2066,16 @@ mod tests {
             .unwrap();
         writer.finish().unwrap();
         file
+    }
+
+    /// A 3.1.3-style IPSW with Restore.plist and the fixed S5L8900 paths.
+    fn restore_plist_ipsw(board_class: &str) -> NamedTempFile {
+        restore_plist_ipsw_layout(
+            board_class,
+            "3.1.3",
+            "7E18",
+            "kernelcache.release.s5l8900x",
+            false,
+        )
     }
 }
