@@ -10,6 +10,7 @@ mod hfs_btree;
 mod iboot32;
 mod img3;
 mod img4;
+mod lzss;
 mod mbn;
 mod onboard;
 mod patch;
@@ -27,6 +28,10 @@ pub use iboot32::{
 };
 pub use img3::{Img3, Img3Element, Img3Error, Img3Tag};
 pub use img4::{Img4Error, extract_im4p_payload, personalize_img4, replace_im4p_payload};
+pub use lzss::{
+    COMPLZSS_HEADER_SIZE, CompLzssHeader, LzssError, adler32, compress_lzss, decompress_lzss,
+    is_lzss_compressed,
+};
 pub use mbn::{MbnError, MbnFile, MbnFormat};
 pub use onboard::{OnboardTicket, OnboardTicketError};
 pub use patch::{PatchError, apply_bsdiff};
