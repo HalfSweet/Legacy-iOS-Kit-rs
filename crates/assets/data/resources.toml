@@ -1439,3 +1439,246 @@ sha256 = "4be13348e91e008b40787435f47cf97ee0e44ceac2ade248fa63f13487e4be21"
 size = 128
 purpose = "iBSS payload that writes the alloc8-modified NOR image on S5L8920, by axi0mX (ipwndfu, GPL-3.0)"
 redistribution = "download-only"
+
+[[resources]]
+id = "jailbreak-daibutsu-bin-tar"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/jailbreak/daibutsu/bin.tar"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "1d178cd7076b752e1bee8f1cee239f3d76814970b0fdf04bc84bb3c0bdc60c87"
+size = 2273280
+purpose = "iOS 7.x/8.x daibutsu ramdisk binaries (RamdiskPackage2) for powdersn0w -daibutsu builds"
+redistribution = "download-only"
+
+[[resources]]
+id = "powder-ios9-package"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/src/ios9.tar"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "4db0dae724b0bdda7c3bf21d9333ba725abc08beb2facac50cff1d56fab64b42"
+size = 399360
+purpose = "FilesystemPackage payload untarred into the root filesystem of powdersn0w iOS 8.x/9.x targets"
+redistribution = "download-only"
+
+[[resources]]
+id = "powder-partition-script"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/src/partition"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "8e4e6d64fbfa4e9b53687a3321a585167503a957664549505f58810b7a77a7bc"
+size = 3261
+purpose = "Repartition script installed as /sbin/reboot in powdersn0w base ramdisks; templated at build time for iOS 5 bases and nvram boot-ramdisk removal"
+redistribution = "download-only"
+
+[[resources]]
+id = "powder-partition-script-iphone5"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/src/partition_iphone5"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "dcf01ce2ecd52abb9fbee67c06c36ce9e264600d4476319ff59ca39a55ac146b"
+size = 3127
+purpose = "ramdiskH variant of the powdersn0w repartition script for iPhone5,* two-bundle builds, used verbatim"
+redistribution = "download-only"
+
+[[resources]]
+id = "powder-exploit-ipad2-11B554a"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/src/target/ipad2/11B554a/exploit"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "e3a76c71916603e477b3ab30cdb3f95244b774f63d3f16be4739b60b34224e6e"
+size = 524288
+purpose = "powdersn0w ramdisk exploit payload (xpwn src/target) for iPad2,1-iPad2,3 with an iOS 7.0-7.1.1 base"
+redistribution = "download-only"
+
+[[resources]]
+id = "powder-exploit-ipad2-11D257"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/src/target/ipad2/11D257/exploit"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "449e13408bc3d8d28e26de66b2c4635831368e7ef6b32e0cdcfaf326947898f8"
+size = 524288
+purpose = "powdersn0w ramdisk exploit payload (xpwn src/target) for iPad2,1-iPad2,3 with an iOS 7.1.2 base"
+redistribution = "download-only"
+
+[[resources]]
+id = "powder-exploit-ipad2b-11B554a"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/src/target/ipad2b/11B554a/exploit"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "d142f300f12739b9bf022058a19076bfe88854fbf70c2759ef68dbe2717518ba"
+size = 524288
+purpose = "powdersn0w ramdisk exploit payload (xpwn src/target) for iPad2,5-iPad2,7 with an iOS 7.0-7.1.1 base"
+redistribution = "download-only"
+
+[[resources]]
+id = "powder-exploit-ipad2b-11D257"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/src/target/ipad2b/11D257/exploit"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "a519831accd8eb4c76a40433e8a412c6ede16643f108888b15414e0c353d919f"
+size = 524288
+purpose = "powdersn0w ramdisk exploit payload (xpwn src/target) for iPad2,5-iPad2,7 with an iOS 7.1.2 base"
+redistribution = "download-only"
+
+[[resources]]
+id = "powder-exploit-ipad3-11D257"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/src/target/ipad3/11D257/exploit"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "4749b1c555c3c2a8365752727650f9bd338f16898dec646af06419ba7b3d2316"
+size = 524288
+purpose = "powdersn0w ramdisk exploit payload (xpwn src/target) for iPad3,1-iPad3,3 with an iOS 7.1.2 base"
+redistribution = "download-only"
+
+[[resources]]
+id = "powder-exploit-ipad3b-11B554a"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/src/target/ipad3b/11B554a/exploit"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "89a19f2127f3661c3a400910912bd439f0f54c37d3a04c9ba3979aad33f6c804"
+size = 524288
+purpose = "powdersn0w ramdisk exploit payload (xpwn src/target) for iPad3,4-iPad3,6 with an iOS 7.0-7.1.1 base"
+redistribution = "download-only"
+
+[[resources]]
+id = "powder-exploit-ipad3b-11D257"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/src/target/ipad3b/11D257/exploit"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "178b97b6edca05c768202e550be180cb1601d03d763c64939eb0512dea12cb07"
+size = 524288
+purpose = "powdersn0w ramdisk exploit payload (xpwn src/target) for iPad3,4-iPad3,6 with an iOS 7.1.2 base"
+redistribution = "download-only"
+
+[[resources]]
+id = "powder-exploit-iphone5-11B554a"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/src/target/iphone5/11B554a/exploit"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "0a2824f734aa440d24b73b6eec8e0ebc5d54b477de86e29cde5b261fcdbf55ec"
+size = 524288
+purpose = "powdersn0w ramdisk exploit payload (xpwn src/target) for iPhone5,1/iPhone5,2 with an iOS 7.0-7.1.1 base"
+redistribution = "download-only"
+
+[[resources]]
+id = "powder-exploit-iphone5-11D257"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/src/target/iphone5/11D257/exploit"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "bd60bb4677d236094fc25c5efb5649d4b8e3216a65c9e3f9bc974489709fa563"
+size = 524288
+purpose = "powdersn0w ramdisk exploit payload (xpwn src/target) for iPhone5,1/iPhone5,2 with an iOS 7.1.2 base"
+redistribution = "download-only"
+
+[[resources]]
+id = "powder-exploit-iphone5b-11B554a"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/src/target/iphone5b/11B554a/exploit"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "b7822171f8117712085f8e63a2a2c2fb07989f423031d152fbce6ff67b485ffb"
+size = 524288
+purpose = "powdersn0w ramdisk exploit payload (xpwn src/target) for iPhone5,3/iPhone5,4 with an iOS 7.0-7.1.1 base"
+redistribution = "download-only"
+
+[[resources]]
+id = "powder-exploit-iphone5b-11D257"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/src/target/iphone5b/11D257/exploit"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "22d7de5f9b6e2db4a9e6805018698e43c6d3870f266129dbc98ac09bf8a13352"
+size = 524288
+purpose = "powdersn0w ramdisk exploit payload (xpwn src/target) for iPhone5,3/iPhone5,4 with an iOS 7.1.2 base"
+redistribution = "download-only"
+
+[[resources]]
+id = "powder-exploit-k48-9B206"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/src/target/k48/9B206/exploit"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "3ce899570ce13ef03054401777a0e72260ce0bdafef703b6299a64856d8b4120"
+size = 65536
+purpose = "powdersn0w ramdisk exploit payload (xpwn src/target) for iPad1,1 with an iOS 5.x base"
+redistribution = "download-only"
+
+[[resources]]
+id = "powder-exploit-k93-10B329"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/src/target/k93/10B329/exploit"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "a6dd5b2106edbfe97eb2faaa686ecc58f80751b9bf110e15f807be87595228d6"
+size = 524288
+purpose = "powdersn0w ramdisk exploit payload (xpwn src/target) for iPad2,1 DRA v6 targets with an iOS 6.1.3 base"
+redistribution = "download-only"
+
+[[resources]]
+id = "powder-exploit-k93a-11D257"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/src/target/k93a/11D257/exploit"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "49d454ada80f1dd6a87dbe00283c5eb2f30cb5fee9331ec589ab96dfb7d31a51"
+size = 524288
+purpose = "powdersn0w ramdisk exploit payload (xpwn src/target) for iPad2,4 with an iOS 7.1.2 base"
+redistribution = "download-only"
+
+[[resources]]
+id = "powder-exploit-n18-9B206"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/src/target/n18/9B206/exploit"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "5df7fdbff8e77bdfe868ae977de16093c7ad5728ecdf678f56363a43dc7722c2"
+size = 65536
+purpose = "powdersn0w ramdisk exploit payload (xpwn src/target) for iPod3,1 with an iOS 5.x base"
+redistribution = "download-only"
+
+[[resources]]
+id = "powder-exploit-n78-11B554a"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/src/target/n78/11B554a/exploit"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "df42a83ee105f3daec8267cf68883933439c40e1dc875697b42e3d016faab2b3"
+size = 524288
+purpose = "powdersn0w ramdisk exploit payload (xpwn src/target) for iPod5,1 with an iOS 7.0-7.1.1 base"
+redistribution = "download-only"
+
+[[resources]]
+id = "powder-exploit-n78-11D257"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/src/target/n78/11D257/exploit"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "78c10b5e6bce868238a12c0d35134e3202dbafd25311dfbf389736cfdad0ef2d"
+size = 524288
+purpose = "powdersn0w ramdisk exploit payload (xpwn src/target) for iPod5,1 with an iOS 7.1.2 base"
+redistribution = "download-only"
+
+[[resources]]
+id = "powder-exploit-n81-10B500"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/src/target/n81/10B500/exploit"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "b1c9582c1b9862d60fb37ed73b0b55614b75c52e9d7e4480027b1565fbb0fd9e"
+size = 524288
+purpose = "powdersn0w ramdisk exploit payload (xpwn src/target) for iPod4,1 with an iOS 6.1.6 base"
+redistribution = "download-only"
+
+[[resources]]
+id = "powder-exploit-n90-11D257"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/src/target/n90/11D257/exploit"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "631d7cea709d197eafa517bf8b5607c4daeb1f68cf821dc68dce61f8de0b0800"
+size = 524288
+purpose = "powdersn0w ramdisk exploit payload (xpwn src/target) for iPhone3,1 with an iOS 7.1.2 base"
+redistribution = "download-only"
+
+[[resources]]
+id = "powder-exploit-n90b-11D257"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/src/target/n90b/11D257/exploit"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "78cf68e1057d261251627e23c3714eafe931ba08166d245cab932b86f97e59e8"
+size = 524288
+purpose = "powdersn0w ramdisk exploit payload (xpwn src/target) for iPhone3,2 with an iOS 7.1.2 base"
+redistribution = "download-only"
+
+[[resources]]
+id = "powder-exploit-n92-11D257"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/src/target/n92/11D257/exploit"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "b760aa6d24bf152fe02baedad25a71838100c04d0c929ad64b8e342e48fa2fd9"
+size = 524288
+purpose = "powdersn0w ramdisk exploit payload (xpwn src/target) for iPhone3,3 with an iOS 7.1.2 base"
+redistribution = "download-only"
+
+[[resources]]
+id = "powder-exploit-n94-10B329"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/src/target/n94/10B329/exploit"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "64c77d41a328d95be8e13d9040acd5899fe68322d7b2dc0d0c2c5c7fb741a1f0"
+size = 524288
+purpose = "powdersn0w ramdisk exploit payload (xpwn src/target) for iPhone4,1 DRA v6 targets with an iOS 6.1.3 base"
+redistribution = "download-only"
+
+[[resources]]
+id = "powder-exploit-n94-11D257"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/src/target/n94/11D257/exploit"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "85f071636a2950d583b5fbdc740fb88ab4014f6d827662032fd7485a8c06a10f"
+size = 524288
+purpose = "powdersn0w ramdisk exploit payload (xpwn src/target) for iPhone4,1 with an iOS 7.1.2 base"
+redistribution = "download-only"

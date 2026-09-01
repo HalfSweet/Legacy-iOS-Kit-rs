@@ -162,10 +162,50 @@ mod tests {
     #[test]
     fn bundled_resources_have_fixed_provenance() {
         let catalog = ResourceCatalog::bundled();
-        assert_eq!(catalog.iter().count(), 160);
+        assert_eq!(catalog.iter().count(), 187);
         let resource = catalog.get(&ResourceId::new("ios4-scab-template")).unwrap();
         assert_eq!(resource.sha256().len(), 64);
         assert_eq!(resource.redistribution(), Redistribution::DownloadOnly);
         assert_eq!(resource.source_commit(), catalog.baseline_commit());
+    }
+
+    #[test]
+    fn powdersn0w_resources_are_cataloged() {
+        let catalog = ResourceCatalog::bundled();
+        for id in [
+            "jailbreak-daibutsu-bin-tar",
+            "powder-ios9-package",
+            "powder-partition-script",
+            "powder-partition-script-iphone5",
+        ] {
+            let resource = catalog.get(&ResourceId::new(id)).unwrap();
+            assert_eq!(resource.redistribution(), Redistribution::DownloadOnly);
+        }
+        // The 23 per-board/per-base-build exploit payloads of the powder
+        // bundle model's `exploit_resource` mapping.
+        for (hw, builds) in [
+            ("ipad2", ["11B554a", "11D257"].as_slice()),
+            ("ipad2b", ["11B554a", "11D257"].as_slice()),
+            ("ipad3", ["11D257"].as_slice()),
+            ("ipad3b", ["11B554a", "11D257"].as_slice()),
+            ("iphone5", ["11B554a", "11D257"].as_slice()),
+            ("iphone5b", ["11B554a", "11D257"].as_slice()),
+            ("k48", ["9B206"].as_slice()),
+            ("k93", ["10B329"].as_slice()),
+            ("k93a", ["11D257"].as_slice()),
+            ("n18", ["9B206"].as_slice()),
+            ("n78", ["11B554a", "11D257"].as_slice()),
+            ("n81", ["10B500"].as_slice()),
+            ("n90", ["11D257"].as_slice()),
+            ("n90b", ["11D257"].as_slice()),
+            ("n92", ["11D257"].as_slice()),
+            ("n94", ["10B329", "11D257"].as_slice()),
+        ] {
+            for build in builds {
+                let id = format!("powder-exploit-{hw}-{build}");
+                let resource = catalog.get(&ResourceId::new(&id)).unwrap();
+                assert_eq!(resource.redistribution(), Redistribution::DownloadOnly);
+            }
+        }
     }
 }
