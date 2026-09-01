@@ -588,6 +588,19 @@ enum DeviceCommand {
         #[arg(long)]
         yes: bool,
     },
+    /// Install the alloc8 exploit to the NOR of a new-bootrom iPhone 3GS in
+    /// DFU mode. This permanently modifies the NOR and requires a prior
+    /// custom 24Kpwn restore.
+    InstallAlloc8 {
+        #[arg(long)]
+        ecid: Option<Ecid>,
+        /// limera1n payload used to enter pwned DFU when the device is not
+        /// already pwned.
+        #[arg(long)]
+        limera1n_payload: Option<PathBuf>,
+        #[arg(long)]
+        yes: bool,
+    },
     /// Enter kDFU mode on a jailbroken device via kloader over SSH.
     EnterKdfu {
         udid: Udid,
@@ -1787,6 +1800,33 @@ async fn main() -> Result<()> {
                 .await
                 .context("Pwnage WTF exploit failed")?;
             write_status(output, "pwned-wtf")?;
+        }
+        Command::Device {
+            command:
+                DeviceCommand::InstallAlloc8 {
+                    ecid,
+                    limera1n_payload,
+                    yes,
+                },
+        } => {
+            confirm(
+                "permanently install the alloc8 exploit to the device NOR",
+                yes,
+            )?;
+            let limera1n_payload = match limera1n_payload {
+                Some(path) => Some(
+                    tokio::fs::read(path)
+                        .await
+                        .context("failed to read limera1n payload")?,
+                ),
+                None => None,
+            };
+            kit.install_alloc8(ecid, limera1n_payload, config.artifact_cache_dir()?)
+                .await
+                .context(
+                    "alloc8 install failed; force restart the device, re-enter DFU mode, and retry",
+                )?;
+            write_status(output, "installed-alloc8")?;
         }
         Command::Device {
             command:

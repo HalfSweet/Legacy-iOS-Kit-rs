@@ -72,6 +72,10 @@ pub enum KitError {
     Limera1n(#[from] legacy_ios_exploits::Limera1nError),
     #[error("checkm8 exploit failed: {0}")]
     Checkm8(#[from] legacy_ios_exploits::Checkm8Error),
+    #[error("alloc8 install failed: {0}")]
+    Alloc8(#[from] legacy_ios_exploits::Alloc8Error),
+    #[error("iBSS from the Apple IPSW does not match the pinned SHA-1")]
+    Alloc8IbssDigest,
     #[error("automatic exploit is not implemented for {0}")]
     AutomaticExploitUnsupported(legacy_ios_core::Soc),
     #[error("automatic limera1n execution requires a payload")]
@@ -239,10 +243,12 @@ impl KitError {
             Self::Recovery(_) => OperationPhase::Booting,
             Self::Limera1n(_)
             | Self::Checkm8(_)
+            | Self::Alloc8(_)
             | Self::AutomaticExploitUnsupported(_)
             | Self::PwnageVerificationTimeout
             | Self::KdfuTimeout
             | Self::PwnageWtfDigest
+            | Self::Alloc8IbssDigest
             | Self::MissingLimera1nPayload
             | Self::PwnVerificationFailed
             | Self::ExternalExploitTimeout => OperationPhase::Exploiting,
@@ -263,6 +269,7 @@ impl KitError {
             Self::Recovery(_) | Self::Limera1n(_) | Self::Checkm8(_) | Self::RamdiskBoot(_) => {
                 Recoverability::ReenterDfu
             }
+            Self::Alloc8(_) => Recoverability::ReenterDfu,
             Self::PwnVerificationFailed | Self::ExternalExploitTimeout => {
                 Recoverability::ReenterDfu
             }
@@ -273,7 +280,7 @@ impl KitError {
             | Self::Task(_) => Recoverability::RestartOperation,
             Self::VerificationTimeout => Recoverability::ReconnectDevice,
             Self::PwnageVerificationTimeout | Self::KdfuTimeout => Recoverability::ReenterDfu,
-            Self::PwnageWtfDigest => Recoverability::NotRecoverable,
+            Self::PwnageWtfDigest | Self::Alloc8IbssDigest => Recoverability::NotRecoverable,
             Self::VersionMismatch { .. } => Recoverability::ManualRecoveryRequired,
             Self::Firmware(_)
             | Self::FirmwareKey(_)

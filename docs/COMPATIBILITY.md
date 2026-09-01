@@ -17,7 +17,7 @@ Legend: ✅ implemented · 🟡 partial / bounded · ❌ not implemented ·
 | A5/A5X | iPhone4,1, iPad2,*, iPad3,1–3, iPod5,1 | external checkm8-a5 hardware (guided, verified) | ✅ |
 | A5X, A6/A6X | iPad2,4/iPad3,*, iPhone5,*, iPad3,4+ | checkm8 armv7 | ✅ |
 | A7–A11 | iPhone5s–X, iPads | checkm8 arm64 | ✅ |
-| alloc8 (new-bootrom 3GS) | iPhone2,1 | — | ❌ |
+| alloc8 (new-bootrom 3GS) | iPhone2,1 | alloc8 NOR installer (`lik device install-alloc8`) | ✅ |
 
 ## Boot / ramdisk
 

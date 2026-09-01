@@ -2,6 +2,7 @@
 
 //! Public facade for embedding Legacy iOS Kit workflows.
 
+mod alloc8;
 mod bootstrap;
 mod device;
 mod erase;
@@ -466,6 +467,19 @@ impl LegacyIosKit {
         cache_root: impl Into<std::path::PathBuf>,
     ) -> Result<(), KitError> {
         pwnage::pwn_wtf(ecid, cache_root.into()).await
+    }
+
+    /// Install the alloc8 exploit to the NOR of a new-bootrom iPhone 3GS.
+    /// This permanently modifies the device NOR and requires a prior custom
+    /// 24Kpwn restore; when the device is not already in pwned DFU mode, a
+    /// limera1n payload must be provided.
+    pub async fn install_alloc8(
+        &self,
+        ecid: Option<Ecid>,
+        limera1n_payload: Option<Vec<u8>>,
+        cache_root: impl Into<std::path::PathBuf>,
+    ) -> Result<(), KitError> {
+        alloc8::install_alloc8(ecid, limera1n_payload, cache_root.into()).await
     }
 
     pub async fn plan_erase(&self, udid: Udid) -> Result<ErasePlan, KitError> {
