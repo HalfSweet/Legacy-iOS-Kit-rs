@@ -15,6 +15,7 @@ mod image_payload;
 mod jailbreak;
 mod kdfu;
 mod lease;
+mod multipart;
 mod operation;
 mod pairing;
 mod pwnage;
@@ -72,6 +73,11 @@ pub use legacy_ios_workflows::{
     RamdiskBootPlan, RamdiskBootPlanError, RamdiskBootPlanStep, RamdiskBootRequest,
     RamdiskBootStepKind, RestoreComponent, RestorePlan, RestorePlanError, RestoreRequest,
     RestoreStep, RestoreStepKind, SepPolicy, TicketPolicy,
+};
+pub use multipart::{
+    MULTIPART_NOR_BUILD, MULTIPART_NOR_VERSION, MultipartIpswSummary, MultipartPrepareRequest,
+    MultipartRestoreRequest, NorSource, RamdiskPayload, multipart_base_version, multipart_support,
+    ramdisk_payload, reboot4_resource,
 };
 pub use operation::OperationHandle;
 pub use pairing::PairingStore;
@@ -301,6 +307,28 @@ impl LegacyIosKit {
 
     pub fn execute_restore(&self, request: RestoreExecutionRequest) -> OperationHandle {
         restore_execution::spawn(
+            self.devices.clone(),
+            self.leases.clone(),
+            self.tss.clone(),
+            request,
+        )
+    }
+
+    /// Build the two custom IPSWs of an iOS 3.x/4.x multipart restore:
+    /// the iOS 5.1.1-based NOR flash IPSW (part 1) and the multipatched
+    /// target IPSW (part 2).
+    pub async fn prepare_multipart_ipsw(
+        &self,
+        request: MultipartPrepareRequest,
+    ) -> Result<MultipartIpswSummary, KitError> {
+        multipart::prepare(request).await
+    }
+
+    /// Execute a two-stage multipart restore: part 1 (NOR flash) without
+    /// final verification, then part 2 after the device re-enters
+    /// DFU/recovery.
+    pub fn execute_multipart_restore(&self, request: MultipartRestoreRequest) -> OperationHandle {
+        multipart::spawn(
             self.devices.clone(),
             self.leases.clone(),
             self.tss.clone(),

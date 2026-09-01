@@ -24,6 +24,8 @@ pub enum KitError {
     Ssh(#[from] legacy_ios_services::SshError),
     #[error("firmware operation failed: {0}")]
     Firmware(#[from] legacy_ios_firmware::FirmwareError),
+    #[error("firmware key operation failed: {0}")]
+    FirmwareKey(#[from] legacy_ios_firmware::FirmwareKeyError),
     #[error("remote firmware operation failed: {0}")]
     RemoteFirmware(#[from] legacy_ios_firmware::RemoteFirmwareError),
     #[error("artifact operation failed: {0}")]
@@ -120,6 +122,18 @@ pub enum KitError {
     FourThreePartitionerFailed,
     #[error("FourThree does not support {0}")]
     FourThreeUnsupportedDevice(String),
+    #[error("multipart restore supports iOS 3.x and 4.0-4.2 targets, found {0}")]
+    MultipartUnsupportedTarget(String),
+    #[error("the custom IPSW restore ramdisk is already multipatched")]
+    MultipartAlreadyPatched,
+    #[error("the custom IPSW ramdisk options.plist is not a dictionary plist")]
+    MultipartInvalidOptionsPlist,
+    #[error("the BuildManifest has no BuildIdentities array")]
+    MultipartInvalidManifest,
+    #[error("no firmware key material for the {0} component")]
+    MultipartMissingKey(&'static str),
+    #[error("timed out waiting for the device to re-enter DFU/recovery between multipart stages")]
+    MultipartStageTimeout,
     #[error("restored device version mismatch: expected {expected}, got {actual}")]
     VersionMismatch { expected: String, actual: String },
     #[error("unknown product type {0}")]
@@ -145,6 +159,7 @@ impl KitError {
     pub const fn stage(&self) -> OperationPhase {
         match self {
             Self::Firmware(_)
+            | Self::FirmwareKey(_)
             | Self::RemoteFirmware(_)
             | Self::CustomIpsw(_)
             | Self::RestorePlan(_)
@@ -172,6 +187,12 @@ impl KitError {
             | Self::MissingFourThreeLockdowndPatch
             | Self::FourThreePartitionerFailed
             | Self::FourThreeUnsupportedDevice(_) => OperationPhase::Planning,
+            Self::MultipartUnsupportedTarget(_)
+            | Self::MultipartAlreadyPatched
+            | Self::MultipartInvalidOptionsPlist
+            | Self::MultipartInvalidManifest
+            | Self::MultipartMissingKey(_) => OperationPhase::Planning,
+            Self::MultipartStageTimeout => OperationPhase::WaitingForDevice,
             Self::RamdiskPreparation(_) => OperationPhase::Preflight,
             Self::RamdiskBoot(_) => OperationPhase::Booting,
             Self::Signing(_)
@@ -237,6 +258,7 @@ impl KitError {
             Self::PwnageWtfDigest => Recoverability::NotRecoverable,
             Self::VersionMismatch { .. } => Recoverability::ManualRecoveryRequired,
             Self::Firmware(_)
+            | Self::FirmwareKey(_)
             | Self::RemoteFirmware(_)
             | Self::CustomIpsw(_)
             | Self::RestorePlan(_)
@@ -278,6 +300,12 @@ impl KitError {
             | Self::MissingFourThreeLockdowndPatch
             | Self::FourThreePartitionerFailed
             | Self::FourThreeUnsupportedDevice(_) => Recoverability::NotRecoverable,
+            Self::MultipartUnsupportedTarget(_)
+            | Self::MultipartAlreadyPatched
+            | Self::MultipartInvalidOptionsPlist
+            | Self::MultipartInvalidManifest
+            | Self::MultipartMissingKey(_) => Recoverability::NotRecoverable,
+            Self::MultipartStageTimeout => Recoverability::ReenterDfu,
         }
     }
 }

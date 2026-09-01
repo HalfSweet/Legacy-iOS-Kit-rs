@@ -39,6 +39,15 @@ impl FirmwareArchive {
         self.read_entry_with_limit(name, u64::MAX)
     }
 
+    pub fn entry_names(&self) -> Result<Vec<String>, FirmwareError> {
+        let mut archive = ZipArchive::new(File::open(&self.path)?)?;
+        let mut names = Vec::with_capacity(archive.len());
+        for index in 0..archive.len() {
+            names.push(archive.by_index(index)?.name().to_owned());
+        }
+        Ok(names)
+    }
+
     pub fn read_entry_with_limit(
         &self,
         name: &str,

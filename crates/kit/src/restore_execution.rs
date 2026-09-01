@@ -32,6 +32,7 @@ pub struct RestoreExecutionRequest {
     work_directory: PathBuf,
     flash_version_1: bool,
     limera1n_payload: Option<Vec<u8>>,
+    final_verification: bool,
 }
 
 impl RestoreExecutionRequest {
@@ -48,6 +49,7 @@ impl RestoreExecutionRequest {
             work_directory: work_directory.into(),
             flash_version_1: false,
             limera1n_payload: None,
+            final_verification: true,
         }
     }
 
@@ -63,6 +65,7 @@ impl RestoreExecutionRequest {
             work_directory: work_directory.into(),
             flash_version_1: false,
             limera1n_payload: None,
+            final_verification: true,
         }
     }
 
@@ -80,6 +83,7 @@ impl RestoreExecutionRequest {
             work_directory: work_directory.into(),
             flash_version_1: false,
             limera1n_payload: None,
+            final_verification: true,
         }
     }
 
@@ -91,6 +95,18 @@ impl RestoreExecutionRequest {
     pub fn with_limera1n_payload(mut self, payload: Vec<u8>) -> Self {
         self.limera1n_payload = Some(payload);
         self
+    }
+
+    /// Skip the final wait for a normal-mode device and version check. Used
+    /// for intermediate restore stages (e.g. the NOR flash stage of an iOS
+    /// 3.x/4.x multipart restore) that do not boot a normal system.
+    pub fn with_final_verification(mut self, enabled: bool) -> Self {
+        self.final_verification = enabled;
+        self
+    }
+
+    pub(crate) fn device(&self) -> &legacy_ios_core::DeviceIdentity {
+        self.plan.device()
     }
 }
 
@@ -119,7 +135,7 @@ pub(crate) fn spawn(
     handle
 }
 
-async fn execute(
+pub(crate) async fn execute(
     devices: &DeviceManager,
     leases: &DeviceLeaseRegistry,
     tss: &TssClient,
@@ -132,6 +148,7 @@ async fn execute(
     let flash_version_1 = request.flash_version_1;
     let limera1n_payload = request.limera1n_payload;
     let work_directory = request.work_directory;
+    let final_verification = request.final_verification;
 
     emitter
         .emit(phase(
@@ -253,6 +270,17 @@ async fn execute(
     if emitter.is_cancelled() {
         drop(lease);
         return Ok(None);
+    }
+    if !final_verification {
+        drop(lease);
+        return Ok(Some(OperationOutcome {
+            operation: OperationKind::Restore,
+            summary: format!(
+                "restored {} ({}) without final verification",
+                plan.product_version(),
+                plan.build_id()
+            ),
+        }));
     }
     emitter
         .emit(phase(

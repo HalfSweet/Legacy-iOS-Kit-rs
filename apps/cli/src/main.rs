@@ -15,12 +15,13 @@ use legacy_ios_kit::{
     CustomRootfsRequest, DeviceDiagnostics, DeviceFileInfo, DeviceInventory, DeviceStorageInfo,
     DeviceSummary, DmgFirmwareKey, Ecid, ExploitPolicy, FirmwareSummary, HfsEntrySummary,
     HfsMutation, HfsStatSummary, HostKeyPolicy, ImageCipher, InstalledApp, LegacyIosKit,
-    MountOptions, NoncePolicy, OperationEvent, OperationHandle, OperationOutcome, ProductType,
-    RamdiskBootExecutionRequest, RamdiskBootRequest, RamdiskBuildRequest, RamdiskBuildSummary,
-    RamdiskSsh, RecoveryDeviceInfo, RecoveryUploadResult, RemoteFirmwareSummary, ResourceId,
-    RestoreBehavior, RestoreExecutionRequest, RestorePlan, RestoreRequest, ScpPath, SepPolicy,
-    ShshRequest, ShshSummary, SigningTicket, SshCommandOutput, SshPassword, SshTarget,
-    TicketPolicy, Udid, UsbHostDiagnostics,
+    MountOptions, MultipartPrepareRequest, MultipartRestoreRequest, NoncePolicy, NorSource,
+    OperationEvent, OperationHandle, OperationOutcome, ProductType, RamdiskBootExecutionRequest,
+    RamdiskBootRequest, RamdiskBuildRequest, RamdiskBuildSummary, RamdiskSsh, RecoveryDeviceInfo,
+    RecoveryUploadResult, RemoteFirmwareSummary, ResourceId, RestoreBehavior,
+    RestoreExecutionRequest, RestorePlan, RestoreRequest, ScpPath, SepPolicy, ShshRequest,
+    ShshSummary, SigningTicket, SshCommandOutput, SshPassword, SshTarget, TicketPolicy, Udid,
+    UsbHostDiagnostics,
 };
 use tracing::level_filters::LevelFilter;
 use tracing::{debug, info, warn};
@@ -821,6 +822,53 @@ enum FirmwareCommand {
         #[arg(long)]
         yes: bool,
     },
+    /// Build the two custom IPSWs of an iOS 3.x/4.x multipart restore:
+    /// the iOS 5.1.1-based NOR flash IPSW and the multipatched target IPSW.
+    MultipartPrepare {
+        #[arg(long)]
+        device: ProductType,
+        #[arg(long)]
+        board: BoardConfig,
+        /// Original IPSW of the target iOS version.
+        #[arg(long)]
+        target_ipsw: PathBuf,
+        /// powdersn0w-built custom IPSW of the target version (part 2 base).
+        #[arg(long)]
+        custom_ipsw: PathBuf,
+        /// IPSW of the device's latest (base) version; supplies the all_flash
+        /// contents of the part 1 IPSW.
+        #[arg(long)]
+        base_ipsw: PathBuf,
+        /// Local iOS 5.1.1 (9B206) IPSW supplying the NOR restore components.
+        #[arg(long, conflicts_with = "nor_url", required_unless_present = "nor_url")]
+        nor_ipsw: Option<PathBuf>,
+        /// URL of the iOS 5.1.1 (9B206) IPSW, read through HTTP range requests.
+        #[arg(long)]
+        nor_url: Option<String>,
+        /// Saved signing ticket (SHSH blob) holding the device APTicket.
+        #[arg(long)]
+        ticket: PathBuf,
+        /// Output path of the part 1 (NOR flash) IPSW.
+        #[arg(long)]
+        part1: PathBuf,
+        /// Output path of the part 2 (multipatched target) IPSW.
+        #[arg(long)]
+        part2: PathBuf,
+        /// Artifact cache for firmware keys and catalog resources.
+        #[arg(long)]
+        cache_dir: Option<PathBuf>,
+        /// bsdiff patch applied to the ramdisk ASR binaries; without it the
+        /// ramdisks keep their existing ASR binaries.
+        #[arg(long)]
+        asr_patch: Option<PathBuf>,
+        /// powdersn0w exploit payload installed as /exploit in the part 2
+        /// ramdisk of iOS 4.x targets.
+        #[arg(long)]
+        exploit: Option<PathBuf>,
+        /// Add UpdateBaseband=false to the part 2 ramdisk options.plist.
+        #[arg(long)]
+        disable_bbupdate: bool,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -1012,6 +1060,37 @@ enum RestoreCommand {
         /// Write the ticket generator to the device boot nonce NVRAM variable.
         #[arg(long)]
         set_nonce: bool,
+        #[arg(long)]
+        yes: bool,
+    },
+    /// Execute a two-stage iOS 3.x/4.x multipart restore: the part 1 NOR
+    /// flash IPSW first, then the multipatched part 2 target IPSW after the
+    /// device re-enters DFU/recovery.
+    Multipart {
+        #[arg(long)]
+        device: ProductType,
+        #[arg(long)]
+        board: BoardConfig,
+        #[arg(long)]
+        ecid: Ecid,
+        /// Part 1: iOS 5.1.1-based NOR flash IPSW.
+        #[arg(long)]
+        part1: PathBuf,
+        /// Part 2: multipatched target IPSW.
+        #[arg(long)]
+        part2: PathBuf,
+        /// Saved signing ticket (SHSH blob) for the part 1 restore.
+        #[arg(long)]
+        ticket: PathBuf,
+        #[arg(long)]
+        work_dir: Option<PathBuf>,
+        #[arg(long, value_enum, default_value_t = ExploitArg::AlreadyPwned)]
+        exploit: ExploitArg,
+        #[arg(long)]
+        limera1n_payload: Option<PathBuf>,
+        /// Do not send baseband firmware during the part 2 restore.
+        #[arg(long)]
+        no_baseband: bool,
         #[arg(long)]
         yes: bool,
     },
@@ -2346,6 +2425,66 @@ async fn main() -> Result<()> {
                 .context("failed to build custom root filesystem IPSW")?;
             write_firmware(output, &summary)?;
         }
+        Command::Firmware {
+            command:
+                FirmwareCommand::MultipartPrepare {
+                    device,
+                    board,
+                    target_ipsw,
+                    custom_ipsw,
+                    base_ipsw,
+                    nor_ipsw,
+                    nor_url,
+                    ticket,
+                    part1,
+                    part2,
+                    cache_dir,
+                    asr_patch,
+                    exploit,
+                    disable_bbupdate,
+                },
+        } => {
+            let nor_source = match (nor_ipsw, nor_url) {
+                (Some(path), None) => NorSource::Local(path),
+                (None, Some(url)) => NorSource::Remote(url),
+                _ => {
+                    return Err(anyhow!(
+                        "exactly one of --nor-ipsw or --nor-url is required"
+                    ));
+                }
+            };
+            let cache_root = match cache_dir {
+                Some(path) => path,
+                None => config.artifact_cache_dir()?,
+            };
+            let mut request = MultipartPrepareRequest::new(
+                device,
+                board,
+                target_ipsw,
+                custom_ipsw,
+                base_ipsw,
+                nor_source,
+                ticket,
+                part1,
+                part2,
+                cache_root,
+            )
+            .with_disable_baseband_update(disable_bbupdate);
+            if let Some(path) = asr_patch {
+                request = request.with_asr_patch(path);
+            }
+            if let Some(path) = exploit {
+                request = request.with_exploit(path);
+            }
+            let summary = kit
+                .prepare_multipart_ipsw(request)
+                .await
+                .context("failed to build the multipart custom IPSWs")?;
+            info!(part1 = %summary.part1().path().display(), "part 1 (NOR flash) IPSW built");
+            write_firmware(output, summary.part1())?;
+            info!(part2 = %summary.part2().path().display(), "part 2 (multipatch) IPSW built");
+            write_firmware(output, summary.part2())?;
+        }
         Command::Restore {
             command:
                 RestoreCommand::Plan {
@@ -2482,6 +2621,92 @@ async fn main() -> Result<()> {
                 );
             }
             consume_operation(output, kit.execute_restore(request)).await?;
+        }
+        Command::Restore {
+            command:
+                RestoreCommand::Multipart {
+                    device,
+                    board,
+                    ecid,
+                    part1,
+                    part2,
+                    ticket,
+                    work_dir,
+                    exploit,
+                    limera1n_payload,
+                    no_baseband,
+                    yes,
+                },
+        } => {
+            let device = kit.resolve_device_identity(device, board)?.with_ecid(ecid);
+            let part1_plan = kit
+                .plan_restore(RestoreRequest {
+                    device: device.clone(),
+                    firmware: part1,
+                    behavior: RestoreBehavior::Erase,
+                    ticket: TicketPolicy::Provided(ticket.clone()),
+                    // The part 1 ramdisk options disable the baseband update.
+                    baseband: BasebandPolicy::None,
+                    sep: SepPolicy::Auto,
+                    exploit: exploit.into(),
+                    nonce: NoncePolicy::Manual,
+                })
+                .context("failed to resolve the part 1 restore plan")?;
+            let part2_plan = kit
+                .plan_restore(RestoreRequest {
+                    device,
+                    firmware: part2,
+                    behavior: RestoreBehavior::Erase,
+                    // The multipatched boot chain is RSA-patched; part 2
+                    // restores without a blob on the pwned device.
+                    ticket: TicketPolicy::Skip,
+                    baseband: if no_baseband {
+                        BasebandPolicy::None
+                    } else {
+                        BasebandPolicy::Auto
+                    },
+                    sep: SepPolicy::Auto,
+                    exploit: exploit.into(),
+                    nonce: NoncePolicy::Manual,
+                })
+                .context("failed to resolve the part 2 restore plan")?;
+            confirm(
+                &format!(
+                    "erase/restore the selected device with multipart plans {} and {}",
+                    part1_plan.id().as_str(),
+                    part2_plan.id().as_str()
+                ),
+                yes,
+            )?;
+            let work_directory = work_dir
+                .or_else(|| config.storage.work_dir.clone())
+                .unwrap_or_else(|| std::env::temp_dir().join("legacy-ios-kit"));
+            let mut part1_request = RestoreExecutionRequest::new(
+                part1_plan.clone(),
+                part1_plan.confirm_destructive(),
+                SigningTicket::open(&ticket).context("failed to read signing ticket")?,
+                work_directory.clone(),
+            );
+            let mut part2_request = RestoreExecutionRequest::skip_blob(
+                part2_plan.clone(),
+                part2_plan.confirm_destructive(),
+                work_directory,
+            );
+            if let Some(path) = limera1n_payload {
+                let payload = tokio::fs::read(&path)
+                    .await
+                    .with_context(|| format!("failed to read {}", path.display()))?;
+                part1_request = part1_request.with_limera1n_payload(payload.clone());
+                part2_request = part2_request.with_limera1n_payload(payload);
+            }
+            consume_operation(
+                output,
+                kit.execute_multipart_restore(MultipartRestoreRequest::new(
+                    part1_request,
+                    part2_request,
+                )),
+            )
+            .await?;
         }
         Command::Ramdisk {
             command:
