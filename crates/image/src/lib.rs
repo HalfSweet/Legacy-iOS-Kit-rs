@@ -21,7 +21,10 @@ pub use dmg::{
 };
 pub use fls::{FlsError, FlsFile};
 pub use hfs::{HfsEntry, HfsEntryKind, HfsError, HfsImage, HfsStat};
-pub use iboot32::{IBoot32, IbootPatchError, patch_iboot32};
+pub use iboot32::{
+    BootMode, BootPartition, IBoot32, Iboot32PatchOptions, IbootPatchError, patch_iboot32,
+    patch_iboot32_with_options,
+};
 pub use img3::{Img3, Img3Element, Img3Error, Img3Tag};
 pub use img4::{Img4Error, extract_im4p_payload, personalize_img4, replace_im4p_payload};
 pub use mbn::{MbnError, MbnFile, MbnFormat};

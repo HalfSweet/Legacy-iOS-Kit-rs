@@ -56,7 +56,9 @@ pub use legacy_ios_core::{
     OperationOutcome, ProductType, Recoverability, Soc, Udid,
 };
 pub use legacy_ios_firmware::{RestoreBehavior, SigningTicket, TicketError};
-pub use legacy_ios_image::{DmgError, DmgFirmwareKey};
+pub use legacy_ios_image::{
+    BootMode, BootPartition, DmgError, DmgFirmwareKey, Iboot32PatchOptions,
+};
 pub use legacy_ios_services::{
     ActivationState, AfcPath, AfcPathError, AppFilter, BackupOptions, BackupOutcome,
     BackupPassword, BackupRestoreOptions, DeviceFileInfo, DeviceFileKind, DeviceFiles,
@@ -247,22 +249,15 @@ impl LegacyIosKit {
         image_payload::replace(source.into(), payload.into(), destination.into(), cipher).await
     }
 
-    /// Patch a decrypted 32-bit iBoot/iBSS/iBEC image (RSA check removal,
-    /// debug-enabled, optional boot-args and command handler override).
+    /// Patch a decrypted 32-bit iBoot/iBSS/iBEC image with the selected
+    /// iBoot32Patcher options (the RSA check patch is always applied).
     pub async fn patch_iboot32(
         &self,
         source: impl Into<std::path::PathBuf>,
         destination: impl Into<std::path::PathBuf>,
-        boot_args: Option<String>,
-        command_handler: Option<(String, u32)>,
+        options: Iboot32PatchOptions,
     ) -> Result<(), KitError> {
-        image_payload::patch_iboot32(
-            source.into(),
-            destination.into(),
-            boot_args,
-            command_handler,
-        )
-        .await
+        image_payload::patch_iboot32(source.into(), destination.into(), options).await
     }
 
     pub fn convert_onboard_dump(&self, dump: &[u8]) -> Result<SigningTicket, KitError> {

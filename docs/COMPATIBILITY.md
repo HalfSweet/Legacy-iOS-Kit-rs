@@ -29,7 +29,7 @@ Legend: ✅ implemented · 🟡 partial / bounded · ❌ not implemented ·
 | ramdisk SSH/SCP/push/pull | ✅ | |
 | onboard SHSH / activation / baseband dump | ✅ | version-aware paths |
 | NVRAM clear / erase iOS 7-8 / erase iOS 9+ / fix datetime | ✅ | |
-| iBoot32Patcher (RSA, debug, boot-args, cmd handler) | ✅ | boot-partition/boot-ramdisk/logo finders ❌ |
+| iBoot32Patcher | ✅ | full Merculous patch set: RSA, debug, boot-args/env boot-args, cmd handler, ticket, local/remote boot, boot-partition(9), boot-ramdisk, setenv, disable-kaslr, bgcolor, logo/logo4, --433, dualboot |
 
 ## Restore
 

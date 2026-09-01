@@ -11,17 +11,17 @@ use anyhow::{Context, Result, anyhow};
 use clap::{ArgAction, Parser, Subcommand, ValueEnum};
 use legacy_ios_kit::{
     ActivationState, AfcPath, AppFilter, AppSignRequest, BackupOptions, BackupOutcome,
-    BackupPassword, BackupRestoreOptions, BasebandPolicy, BoardConfig, BootNonce,
-    CustomRootfsRequest, DeviceDiagnostics, DeviceFileInfo, DeviceInventory, DeviceStorageInfo,
-    DeviceSummary, DmgFirmwareKey, Ecid, ExploitPolicy, FirmwareSummary, HfsEntrySummary,
-    HfsMutation, HfsStatSummary, HostKeyPolicy, ImageCipher, InstalledApp, LegacyIosKit,
-    MountOptions, MultipartPrepareRequest, MultipartRestoreRequest, NoncePolicy, NorSource,
-    OperationEvent, OperationHandle, OperationOutcome, ProductType, RamdiskBootExecutionRequest,
-    RamdiskBootRequest, RamdiskBuildRequest, RamdiskBuildSummary, RamdiskSsh, RecoveryDeviceInfo,
-    RecoveryUploadResult, RemoteFirmwareSummary, ResourceId, RestoreBehavior,
-    RestoreExecutionRequest, RestorePlan, RestoreRequest, ScpPath, SepPolicy, ShshRequest,
-    ShshSummary, SigningTicket, SshCommandOutput, SshPassword, SshTarget, TicketPolicy, Udid,
-    UsbHostDiagnostics,
+    BackupPassword, BackupRestoreOptions, BasebandPolicy, BoardConfig, BootMode, BootNonce,
+    BootPartition, CustomRootfsRequest, DeviceDiagnostics, DeviceFileInfo, DeviceInventory,
+    DeviceStorageInfo, DeviceSummary, DmgFirmwareKey, Ecid, ExploitPolicy, FirmwareSummary,
+    HfsEntrySummary, HfsMutation, HfsStatSummary, HostKeyPolicy, Iboot32PatchOptions, ImageCipher,
+    InstalledApp, LegacyIosKit, MountOptions, MultipartPrepareRequest, MultipartRestoreRequest,
+    NoncePolicy, NorSource, OperationEvent, OperationHandle, OperationOutcome, ProductType,
+    RamdiskBootExecutionRequest, RamdiskBootRequest, RamdiskBuildRequest, RamdiskBuildSummary,
+    RamdiskSsh, RecoveryDeviceInfo, RecoveryUploadResult, RemoteFirmwareSummary, ResourceId,
+    RestoreBehavior, RestoreExecutionRequest, RestorePlan, RestoreRequest, ScpPath, SepPolicy,
+    ShshRequest, ShshSummary, SigningTicket, SshCommandOutput, SshPassword, SshTarget,
+    TicketPolicy, Udid, UsbHostDiagnostics,
 };
 use tracing::level_filters::LevelFilter;
 use tracing::{debug, info, warn};
@@ -977,11 +977,57 @@ enum ImageCommand {
     PatchIboot32 {
         source: PathBuf,
         destination: PathBuf,
-        #[arg(long)]
+        /// Apply custom boot-args.
+        #[arg(long, short = 'b', conflicts_with = "env_boot_args")]
         boot_args: Option<String>,
+        /// Use the boot-args environment variable.
+        #[arg(long)]
+        env_boot_args: bool,
         /// Redirect a recovery console command handler: `--cmd-handler ticket=0x80000000`.
         #[arg(long, value_name = "CMD=PTR")]
         cmd_handler: Option<String>,
+        /// Apply the debug-enabled patch.
+        #[arg(long)]
+        debug: bool,
+        /// Apply the ticket patch.
+        #[arg(long)]
+        ticket: bool,
+        /// Apply the iOS 10 local boot patch.
+        #[arg(long, conflicts_with = "remote_boot")]
+        local_boot: bool,
+        /// Apply the iOS 10 remote boot patch.
+        #[arg(long)]
+        remote_boot: bool,
+        /// Apply the boot-partition patch.
+        #[arg(long)]
+        boot_partition: bool,
+        /// Apply the boot-partition patch for De Rebus Antiquis (iOS 9 or later).
+        #[arg(long)]
+        boot_partition9: bool,
+        /// Apply the boot-ramdisk patch.
+        #[arg(long)]
+        boot_ramdisk: bool,
+        /// Apply the setenv patch.
+        #[arg(long)]
+        setenv: bool,
+        /// Disable KASLR.
+        #[arg(long)]
+        disable_kaslr: bool,
+        /// Apply a custom background color.
+        #[arg(long, value_name = "RRGGBB")]
+        bgcolor: Option<String>,
+        /// Fix AppleLogo for iOS 5+ iBoot (De Rebus Antiquis).
+        #[arg(long)]
+        logo: bool,
+        /// Fix AppleLogo for iOS 4 iBoot (De Rebus Antiquis).
+        #[arg(long = "logo4")]
+        logo4: bool,
+        /// Enable jumping to an iOS 4.3.3-or-lower iBoot.
+        #[arg(long = "433")]
+        jump_iboot_433: bool,
+        /// Apply the default dualboot patches (iOS 5 -> iOS 10).
+        #[arg(long)]
+        dualboot: bool,
         #[arg(long)]
         yes: bool,
     },
@@ -2262,7 +2308,22 @@ async fn main() -> Result<()> {
                 source,
                 destination,
                 boot_args,
+                env_boot_args,
                 cmd_handler,
+                debug,
+                ticket,
+                local_boot,
+                remote_boot,
+                boot_partition,
+                boot_partition9,
+                boot_ramdisk,
+                setenv,
+                disable_kaslr,
+                bgcolor,
+                logo,
+                logo4,
+                jump_iboot_433,
+                dualboot,
                 yes,
             } => {
                 confirm("write the patched iBoot image", yes)?;
@@ -2277,8 +2338,38 @@ async fn main() -> Result<()> {
                         Ok::<_, anyhow::Error>((command.to_owned(), pointer))
                     })
                     .transpose()?;
-                kit.patch_iboot32(source, destination, boot_args, handler)
-                    .await?;
+                let boot_mode = if local_boot {
+                    Some(BootMode::Local)
+                } else if remote_boot {
+                    Some(BootMode::Remote)
+                } else {
+                    None
+                };
+                let boot_partition = if boot_partition9 {
+                    Some(BootPartition::Ios9OrLater)
+                } else if boot_partition {
+                    Some(BootPartition::Standard)
+                } else {
+                    None
+                };
+                let options = Iboot32PatchOptions {
+                    boot_args,
+                    env_boot_args,
+                    command_handler: handler,
+                    debug,
+                    ticket,
+                    boot_mode,
+                    boot_partition,
+                    boot_ramdisk,
+                    setenv,
+                    disable_kaslr,
+                    bgcolor,
+                    logo,
+                    logo4,
+                    jump_iboot_433,
+                    dualboot,
+                };
+                kit.patch_iboot32(source, destination, options).await?;
                 write_status(output, "patched-iboot32")?;
             }
         },

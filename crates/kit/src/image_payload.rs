@@ -109,18 +109,11 @@ pub(crate) async fn replace(
 pub(crate) async fn patch_iboot32(
     source: PathBuf,
     destination: PathBuf,
-    boot_args: Option<String>,
-    command_handler: Option<(String, u32)>,
+    options: legacy_ios_image::Iboot32PatchOptions,
 ) -> Result<(), KitError> {
     let image = tokio::fs::read(source).await?;
     let patched = tokio::task::spawn_blocking(move || {
-        legacy_ios_image::patch_iboot32(
-            &image,
-            boot_args.as_deref(),
-            command_handler
-                .as_ref()
-                .map(|(command, pointer)| (command.as_str(), *pointer)),
-        )
+        legacy_ios_image::patch_iboot32_with_options(&image, &options)
     })
     .await
     .map_err(|error| KitError::Task(error.to_string()))??;
