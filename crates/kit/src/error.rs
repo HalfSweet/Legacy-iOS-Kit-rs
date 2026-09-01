@@ -56,6 +56,12 @@ pub enum KitError {
     PowderUnsupportedDevice(String),
     #[error("the payload plan expects an iBoot.tar sidecar but none was provided")]
     PowderMissingIbootSidecar,
+    #[error("powdersn0w -base builds with an APTicket replacement require the -apticket DER")]
+    PowderMissingApTicket,
+    #[error("the {0} image is too short for the IMG3 TYPE tag rewrite")]
+    PowderTruncatedNorImage(&'static str),
+    #[error("the partition script resource is not valid UTF-8")]
+    PowderInvalidPartitionScript,
     #[error("the restore ramdisk has no options plist at the per-board or default path")]
     PowderMissingRamdiskOptions,
     #[error("the firmware bundle has no {0} entry")]
@@ -265,6 +271,8 @@ impl KitError {
             Self::PowderBundle(_)
             | Self::PowderUnsupportedDevice(_)
             | Self::PowderMissingIbootSidecar
+            | Self::PowderMissingApTicket
+            | Self::PowderInvalidPartitionScript
             | Self::PowderMissingRamdiskOptions
             | Self::PowderMissingComponent(_) => OperationPhase::Planning,
             Self::MultipartStageTimeout => OperationPhase::WaitingForDevice,
@@ -282,6 +290,7 @@ impl KitError {
             | Self::PowderIbootPatch(_)
             | Self::PowderAsrPatch(_)
             | Self::PowderKernelPatch(_)
+            | Self::PowderTruncatedNorImage(_)
             | Self::Lzss(_)
             | Self::Ticket(_)
             | Self::TicketPolicyMismatch
@@ -409,8 +418,11 @@ impl KitError {
             Self::PowderBundle(_)
             | Self::PowderUnsupportedDevice(_)
             | Self::PowderMissingIbootSidecar
+            | Self::PowderMissingApTicket
+            | Self::PowderInvalidPartitionScript
             | Self::PowderMissingRamdiskOptions
-            | Self::PowderMissingComponent(_) => Recoverability::NotRecoverable,
+            | Self::PowderMissingComponent(_)
+            | Self::PowderTruncatedNorImage(_) => Recoverability::NotRecoverable,
             Self::MultipartStageTimeout => Recoverability::ReenterDfu,
         }
     }

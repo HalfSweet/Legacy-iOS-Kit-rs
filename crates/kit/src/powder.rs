@@ -24,12 +24,23 @@
 //! `/sbin/reboot` hook is installed. The output stays a deflated IPSW written
 //! through [`CustomIpswBuilder`].
 //!
-//! Deliberately out of scope (two-bundle `-base` mode): the
-//! FirmwarePath/FirmwareReplace NOR copies with their TYPE tag rewrites, the
-//! APTicket scab reseal, the NewiBoot patch, the RamdiskExploit/partition
-//! script hook, and the ios4powder `-apticket` mode. main.c's `Update
-//! Ramdisk` removal is not modeled because the bundle format never emits an
-//! `Update Ramdisk` entry.
+//! Two-bundle `-base` builds (upstream's `ipsw_prepare_powder` and the
+//! 4.3.x-only `ipsw_prepare_ios4powder`, main.c's `useBaseFW` block)
+//! additionally: reseal the `-apticket` DER into the scab template (the same
+//! `replace_image_payload` reseal `crate::multipart` uses — xpwn's own path
+//! is marked "buggy" upstream), append the bundle manifest additions to the
+//! target's all_flash manifest, copy the base IPSW's NOR images over the
+//! target paths with the IMG3 TYPE byte rewrites (`logo`→`logb`,
+//! `recm`→`recb`, `ibot`→`ibob`), patch the target iBoot into the decrypted
+//! `NewiBoot` with the config-gated boot-args (no unconditional CSBYPASS
+//! here), untar the bundle-declared `FilesystemPackage` (bootstrap gated on
+//! the FilesystemJailbreak config, package untarred under the same block) and
+//! `RamdiskPackage` (`bin4.tar` with the patched iBoot appended for
+//! ios4powder), and install the base bundle's RamdiskExploit hook: the
+//! (templated) partition script as `/sbin/reboot` — the reboot4 binary for
+//! ios4powder — and the per-hw/per-build exploit as `/exploit`. main.c's
+//! `Update Ramdisk` removal is not modeled because the bundle format never
+//! emits an `Update Ramdisk` entry.
 
 use std::{fmt, io::Cursor, path::PathBuf};
 
@@ -39,10 +50,11 @@ use legacy_ios_core::{
     OperationOutcome, OperationPhase, ProductType, Progress, ProgressUnit, Soc,
 };
 use legacy_ios_firmware::{
-    BundleRole, CustomIpswBuilder, FirmwareArchive, FirmwareComponentKind, FirmwareEntry,
-    FirmwareKeyProvider, PowderBundle, PowderBundleRequest, PowderConfig, PowderMode,
-    PowderPayloadPlan, PowderPayloadRequest, PowderTar, RestoreBehavior, iboot_tar, reboot_script,
-    system_partition_size, system_version_tar,
+    BuildIdentity, BundleRole, CustomIpswBuilder, FirmwareArchive, FirmwareComponentKind,
+    FirmwareEntry, FirmwareKeyProvider, FirmwareKeySet, PowderBundle, PowderBundleRequest,
+    PowderConfig, PowderMode, PowderPayloadPlan, PowderPayloadRequest, PowderTar, RestoreBehavior,
+    UstarBuilder, iboot_tar, partition_script_resource, reboot_script, render_partition_script,
+    system_partition_size, system_version_tar, uses_ramdisk_h,
 };
 use legacy_ios_image::{
     DmgFirmwareKey, DmgImage, DmgPartitionInput, HfsError, HfsImage, PowderIBootPatchOptions,
@@ -81,8 +93,10 @@ const PREF_DATA: [u8; 76] = [
 
 const MIB: u64 = 1024 * 1024;
 
-/// Request for a powdersn0w single-IPSW custom build, mirroring the option
-/// surface of upstream's `ipsw_prepare_32bit`.
+/// Request for a powdersn0w custom build, mirroring the option surface of
+/// upstream's `ipsw_prepare_32bit` (single IPSW), `ipsw_prepare_powder`
+/// (two-bundle `-base`), and `ipsw_prepare_ios4powder` (4.3.x `-base` with
+/// `-apticket`).
 pub struct PowderPrepareRequest {
     product_type: ProductType,
     board_config: BoardConfig,
@@ -98,6 +112,10 @@ pub struct PowderPrepareRequest {
     ramdisk_grow_blocks: u64,
     iboot_sidecar: Option<(String, Vec<u8>)>,
     extra_tars: Vec<(String, Vec<u8>)>,
+    base: Option<PathBuf>,
+    apticket: Option<Vec<u8>>,
+    drav6: bool,
+    latest_version: Option<IosVersion>,
 }
 
 impl PowderPrepareRequest {
@@ -123,6 +141,10 @@ impl PowderPrepareRequest {
             ramdisk_grow_blocks: DEFAULT_RAMDISK_GROW_BLOCKS,
             iboot_sidecar: None,
             extra_tars: Vec::new(),
+            base: None,
+            apticket: None,
+            drav6: false,
+            latest_version: None,
         }
     }
 
@@ -189,6 +211,41 @@ impl PowderPrepareRequest {
         self.extra_tars = tars;
         self
     }
+
+    /// Base IPSW of a two-bundle build (`-base`), mirroring
+    /// `ipsw_prepare_powder`; combined with a 4.3.x target this selects the
+    /// `ipsw_prepare_ios4powder` variant. The base build/version are read
+    /// from the base IPSW's BuildManifest at plan time.
+    pub fn with_base(mut self, base: impl Into<PathBuf>) -> Self {
+        self.base = Some(base.into());
+        self
+    }
+
+    /// APTicket DER resealed into the scab template (`-apticket`), required
+    /// when the target bundle declares an APTicket replacement (the 4.3.x
+    /// ios4powder flow). Extract it from a saved signing ticket with
+    /// [`extract_apticket_der`][crate::extract_apticket_der]. Ignored without
+    /// `with_base`, like upstream's `-apticket` outside `-base` mode.
+    pub fn with_apticket(mut self, der: Vec<u8>) -> Self {
+        self.apticket = Some(der);
+        self
+    }
+
+    /// DRA v6 target (`device_target_drav6`): keeps the board name in the
+    /// RamdiskExploit hardware mapping and drops the `nvram boot-ramdisk`
+    /// write from the partition script of iPhone4,1 builds.
+    pub fn with_drav6(mut self, enabled: bool) -> Self {
+        self.drav6 = enabled;
+        self
+    }
+
+    /// The device's latest iOS version (`device_latest_vers`), driving the
+    /// target bundle's manifest additions. Defaults to the target version,
+    /// which is correct whenever the manifest additions go unused.
+    pub fn with_latest_version(mut self, version: IosVersion) -> Self {
+        self.latest_version = Some(version);
+        self
+    }
 }
 
 impl fmt::Debug for PowderPrepareRequest {
@@ -206,6 +263,9 @@ impl fmt::Debug for PowderPrepareRequest {
             .field("verbose_boot_args", &self.verbose_boot_args)
             .field("boot_args", &self.boot_args)
             .field("ramdisk_grow_blocks", &self.ramdisk_grow_blocks)
+            .field("base", &self.base)
+            .field("drav6", &self.drav6)
+            .field("latest_version", &self.latest_version)
             .finish_non_exhaustive()
     }
 }
@@ -220,6 +280,53 @@ struct DaibutsuStage {
     hwmodel: String,
 }
 
+/// Resolved base side of a two-bundle build: the base bundle (FirmwarePath
+/// NOR sources, RamdiskExploit) plus the fetched exploit payload and the
+/// rendered partition script (the reboot4 binary for ios4powder).
+pub struct PowderBasePlan {
+    source: PathBuf,
+    version: IosVersion,
+    build: BuildId,
+    bundle: PowderBundle,
+    partition: Vec<u8>,
+    exploit: Vec<u8>,
+}
+
+impl PowderBasePlan {
+    /// Path of the base IPSW.
+    pub fn source(&self) -> &std::path::Path {
+        &self.source
+    }
+
+    /// Base iOS version, read from the base IPSW's BuildManifest. The restore
+    /// side takes the signing ticket from blobs saved for this version.
+    pub const fn version(&self) -> &IosVersion {
+        &self.version
+    }
+
+    /// Base build id.
+    pub const fn build_id(&self) -> &BuildId {
+        &self.build
+    }
+
+    /// The resolved base bundle, mirroring upstream's generated
+    /// `BASE_*` `Info.plist`.
+    pub const fn bundle(&self) -> &PowderBundle {
+        &self.bundle
+    }
+}
+
+impl fmt::Debug for PowderBasePlan {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("PowderBasePlan")
+            .field("source", &self.source)
+            .field("version", &self.version)
+            .field("build", &self.build)
+            .finish_non_exhaustive()
+    }
+}
+
 /// A resolved powder build: validated device/version, firmware bundle,
 /// config, ordered payload tars, and sizing, ready to execute.
 pub struct PowderPreparePlan {
@@ -229,11 +336,18 @@ pub struct PowderPreparePlan {
     board_config: BoardConfig,
     version: IosVersion,
     build: BuildId,
+    mode: PowderMode,
     bundle: PowderBundle,
     config: PowderConfig,
     tars: Vec<(String, Vec<u8>)>,
     punchd: bool,
     daibutsu: Option<DaibutsuStage>,
+    base: Option<PowderBasePlan>,
+    apticket: Option<Vec<u8>>,
+    scab_template: Option<Vec<u8>>,
+    bootstrap: Option<Vec<u8>>,
+    filesystem_package: Option<Vec<u8>>,
+    ramdisk_package: Option<Vec<u8>>,
     root_size_mb: u64,
     update_baseband: bool,
     ramdisk_grow_blocks: u64,
@@ -264,6 +378,17 @@ impl PowderPreparePlan {
         &self.build
     }
 
+    /// The powdersn0w call path, derived from the base/target combination at
+    /// plan time.
+    pub const fn mode(&self) -> PowderMode {
+        self.mode
+    }
+
+    /// The base side of a two-bundle build; `None` for single-IPSW builds.
+    pub const fn base(&self) -> Option<&PowderBasePlan> {
+        self.base.as_ref()
+    }
+
     /// The resolved firmware bundle, mirroring upstream's generated
     /// `Info.plist`.
     pub const fn bundle(&self) -> &PowderBundle {
@@ -292,6 +417,8 @@ impl fmt::Debug for PowderPreparePlan {
             .field("board_config", &self.board_config)
             .field("version", &self.version)
             .field("build", &self.build)
+            .field("mode", &self.mode)
+            .field("base", &self.base)
             .field("root_size_mb", &self.root_size_mb)
             .field("update_baseband", &self.update_baseband)
             .finish_non_exhaustive()
@@ -300,7 +427,10 @@ impl fmt::Debug for PowderPreparePlan {
 
 /// Resolve a powder build plan, mirroring `ipsw_prepare_bundle` (including
 /// the ramdisk options plist extraction for `SystemPartitionSize`) and
-/// `ipsw_prepare_config` for a single-IPSW build.
+/// `ipsw_prepare_config`. With a base IPSW this mirrors the two-bundle
+/// `ipsw_prepare_powder` flow (or the 4.3.x `ipsw_prepare_ios4powder`
+/// variant): the base bundle/keys/options are resolved the same way and the
+/// RamdiskExploit payloads are fetched.
 pub(crate) async fn plan(request: PowderPrepareRequest) -> Result<PowderPreparePlan, KitError> {
     let profile = DeviceDatabase::bundled()
         .find_product(&request.product_type)
@@ -326,18 +456,45 @@ pub(crate) async fn plan(request: PowderPrepareRequest) -> Result<PowderPrepareP
     let version = manifest.product_version().clone();
     let build = manifest.build_id().clone();
 
-    let payload = PowderPayloadPlan::resolve(
-        &PowderPayloadRequest::new(
-            PowderMode::Single,
-            request.product_type.clone(),
-            version.clone(),
-            build.clone(),
-        )
-        .with_jailbreak(request.jailbreak)
-        .with_openssh(request.openssh)
-        .with_beta(request.beta)
-        .with_iboot_sidecar(request.iboot_sidecar.is_some()),
-    )?;
+    // Upstream dispatch (restore.sh `ipsw_prepare`): a 4.3.x target with a
+    // base goes to `ipsw_prepare_ios4powder` (the payload plan rejects 4.x
+    // other than 4.3), any other base build to `ipsw_prepare_powder`.
+    let mode = match &request.base {
+        None => PowderMode::Single,
+        Some(_) if version.as_str().starts_with("4.") => PowderMode::Ios4,
+        Some(_) => PowderMode::TwoBundle,
+    };
+
+    let base_archive = request
+        .base
+        .as_ref()
+        .map(FirmwareArchive::open)
+        .transpose()?;
+    let base_manifest = base_archive
+        .as_ref()
+        .map(FirmwareArchive::build_manifest)
+        .transpose()?;
+    let base_version = base_manifest
+        .as_ref()
+        .map(|manifest| manifest.product_version().clone());
+    let base_build = base_manifest
+        .as_ref()
+        .map(|manifest| manifest.build_id().clone());
+
+    let mut payload_request = PowderPayloadRequest::new(
+        mode,
+        request.product_type.clone(),
+        version.clone(),
+        build.clone(),
+    )
+    .with_jailbreak(request.jailbreak)
+    .with_openssh(request.openssh)
+    .with_beta(request.beta)
+    .with_iboot_sidecar(request.iboot_sidecar.is_some());
+    if let Some(base_version) = &base_version {
+        payload_request = payload_request.with_base_version(base_version.clone());
+    }
+    let payload = PowderPayloadPlan::resolve(&payload_request)?;
 
     info!(
         product = %request.product_type,
@@ -345,55 +502,35 @@ pub(crate) async fn plan(request: PowderPrepareRequest) -> Result<PowderPrepareP
         build = %build,
         "fetching powder component keys"
     );
-    let keys = FirmwareKeyProvider::with_cache(&request.cache_root)
-        .fetch(&request.product_type, &build)
-        .await?;
+    let key_provider = FirmwareKeyProvider::with_cache(&request.cache_root);
+    let keys = key_provider.fetch(&request.product_type, &build).await?;
 
     let identity = manifest.select_identity(&request.board_config, RestoreBehavior::Erase)?;
-
-    // `ipsw_prepare_bundle` derives RootFilesystemSize from the restore
-    // ramdisk's options plist: decrypt the ramdisk and read the per-board
-    // plist first, falling back to the plain one, like the shell flow.
-    let ramdisk_path = identity.component_path("RestoreRamDisk")?.to_owned();
-    let ramdisk_container = archive.read_entry(&ramdisk_path)?;
-    let ramdisk_key = keys
-        .key("RestoreRamdisk")
-        .and_then(|key| key.key().map(<[u8]>::to_vec));
-    let ramdisk_iv = keys.key("RestoreRamdisk").and_then(|key| key.iv().copied());
-    let board = request.board_config.clone();
-    let options_plist = tokio::task::spawn_blocking(move || {
-        let encryption = ramdisk_key
-            .as_deref()
-            .zip(ramdisk_iv.as_ref().map(|iv| iv.as_slice()));
-        let payload = extract_image_payload(&ramdisk_container, encryption)?;
-        let hfs = HfsImage::parse(payload)?;
-        let per_board = format!("/usr/local/share/restore/options.{}.plist", board.as_str());
-        match hfs.read(&per_board) {
-            Ok(bytes) if !bytes.is_empty() => Ok(bytes),
-            _ => hfs
-                .read("/usr/local/share/restore/options.plist")
-                .map_err(|_| KitError::PowderMissingRamdiskOptions),
-        }
-    })
-    .await
-    .map_err(|error| KitError::Task(error.to_string()))??;
-    let system_partition = system_partition_size(&options_plist)?;
+    let system_partition =
+        ramdisk_system_partition(&archive, identity, &keys, &request.board_config).await?;
 
     let filename = request
         .source
         .file_name()
         .map(|name| name.to_string_lossy().into_owned())
         .unwrap_or_else(|| "custom.ipsw".to_owned());
+    let latest_version = request
+        .latest_version
+        .clone()
+        .unwrap_or_else(|| version.clone());
+    let role = match mode {
+        PowderMode::Single => BundleRole::Single,
+        PowderMode::TwoBundle | PowderMode::Ios4 => BundleRole::Target,
+    };
     let bundle = PowderBundle::resolve(
         &PowderBundleRequest::new(
-            BundleRole::Single,
+            role,
             request.product_type.clone(),
             request.board_config.clone(),
             filename,
             version.clone(),
             version.clone(),
-            // The latest version only feeds target-bundle manifest additions.
-            version.clone(),
+            latest_version.clone(),
             system_partition,
         )
         .with_jailbreak(request.jailbreak)
@@ -402,14 +539,139 @@ pub(crate) async fn plan(request: PowderPrepareRequest) -> Result<PowderPrepareP
         Some(identity),
     )?;
     let Some(config) = PowderConfig::resolve(
-        BundleRole::Single,
+        role,
         request.jailbreak,
         &version,
         request.verbose_boot_args,
         request.boot_args.as_deref(),
     )?
     else {
-        unreachable!("single-IPSW builds always carry a config");
+        unreachable!("single-IPSW and target bundles always carry a config");
+    };
+
+    let base = match (
+        &request.base,
+        base_archive,
+        base_manifest,
+        base_version,
+        base_build,
+    ) {
+        (
+            Some(base_path),
+            Some(base_archive),
+            Some(base_manifest),
+            Some(base_version),
+            Some(base_build),
+        ) => {
+            info!(
+                version = %base_version,
+                build = %base_build,
+                "fetching base powder component keys"
+            );
+            let base_keys = key_provider
+                .fetch(&request.product_type, &base_build)
+                .await?;
+            let base_identity =
+                base_manifest.select_identity(&request.board_config, RestoreBehavior::Erase)?;
+            let base_system_partition = ramdisk_system_partition(
+                &base_archive,
+                base_identity,
+                &base_keys,
+                &request.board_config,
+            )
+            .await?;
+            let base_filename = base_path
+                .file_name()
+                .map(|name| name.to_string_lossy().into_owned())
+                .unwrap_or_else(|| "base.ipsw".to_owned());
+            let base_bundle = PowderBundle::resolve(
+                &PowderBundleRequest::new(
+                    BundleRole::Base,
+                    request.product_type.clone(),
+                    request.board_config.clone(),
+                    base_filename,
+                    base_version.clone(),
+                    version.clone(),
+                    latest_version,
+                    base_system_partition,
+                )
+                .with_drav6(request.drav6)
+                .with_base_build(base_build.clone()),
+                &base_keys,
+                Some(base_identity),
+            )?;
+
+            let exploit = base_bundle
+                .ramdisk_exploit()
+                .expect("base bundles always carry a RamdiskExploit");
+            let exploit_id = exploit.resource_id();
+            debug!(resource = exploit_id.as_str(), "fetching ramdisk exploit");
+            let exploit = read_resource(&exploit_id, &request.cache_root).await?;
+            let partition = match mode {
+                // ios4powder installs the reboot4 binary as `partition`
+                // (`ipsw_prepare_reboot4`); it is not a shell script.
+                PowderMode::Ios4 => {
+                    read_resource(
+                        &crate::multipart::reboot4_resource(&request.product_type),
+                        &request.cache_root,
+                    )
+                    .await?
+                }
+                _ => {
+                    let ramdisk_h = uses_ramdisk_h(&request.product_type, base_version.as_str());
+                    let id = partition_script_resource(ramdisk_h);
+                    debug!(resource = id.as_str(), "fetching partition script");
+                    let template = read_resource(&id, &request.cache_root).await?;
+                    if ramdisk_h {
+                        // The ramdiskH (iPhone5) script is used verbatim.
+                        template
+                    } else {
+                        let template = String::from_utf8(template)
+                            .map_err(|_| KitError::PowderInvalidPartitionScript)?;
+                        render_partition_script(
+                            &template,
+                            base_version.as_str(),
+                            &request.product_type,
+                            request.drav6,
+                        )
+                        .into_bytes()
+                    }
+                }
+            };
+            Some(PowderBasePlan {
+                source: base_path.clone(),
+                version: base_version,
+                build: base_build,
+                bundle: base_bundle,
+                partition,
+                exploit,
+            })
+        }
+        _ => None,
+    };
+
+    // ios4powder appends the externally patched iBoot to the bin4 ramdisk
+    // package for every device, so the sidecar is mandatory there even though
+    // the payload plan only lists iBoot.tar for iPad1,1.
+    if mode == PowderMode::Ios4 && request.iboot_sidecar.is_none() {
+        return Err(KitError::PowderMissingIbootSidecar);
+    }
+    // The scab reseal runs when the target bundle declares an APTicket
+    // replacement (4.x targets); upstream requires `-apticket` there.
+    let needs_apticket = bundle
+        .firmware_replacements()
+        .iter()
+        .any(|entry| entry.component() == "APTicket");
+    let apticket = if needs_apticket {
+        let der = request.apticket.ok_or(KitError::PowderMissingApTicket)?;
+        Some(der)
+    } else {
+        None
+    };
+    let scab_template = if needs_apticket {
+        Some(read_resource(&ResourceId::new("ios4-scab-template"), &request.cache_root).await?)
+    } else {
+        None
     };
 
     // Payload tars in upstream argv order: generated extras
@@ -471,6 +733,60 @@ pub(crate) async fn plan(request: PowderPrepareRequest) -> Result<PowderPrepareP
         None => None,
     };
 
+    // Two-bundle target bundles declare package payloads (main.c's
+    // FilesystemPackage/RamdiskPackage). The bootstrap (freeze.tar) is
+    // fetched only under a FilesystemJailbreak config, like main.c's
+    // `bootstrap && jailbreak` gate; the filesystem package (ios9.tar) is
+    // fetched whenever declared; the ramdisk package is bin.tar, replaced by
+    // bin4.tar with the patched iBoot appended for ios4powder
+    // (`rm src/bin.tar; mv src/bin4.tar src/bin.tar; tar -rvf src/bin.tar iBoot`).
+    let bootstrap = match bundle.filesystem_package() {
+        Some(_) if config.filesystem_jailbreak() => Some(
+            read_tar_resource(
+                &ResourceId::new("jailbreak-bootstrap-freeze"),
+                &request.cache_root,
+            )
+            .await?,
+        ),
+        _ => None,
+    };
+    let filesystem_package = match bundle.filesystem_package().and_then(|p| p.package()) {
+        Some(_) => Some(
+            read_tar_resource(&ResourceId::new("powder-ios9-package"), &request.cache_root).await?,
+        ),
+        None => None,
+    };
+    let ramdisk_package = match bundle.ramdisk_package() {
+        Some(_) => {
+            let package = match mode {
+                PowderMode::Ios4 => {
+                    let bin4 = read_tar_resource(
+                        &ResourceId::new("ios4-restore-bin-tar"),
+                        &request.cache_root,
+                    )
+                    .await?;
+                    let (_, iboot) = request
+                        .iboot_sidecar
+                        .as_ref()
+                        .expect("ios4powder requires the iBoot sidecar");
+                    let mut tar = UstarBuilder::appending(&bin4);
+                    tar.add_file("iBoot", iboot)
+                        .expect("constant ustar entry name");
+                    tar.finish()
+                }
+                _ => {
+                    read_tar_resource(
+                        &ResourceId::new("legacy-restore-bin-tar"),
+                        &request.cache_root,
+                    )
+                    .await?
+                }
+            };
+            Some(package)
+        }
+        None => None,
+    };
+
     // Two-bundle builds additionally count the bundle-declared
     // FilesystemPackage tars here: the bootstrap only under a
     // FilesystemJailbreak config, the package unconditionally. Single-IPSW
@@ -480,13 +796,14 @@ pub(crate) async fn plan(request: PowderPrepareRequest) -> Result<PowderPrepareP
         bundle.root_filesystem_size_mb(),
         &tar_sizes,
         daibutsu.as_ref().map(|stage| stage.untether.len() as u64),
-        None,
-        None,
+        bootstrap.as_ref().map(|bytes| bytes.len() as u64),
+        filesystem_package.as_ref().map(|bytes| bytes.len() as u64),
     );
 
     info!(
         product = %request.product_type,
         version = %version,
+        mode = ?mode,
         jailbreak = request.jailbreak,
         daibutsu = daibutsu.is_some(),
         root_size_mb,
@@ -499,11 +816,18 @@ pub(crate) async fn plan(request: PowderPrepareRequest) -> Result<PowderPrepareP
         board_config: request.board_config,
         version,
         build,
+        mode,
         bundle,
         config,
         tars,
         punchd: payload.punchd(),
         daibutsu,
+        base,
+        apticket,
+        scab_template,
+        bootstrap,
+        filesystem_package,
+        ramdisk_package,
         root_size_mb,
         update_baseband: request.update_baseband,
         ramdisk_grow_blocks: request.ramdisk_grow_blocks,
@@ -516,13 +840,53 @@ async fn read_tar_resource(
     id: &ResourceId,
     cache_root: &std::path::Path,
 ) -> Result<Vec<u8>, KitError> {
-    let path = crate::firmware::fetch_resource(id, cache_root.to_owned()).await?;
-    let bytes = tokio::fs::read(path).await?;
+    let bytes = read_resource(id, cache_root).await?;
     if bytes.starts_with(&[0x1f, 0x8b]) {
         crate::bootstrap::gunzip(&bytes)
     } else {
         Ok(bytes)
     }
+}
+
+/// Fetch a catalog resource verbatim.
+async fn read_resource(id: &ResourceId, cache_root: &std::path::Path) -> Result<Vec<u8>, KitError> {
+    let path = crate::firmware::fetch_resource(id, cache_root.to_owned()).await?;
+    Ok(tokio::fs::read(path).await?)
+}
+
+/// `ipsw_prepare_bundle` derives RootFilesystemSize from the restore
+/// ramdisk's options plist: decrypt the ramdisk and read the per-board plist
+/// first, falling back to the plain one, like the shell flow.
+async fn ramdisk_system_partition(
+    archive: &FirmwareArchive,
+    identity: &BuildIdentity,
+    keys: &FirmwareKeySet,
+    board: &BoardConfig,
+) -> Result<u64, KitError> {
+    let ramdisk_path = identity.component_path("RestoreRamDisk")?.to_owned();
+    let ramdisk_container = archive.read_entry(&ramdisk_path)?;
+    let ramdisk_key = keys
+        .key("RestoreRamdisk")
+        .and_then(|key| key.key().map(<[u8]>::to_vec));
+    let ramdisk_iv = keys.key("RestoreRamdisk").and_then(|key| key.iv().copied());
+    let board = board.clone();
+    let options_plist = tokio::task::spawn_blocking(move || {
+        let encryption = ramdisk_key
+            .as_deref()
+            .zip(ramdisk_iv.as_ref().map(|iv| iv.as_slice()));
+        let payload = extract_image_payload(&ramdisk_container, encryption)?;
+        let hfs = HfsImage::parse(payload)?;
+        let per_board = format!("/usr/local/share/restore/options.{}.plist", board.as_str());
+        match hfs.read(&per_board) {
+            Ok(bytes) if !bytes.is_empty() => Ok(bytes),
+            _ => hfs
+                .read("/usr/local/share/restore/options.plist")
+                .map_err(|_| KitError::PowderMissingRamdiskOptions),
+        }
+    })
+    .await
+    .map_err(|error| KitError::Task(error.to_string()))??;
+    Ok(system_partition_size(&options_plist)?)
 }
 
 pub(crate) fn spawn(plan: PowderPreparePlan) -> OperationHandle {
@@ -542,7 +906,12 @@ async fn execute(plan: PowderPreparePlan, emitter: &OperationEmitter) -> Result<
             cancellation: CancellationSafety::UnsafeUntilPhaseEnds,
         })
         .await;
-    let stages = (plan.bundle.firmware().len() + 2) as u64;
+    let stages = (plan.bundle.firmware().len()
+        + 2
+        + plan
+            .base
+            .as_ref()
+            .map_or(0, |base| base.bundle.firmware_paths().len())) as u64;
     let source = plan.source.clone();
     let destination = plan.destination.clone();
     let summary_text = format!(
@@ -611,6 +980,15 @@ fn assemble(
             unit: ProgressUnit::Steps,
         }));
     };
+
+    // main.c's useBaseFW block runs before the Firmware dict loop: APTicket
+    // scab reseal, the all_flash manifest rewrite, and the FirmwarePath →
+    // FirmwareReplace NOR copies with their TYPE rewrites and the NewiBoot
+    // patch.
+    if let Some(base) = &plan.base {
+        completed = apply_base_stage(plan, base, &archive, &mut replacements, completed)?;
+        progress(emitter, completed);
+    }
 
     for entry in plan.bundle.firmware() {
         debug!(
@@ -727,6 +1105,170 @@ fn assemble(
     Ok(replacements)
 }
 
+/// The useBaseFW block of main.c: reseal the APTicket into the scab
+/// template, write the all_flash manifest with the bundle's additions
+/// appended, and copy the base IPSW's NOR images over the target bundle's
+/// FirmwareReplace paths — with the IMG3 TYPE byte rewrites for the target's
+/// own logo/recovery/iBoot and the NewiBoot patch (patched target iBoot,
+/// stored decrypted under the `ibob` tag). Returns the updated stage count.
+fn apply_base_stage(
+    plan: &PowderPreparePlan,
+    base: &PowderBasePlan,
+    archive: &FirmwareArchive,
+    replacements: &mut Vec<(String, Vec<u8>)>,
+    mut completed: u64,
+) -> Result<u64, KitError> {
+    let base_archive = FirmwareArchive::open(&base.source)?;
+    let replacement = |component: &'static str| {
+        plan.bundle
+            .firmware_replacements()
+            .iter()
+            .find(|entry| entry.component() == component)
+            .ok_or(KitError::PowderMissingComponent(component))
+    };
+
+    // APTicket: reseal the `-apticket` DER into the scab template IMG3, like
+    // main.c's duplicateAbstractFile2 payload swap (and multipart's reseal,
+    // which uses the same primitive successfully; xpwn's own ticket path is
+    // marked "buggy" upstream).
+    if let Ok(entry) = replacement("APTicket") {
+        let template = plan
+            .scab_template
+            .as_deref()
+            .expect("an APTicket replacement implies a fetched scab template");
+        let der = plan
+            .apticket
+            .as_deref()
+            .expect("an APTicket replacement implies a validated ticket");
+        replacements.push((
+            entry.file().to_owned(),
+            replace_image_payload(template, der, None)?,
+        ));
+    }
+
+    // manifest: the bundle manifest is the target IPSW's own all_flash
+    // manifest with the renamed images appended by `ipsw_prepare_paths`.
+    let manifest_entry = replacement("manifest")?;
+    let original = archive.read_entry(manifest_entry.file())?;
+    replacements.push((
+        manifest_entry.file().to_owned(),
+        all_flash_manifest(&original, plan.bundle.manifest_additions()),
+    ));
+
+    // FirmwarePath loop: base NOR images over the target paths.
+    for base_path in base.bundle.firmware_paths() {
+        let data = base_archive.read_entry(base_path.file())?;
+        match base_path.component() {
+            "AppleLogo" => {
+                replacements.push((replacement("AppleLogo")?.file().to_owned(), data));
+                // NewAppleLogo: the target's own logo with TYPE logo→logb.
+                let new_logo = replacement("NewAppleLogo")?;
+                let mut logo = archive.read_entry(new_logo.file())?;
+                rewrite_img3_type_base(&mut logo, "NewAppleLogo")?;
+                replacements.push((new_logo.file().to_owned(), logo));
+            }
+            "RecoveryMode" => {
+                replacements.push((replacement("RecoveryMode")?.file().to_owned(), data));
+                // NewRecoveryMode: the target's own recoverym with TYPE
+                // recm→recb.
+                let new_recovery = replacement("NewRecoveryMode")?;
+                let mut recovery = archive.read_entry(new_recovery.file())?;
+                rewrite_img3_type_base(&mut recovery, "NewRecoveryMode")?;
+                replacements.push((new_recovery.file().to_owned(), recovery));
+            }
+            "iBoot" => {
+                let ibot = replacement("iBoot")?;
+                if let Ok(new_iboot) = replacement("NewiBoot") {
+                    // NewiBoot (absent on iPad1,1): the target's own iBoot
+                    // with TYPE ibot→ibob, patched with the config-gated
+                    // boot-args and stored decrypted (main.c's doiBootPatch
+                    // followed by doDecrypt).
+                    let mut container = archive.read_entry(ibot.file())?;
+                    rewrite_img3_type_base(&mut container, "NewiBoot")?;
+                    let encryption = match (new_iboot.key(), new_iboot.iv()) {
+                        (Some(key), Some(iv)) => Some((key, iv.as_slice())),
+                        _ => None,
+                    };
+                    let patched = transform_payload(&container, encryption, |raw| {
+                        Ok(patch_powder_iboot(
+                            raw,
+                            &PowderIBootPatchOptions {
+                                boot_args: base_iboot_boot_args(&plan.config),
+                                debug: plan.config.filesystem_jailbreak(),
+                            },
+                        )?)
+                    })?;
+                    replacements.push((
+                        new_iboot.file().to_owned(),
+                        decrypt_rewrap(&patched, encryption)?,
+                    ));
+                }
+                // The base IPSW's original iBoot takes the target iBoot path.
+                replacements.push((ibot.file().to_owned(), data));
+            }
+            // Batteries, BatteryPlugin, LLB: plain copies.
+            component => {
+                let entry = plan
+                    .bundle
+                    .firmware_replacements()
+                    .iter()
+                    .find(|entry| entry.component() == component)
+                    .ok_or(KitError::PowderMissingComponent("NOR image"))?;
+                replacements.push((entry.file().to_owned(), data));
+            }
+        }
+        completed += 1;
+    }
+    Ok(completed)
+}
+
+/// main.c's TYPE tag rewrite for base-mode NOR images: the IMG3 identify
+/// field and the TYPE tag value are stored byte-reversed, so flipping the
+/// first stored byte of each to `b` turns `logo`/`recm`/`ibot` into
+/// `logb`/`recb`/`ibob`.
+fn rewrite_img3_type_base(data: &mut [u8], component: &'static str) -> Result<(), KitError> {
+    if data.len() <= 0x20 {
+        return Err(KitError::PowderTruncatedNorImage(component));
+    }
+    data[0x10] = b'b';
+    data[0x20] = b'b';
+    Ok(())
+}
+
+/// Boot-args of the NewiBoot patch, mirroring main.c's bootargs assembly:
+/// CSBYPASS_BOOTARGS only under the FilesystemJailbreak config, with the
+/// config's bootArgsString appended (or used alone) when bootArgsInjection
+/// is set; no boot-args otherwise. Unlike the Firmware-loop iBSS/iBEC patch,
+/// CSBYPASS is not unconditional here.
+fn base_iboot_boot_args(config: &PowderConfig) -> Option<String> {
+    let mut args = config
+        .filesystem_jailbreak()
+        .then(|| CSBYPASS_BOOTARGS.to_owned());
+    if config.boot_args_injection() {
+        match &mut args {
+            Some(args) => {
+                args.push(' ');
+                args.push_str(config.boot_args());
+            }
+            None => args = Some(config.boot_args().to_owned()),
+        }
+    }
+    args
+}
+
+/// The bundle manifest main.c writes over all_flash/manifest: the target
+/// IPSW's own manifest text with the bundle's additions appended one per
+/// line, mirroring the `echo >> $FirmwareBundle/manifest` calls of
+/// `ipsw_prepare_paths`.
+fn all_flash_manifest(original: &[u8], additions: &[String]) -> Vec<u8> {
+    let mut text = String::from_utf8_lossy(original).into_owned();
+    for addition in additions {
+        text.push_str(addition);
+        text.push('\n');
+    }
+    text.into_bytes()
+}
+
 /// Root filesystem stage of main.c: decrypt and extract the DMG, grow to the
 /// estimated size, punchd rename, payload tar merges, the daibutsu
 /// LaunchDaemon shuffles around the untether untar, the FilesystemJailbreak
@@ -789,15 +1331,28 @@ fn personalize_rootfs(
     }
 
     if plan.config.filesystem_jailbreak() {
-        // Never set by single-IPSW configs; two-bundle jailbroken 6/8/9
-        // targets land here and also untar the bundle-declared
-        // FilesystemPackage bootstrap/package bytes after the fstab write.
+        // Two-bundle jailbroken 6/8/9 targets land here: the rw fstab wins
+        // over the payload tar merge, then the bundle-declared
+        // FilesystemPackage bootstrap and package bytes are untarred (main.c
+        // untars both inside the jailbreak block, bootstrap first).
         if hfs.stat(FSTAB_PATH).is_ok() {
             hfs.remove_file(FSTAB_PATH)?;
         }
         hfs.add_file(FSTAB_PATH, FSTAB_DATA)?;
         hfs.chmod(FSTAB_PATH, 0o644)?;
         hfs.chown(FSTAB_PATH, 0, 0)?;
+        if let Some(bootstrap) = &plan.bootstrap {
+            debug!(bytes = bootstrap.len(), "installing bootstrap package");
+            if !bootstrap.is_empty() {
+                hfs.untar(bootstrap)?;
+            }
+        }
+        if let Some(package) = &plan.filesystem_package {
+            debug!(bytes = package.len(), "installing filesystem package");
+            if !package.is_empty() {
+                hfs.untar(package)?;
+            }
+        }
     }
 
     if plan.config.need_pref() {
@@ -823,9 +1378,11 @@ fn personalize_ramdisk(plan: &PowderPreparePlan, container: &[u8]) -> Result<Vec
 
     let block_size = u64::from(hfs.block_size()?);
     // The RamdiskPackage size feeds the growth only when nonzero (main.c's
-    // `if(rdsize)`); single-IPSW bundles declare no RamdiskPackage, and
-    // two-bundle mode passes the fetched package bytes here.
-    let package_size: Option<u64> = None;
+    // `if(rdsize)`); single-IPSW bundles declare no RamdiskPackage.
+    let package_size = plan
+        .ramdisk_package
+        .as_ref()
+        .map(|bytes| bytes.len() as u64);
     let daibutsu_sizes = plan
         .daibutsu
         .as_ref()
@@ -843,9 +1400,25 @@ fn personalize_ramdisk(plan: &PowderPreparePlan, container: &[u8]) -> Result<Vec
     let asr = patch_asr(&hfs.read("/usr/sbin/asr")?)?;
     upsert_file(&mut hfs, "/usr/sbin/asr", &asr)?;
 
-    // Two-bundle mode: untar the bundle-declared RamdiskPackage bytes here
-    // (before the marker), followed by the base bundle's RamdiskExploit
-    // reboot hook and /exploit payload.
+    // Two-bundle mode: untar the bundle-declared RamdiskPackage bytes
+    // (bin.tar, or bin4.tar with the patched iBoot appended for ios4powder),
+    // then install the base bundle's RamdiskExploit hook: move /sbin/reboot
+    // aside, install the partition script (reboot4 binary for ios4powder) as
+    // /sbin/reboot, and the per-hw/per-build exploit as /exploit, in main.c's
+    // order.
+    if let Some(package) = &plan.ramdisk_package {
+        debug!(bytes = package.len(), "installing ramdisk package");
+        if !package.is_empty() {
+            hfs.untar(package)?;
+        }
+    }
+    if let Some(base) = &plan.base {
+        hfs.move_entry("/sbin/reboot", "/sbin/reboot_")?;
+        hfs.add_file("/sbin/reboot", &base.partition)?;
+        hfs.add_file("/exploit", &base.exploit)?;
+        hfs.chmod("/sbin/reboot", 0o755)?;
+        hfs.chown("/sbin/reboot", 0, 0)?;
+    }
     if let Some(marker) = plan
         .bundle
         .ramdisk_package()
@@ -1423,5 +1996,103 @@ mod tests {
         let output =
             rewrite_manifest_paths(manifest, &[("RestoreDeviceTree", "Downgrade/X")]).unwrap();
         assert_eq!(output, manifest);
+    }
+
+    #[test]
+    fn img3_type_rewrite_flips_byte_reversed_fourcc() {
+        // IMG3 stores the identify field and TYPE tag value byte-reversed:
+        // "logo" appears as "ogol" at 0x10 and 0x20; flipping the first stored
+        // byte to 'b' yields "logb".
+        let mut image = vec![0u8; 0x30];
+        image[0x10..0x14].copy_from_slice(b"ogol");
+        image[0x20..0x24].copy_from_slice(b"ogol");
+        rewrite_img3_type_base(&mut image, "NewAppleLogo").unwrap();
+        assert_eq!(&image[0x10..0x14], b"bgol");
+        assert_eq!(&image[0x20..0x24], b"bgol");
+        assert!(rewrite_img3_type_base(&mut [0u8; 0x20], "NewAppleLogo").is_err());
+    }
+
+    #[test]
+    fn scab_reseal_swaps_payload_like_multipart() {
+        // The same replace_image_payload primitive multipart uses for its
+        // working ticket reseal: the scab template keeps its header/TYPE tag,
+        // the DATA payload becomes the APTicket DER.
+        use legacy_ios_image::{Img3, Img3Element, Img3Tag};
+        let template = Img3::new(
+            0x7363_6162,
+            vec![
+                Img3Element::new(Img3Tag::TYPE, b"scab".to_vec()),
+                Img3Element::new(Img3Tag::DATA, b"placeholder".to_vec()),
+            ],
+        )
+        .to_bytes();
+        let der = [0x30, 0x82, 0x01, 0x00, 0xaa];
+        let resealed = replace_image_payload(&template, &der, None).unwrap();
+        assert_eq!(extract_image_payload(&resealed, None).unwrap(), der);
+        // Magic and the identify field are untouched (the size fields scale
+        // with the payload).
+        assert_eq!(&resealed[..4], &template[..4]);
+        assert_eq!(&resealed[0x10..0x14], &template[0x10..0x14]);
+        assert_eq!(
+            Img3::parse(&resealed).unwrap().elements()[0].data(),
+            b"scab"
+        );
+    }
+
+    #[test]
+    fn all_flash_manifest_appends_additions_in_order() {
+        let output = all_flash_manifest(
+            b"applelogo.s5l8930x.img3\nLLB.n90ap.RELEASE.img3\n",
+            &[
+                "applelogo7.s5l8930x.img3".to_owned(),
+                "recoverymode7.s5l8930x.img3".to_owned(),
+                "iBoot2.n90ap.RELEASE.img3".to_owned(),
+            ],
+        );
+        assert_eq!(
+            output,
+            b"applelogo.s5l8930x.img3\nLLB.n90ap.RELEASE.img3\napplelogo7.s5l8930x.img3\nrecoverymode7.s5l8930x.img3\niBoot2.n90ap.RELEASE.img3\n"
+        );
+    }
+
+    #[test]
+    fn base_iboot_args_follow_the_config_gates() {
+        let version = IosVersion::from("8.4.1");
+        // FilesystemJailbreak (jailbroken 6/8/9 target): CSBYPASS leads.
+        let jailbroken = PowderConfig::resolve(BundleRole::Target, true, &version, false, None)
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            base_iboot_boot_args(&jailbroken),
+            Some(CSBYPASS_BOOTARGS.to_owned())
+        );
+        let verbose = PowderConfig::resolve(BundleRole::Target, true, &version, true, None)
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            base_iboot_boot_args(&verbose),
+            Some(format!("{CSBYPASS_BOOTARGS} pio-error=0 -v"))
+        );
+        // No jailbreak, bootArgsInjection set: the config string alone.
+        let custom =
+            PowderConfig::resolve(BundleRole::Target, false, &version, false, Some("serial=1"))
+                .unwrap()
+                .unwrap();
+        assert_eq!(
+            base_iboot_boot_args(&custom),
+            Some("pio-error=0 debug=0x2014e serial=3 serial=1".to_owned())
+        );
+        // Plain config (the ios4powder forced `false true`): no boot-args.
+        let plain = PowderConfig::resolve(
+            BundleRole::Target,
+            true,
+            &IosVersion::from("4.3.3"),
+            false,
+            None,
+        )
+        .unwrap()
+        .unwrap();
+        assert!(!plain.filesystem_jailbreak());
+        assert_eq!(base_iboot_boot_args(&plain), None);
     }
 }

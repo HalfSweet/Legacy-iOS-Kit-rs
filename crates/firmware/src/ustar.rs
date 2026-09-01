@@ -31,6 +31,25 @@ impl UstarBuilder {
         self.push_entry(&format!("{path}/"), b"0000755\0", b'5', &[])
     }
 
+    /// Resume building from an existing block-aligned archive, mirroring
+    /// `tar -rvf`: the trailing zero blocks (end marker and record padding)
+    /// are stripped so new entries land at the end-of-archive marker, and
+    /// [`finish`](Self::finish) re-appends the marker. Bytes of a trailing
+    /// partial block (never produced by tar) are dropped with the padding.
+    pub fn appending(archive: &[u8]) -> Self {
+        let mut blocks = archive.len() / BLOCK;
+        while blocks > 0
+            && archive[(blocks - 1) * BLOCK..blocks * BLOCK]
+                .iter()
+                .all(|&byte| byte == 0)
+        {
+            blocks -= 1;
+        }
+        Self {
+            data: archive[..blocks * BLOCK].to_vec(),
+        }
+    }
+
     /// Finish the archive, appending the two zero end blocks.
     pub fn finish(mut self) -> Vec<u8> {
         self.data.resize(self.data.len() + 2 * BLOCK, 0);
@@ -118,5 +137,24 @@ mod tests {
     fn rejects_long_names() {
         let mut builder = UstarBuilder::new();
         assert!(builder.add_file(&"x".repeat(101), b"").is_err());
+    }
+
+    #[test]
+    fn appending_resumes_at_the_end_marker() {
+        let mut builder = UstarBuilder::new();
+        builder.add_file("bin/tool", b"original").unwrap();
+        let archive = builder.finish();
+
+        let mut builder = UstarBuilder::appending(&archive);
+        builder.add_file("iBoot", b"patched").unwrap();
+        let appended = builder.finish();
+
+        // The original entry survives and the appended entry lands where the
+        // end marker was (one header + one data block for 8 bytes).
+        assert_eq!(&appended[..8], b"bin/tool");
+        assert_eq!(&appended[1024..1029], b"iBoot");
+        assert_eq!(&appended[1536..1543], b"patched");
+        assert_eq!(appended.len(), 2048 + 2 * 512);
+        assert!(appended[2048..].iter().all(|&byte| byte == 0));
     }
 }

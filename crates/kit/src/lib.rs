@@ -84,12 +84,15 @@ pub use legacy_ios_workflows::{
 pub use multipart::{
     MULTIPART_IBOOT_BOOT_ARGS, MULTIPART_IBOOT_BOOT_ARGS_VERBOSE, MULTIPART_NOR_BUILD,
     MULTIPART_NOR_VERSION, MultipartIpswSummary, MultipartPrepareRequest, MultipartRestoreRequest,
-    NorSource, RamdiskPayload, TargetIbootDisposition, multipart_base_version, multipart_support,
-    ramdisk_payload, reboot4_resource, target_iboot_disposition, target_iboot_patch_options,
+    NorSource, RamdiskPayload, TargetIbootDisposition, extract_apticket_der,
+    multipart_base_version, multipart_support, ramdisk_payload, reboot4_resource,
+    target_iboot_disposition, target_iboot_patch_options,
 };
 pub use operation::OperationHandle;
 pub use pairing::PairingStore;
-pub use powder::{DEFAULT_RAMDISK_GROW_BLOCKS, PowderPreparePlan, PowderPrepareRequest};
+pub use powder::{
+    DEFAULT_RAMDISK_GROW_BLOCKS, PowderBasePlan, PowderPreparePlan, PowderPrepareRequest,
+};
 pub use ramdisk::{RamdiskBuildRequest, RamdiskBuildSummary};
 pub use ramdisk_boot::RamdiskBootExecutionRequest;
 pub use recovery::{RecoveryDevice, RecoveryManager, RecoveryUploadResult};
@@ -330,10 +333,11 @@ impl LegacyIosKit {
         multipart::prepare(request).await
     }
 
-    /// Plan a powdersn0w single-IPSW custom build (upstream's
-    /// `ipsw_prepare_32bit` without `-base`): gate the device and version,
-    /// resolve the firmware bundle/config/payload plan, and fetch the
-    /// jailbreak payload resources.
+    /// Plan a powdersn0w custom build: gate the device and version, resolve
+    /// the firmware bundle/config/payload plan, and fetch the payload
+    /// resources. Without a base IPSW this mirrors upstream's
+    /// `ipsw_prepare_32bit`; with one, the two-bundle `ipsw_prepare_powder`
+    /// (or, for a 4.3.x target with `-apticket`, `ipsw_prepare_ios4powder`).
     pub async fn plan_powder_ipsw(
         &self,
         request: PowderPrepareRequest,
