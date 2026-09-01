@@ -1682,3 +1682,345 @@ sha256 = "85f071636a2950d583b5fbdc740fb88ab4014f6d827662032fd7485a8c06a10f"
 size = 524288
 purpose = "powdersn0w ramdisk exploit payload (xpwn src/target) for iPhone4,1 with an iOS 7.1.2 base"
 redistribution = "download-only"
+[[resources]]
+id = "gilbertjb-jb-9A334-K93AP"
+source_url = "https://raw.githubusercontent.com/g1lbertJB/g1lbertJB/6216ad517d42df7a046f54d6c180fec4726a9f5e/payload/9A334_K93AP/jb"
+source_commit = "6216ad517d42df7a046f54d6c180fec4726a9f5e"
+sha256 = "21d420ab1bc64bc4e500ae656af9a41220a51e56e3d3d821c7a1f66e65da76cb"
+size = 53824
+purpose = "g1lbertJB on-device kernel exploit/patcher (unthredera1n) for K93AP on build 9A334; a data asset run at boot, never regenerated"
+redistribution = "download-only"
+
+[[resources]]
+id = "gilbertjb-jb-9A334-K94AP"
+source_url = "https://raw.githubusercontent.com/g1lbertJB/g1lbertJB/6216ad517d42df7a046f54d6c180fec4726a9f5e/payload/9A334_K94AP/jb"
+source_commit = "6216ad517d42df7a046f54d6c180fec4726a9f5e"
+sha256 = "63b9620e550f25f6452bfd53a35111fb3341e6a0dbe5dd60fa045f95dd6c216f"
+size = 53824
+purpose = "g1lbertJB on-device kernel exploit/patcher (unthredera1n) for K94AP on build 9A334; a data asset run at boot, never regenerated"
+redistribution = "download-only"
+
+[[resources]]
+id = "gilbertjb-jb-9A334-K95AP"
+source_url = "https://raw.githubusercontent.com/g1lbertJB/g1lbertJB/6216ad517d42df7a046f54d6c180fec4726a9f5e/payload/9A334_K95AP/jb"
+source_commit = "6216ad517d42df7a046f54d6c180fec4726a9f5e"
+sha256 = "6bb4c8b2b2ba35fef3d00005db53fe14a8fca0b4e09b717db5c3a0a124dd8706"
+size = 53824
+purpose = "g1lbertJB on-device kernel exploit/patcher (unthredera1n) for K95AP on build 9A334; a data asset run at boot, never regenerated"
+redistribution = "download-only"
+
+[[resources]]
+id = "gilbertjb-jb-9A334-N94AP"
+source_url = "https://raw.githubusercontent.com/g1lbertJB/g1lbertJB/6216ad517d42df7a046f54d6c180fec4726a9f5e/payload/9A334_N94AP/jb"
+source_commit = "6216ad517d42df7a046f54d6c180fec4726a9f5e"
+sha256 = "439b36aa1c366ced436a6572bd330dd9161c6efb7f7aa7206cbe3e07835d6320"
+size = 53824
+purpose = "g1lbertJB on-device kernel exploit/patcher (unthredera1n) for N94AP on build 9A334; a data asset run at boot, never regenerated"
+redistribution = "download-only"
+
+[[resources]]
+id = "gilbertjb-jb-9A405-K93AP"
+source_url = "https://raw.githubusercontent.com/g1lbertJB/g1lbertJB/6216ad517d42df7a046f54d6c180fec4726a9f5e/payload/9A405_K93AP/jb"
+source_commit = "6216ad517d42df7a046f54d6c180fec4726a9f5e"
+sha256 = "9c6b96543f8fc9bf747d0e561dbaab8d857ce2f6d7279d79426bbddd7cb5b180"
+size = 53824
+purpose = "g1lbertJB on-device kernel exploit/patcher (unthredera1n) for K93AP on build 9A405; a data asset run at boot, never regenerated"
+redistribution = "download-only"
+
+[[resources]]
+id = "gilbertjb-jb-9A405-K94AP"
+source_url = "https://raw.githubusercontent.com/g1lbertJB/g1lbertJB/6216ad517d42df7a046f54d6c180fec4726a9f5e/payload/9A405_K94AP/jb"
+source_commit = "6216ad517d42df7a046f54d6c180fec4726a9f5e"
+sha256 = "4a6c4a05b47a3920ef0d83f19555afc3719fdee3e9c184a10ebe22a17934e044"
+size = 53824
+purpose = "g1lbertJB on-device kernel exploit/patcher (unthredera1n) for K94AP on build 9A405; a data asset run at boot, never regenerated"
+redistribution = "download-only"
+
+[[resources]]
+id = "gilbertjb-jb-9A405-K95AP"
+source_url = "https://raw.githubusercontent.com/g1lbertJB/g1lbertJB/6216ad517d42df7a046f54d6c180fec4726a9f5e/payload/9A405_K95AP/jb"
+source_commit = "6216ad517d42df7a046f54d6c180fec4726a9f5e"
+sha256 = "ad1bf460acce5f7d1d5f6ade00653c5e100b525b4edae32396bfd98592d308a4"
+size = 53824
+purpose = "g1lbertJB on-device kernel exploit/patcher (unthredera1n) for K95AP on build 9A405; a data asset run at boot, never regenerated"
+redistribution = "download-only"
+
+[[resources]]
+id = "gilbertjb-jb-9A405-N94AP"
+source_url = "https://raw.githubusercontent.com/g1lbertJB/g1lbertJB/6216ad517d42df7a046f54d6c180fec4726a9f5e/payload/9A405_N94AP/jb"
+source_commit = "6216ad517d42df7a046f54d6c180fec4726a9f5e"
+sha256 = "f7fe244caddff3707d07de59fd36802ce8247a36a95ed5fcff26c9018ca8a68c"
+size = 53824
+purpose = "g1lbertJB on-device kernel exploit/patcher (unthredera1n) for N94AP on build 9A405; a data asset run at boot, never regenerated"
+redistribution = "download-only"
+
+[[resources]]
+id = "gilbertjb-jb-9A406-N94AP"
+source_url = "https://raw.githubusercontent.com/g1lbertJB/g1lbertJB/6216ad517d42df7a046f54d6c180fec4726a9f5e/payload/9A406_N94AP/jb"
+source_commit = "6216ad517d42df7a046f54d6c180fec4726a9f5e"
+sha256 = "e537b83e504bdb7e9b4c277f6e14be0f3abd1e4f4b16d1deff8d395786d139fe"
+size = 53824
+purpose = "g1lbertJB on-device kernel exploit/patcher (unthredera1n) for N94AP on build 9A406; a data asset run at boot, never regenerated"
+redistribution = "download-only"
+
+[[resources]]
+id = "gilbertjb-jb-9B176-J1AP"
+source_url = "https://raw.githubusercontent.com/g1lbertJB/g1lbertJB/6216ad517d42df7a046f54d6c180fec4726a9f5e/payload/9B176_J1AP/jb"
+source_commit = "6216ad517d42df7a046f54d6c180fec4726a9f5e"
+sha256 = "c3dfa624684f03829fb7c49cb5e8a4a35359c41c6af47536acb788be56808e94"
+size = 53824
+purpose = "g1lbertJB on-device kernel exploit/patcher (unthredera1n) for J1AP on build 9B176; a data asset run at boot, never regenerated"
+redistribution = "download-only"
+
+[[resources]]
+id = "gilbertjb-jb-9B176-J2AP"
+source_url = "https://raw.githubusercontent.com/g1lbertJB/g1lbertJB/6216ad517d42df7a046f54d6c180fec4726a9f5e/payload/9B176_J2AP/jb"
+source_commit = "6216ad517d42df7a046f54d6c180fec4726a9f5e"
+sha256 = "a6857e455455e7b34563abb9cd552576c074f2f2e1417bd55689f0374f2e5ba6"
+size = 53824
+purpose = "g1lbertJB on-device kernel exploit/patcher (unthredera1n) for J2AP on build 9B176; a data asset run at boot, never regenerated"
+redistribution = "download-only"
+
+[[resources]]
+id = "gilbertjb-jb-9B176-J2aAP"
+source_url = "https://raw.githubusercontent.com/g1lbertJB/g1lbertJB/6216ad517d42df7a046f54d6c180fec4726a9f5e/payload/9B176_J2aAP/jb"
+source_commit = "6216ad517d42df7a046f54d6c180fec4726a9f5e"
+sha256 = "46ab231548942e49f344272c2ee22831566c406a3bb6f12528ce5b67973fc07c"
+size = 53824
+purpose = "g1lbertJB on-device kernel exploit/patcher (unthredera1n) for J2aAP on build 9B176; a data asset run at boot, never regenerated"
+redistribution = "download-only"
+
+[[resources]]
+id = "gilbertjb-jb-9B176-K93AP"
+source_url = "https://raw.githubusercontent.com/g1lbertJB/g1lbertJB/6216ad517d42df7a046f54d6c180fec4726a9f5e/payload/9B176_K93AP/jb"
+source_commit = "6216ad517d42df7a046f54d6c180fec4726a9f5e"
+sha256 = "164e831d9b751cd800f218dc006abdf18913a815c56c25e0744e61213e3d9315"
+size = 53824
+purpose = "g1lbertJB on-device kernel exploit/patcher (unthredera1n) for K93AP on build 9B176; a data asset run at boot, never regenerated"
+redistribution = "download-only"
+
+[[resources]]
+id = "gilbertjb-jb-9B176-K93aAP"
+source_url = "https://raw.githubusercontent.com/g1lbertJB/g1lbertJB/6216ad517d42df7a046f54d6c180fec4726a9f5e/payload/9B176_K93aAP/jb"
+source_commit = "6216ad517d42df7a046f54d6c180fec4726a9f5e"
+sha256 = "83f4973a675530527e24a6dc7824575f1e630ae90e9fcfcb0b16af0be694698e"
+size = 53840
+purpose = "g1lbertJB on-device kernel exploit/patcher (unthredera1n) for K93aAP on build 9B176; a data asset run at boot, never regenerated"
+redistribution = "download-only"
+
+[[resources]]
+id = "gilbertjb-jb-9B176-K94AP"
+source_url = "https://raw.githubusercontent.com/g1lbertJB/g1lbertJB/6216ad517d42df7a046f54d6c180fec4726a9f5e/payload/9B176_K94AP/jb"
+source_commit = "6216ad517d42df7a046f54d6c180fec4726a9f5e"
+sha256 = "e42209726e04eb6efa544cd8f9a6243a7d1818af247b8ca557f6a888e3d11e7e"
+size = 53824
+purpose = "g1lbertJB on-device kernel exploit/patcher (unthredera1n) for K94AP on build 9B176; a data asset run at boot, never regenerated"
+redistribution = "download-only"
+
+[[resources]]
+id = "gilbertjb-jb-9B176-K95AP"
+source_url = "https://raw.githubusercontent.com/g1lbertJB/g1lbertJB/6216ad517d42df7a046f54d6c180fec4726a9f5e/payload/9B176_K95AP/jb"
+source_commit = "6216ad517d42df7a046f54d6c180fec4726a9f5e"
+sha256 = "a85b74f1503e4f0fc5156e39529b52e84e202c35d775ee2ed27b0a272d04411c"
+size = 53824
+purpose = "g1lbertJB on-device kernel exploit/patcher (unthredera1n) for K95AP on build 9B176; a data asset run at boot, never regenerated"
+redistribution = "download-only"
+
+[[resources]]
+id = "gilbertjb-jb-9B179-N94AP"
+source_url = "https://raw.githubusercontent.com/g1lbertJB/g1lbertJB/6216ad517d42df7a046f54d6c180fec4726a9f5e/payload/9B179_N94AP/jb"
+source_commit = "6216ad517d42df7a046f54d6c180fec4726a9f5e"
+sha256 = "7264fc577376ca4f9ad21e25c96b220151caddfdbef1cd0e87abeeea94b34ac4"
+size = 53824
+purpose = "g1lbertJB on-device kernel exploit/patcher (unthredera1n) for N94AP on build 9B179; a data asset run at boot, never regenerated"
+redistribution = "download-only"
+
+[[resources]]
+id = "gilbertjb-jb-9B206-J1AP"
+source_url = "https://raw.githubusercontent.com/g1lbertJB/g1lbertJB/6216ad517d42df7a046f54d6c180fec4726a9f5e/payload/9B206_J1AP/jb"
+source_commit = "6216ad517d42df7a046f54d6c180fec4726a9f5e"
+sha256 = "ee683edad52b8c20a318d50473bafc7ce1ff27b615570c03228fd7ab5f2ca729"
+size = 53824
+purpose = "g1lbertJB on-device kernel exploit/patcher (unthredera1n) for J1AP on build 9B206; a data asset run at boot, never regenerated"
+redistribution = "download-only"
+
+[[resources]]
+id = "gilbertjb-jb-9B206-J2AP"
+source_url = "https://raw.githubusercontent.com/g1lbertJB/g1lbertJB/6216ad517d42df7a046f54d6c180fec4726a9f5e/payload/9B206_J2AP/jb"
+source_commit = "6216ad517d42df7a046f54d6c180fec4726a9f5e"
+sha256 = "97bf1851391dfd383851a9d4dba01f6d7fe6a8ee915b0bb85b09484c96c0c600"
+size = 53824
+purpose = "g1lbertJB on-device kernel exploit/patcher (unthredera1n) for J2AP on build 9B206; a data asset run at boot, never regenerated"
+redistribution = "download-only"
+
+[[resources]]
+id = "gilbertjb-jb-9B206-J2aAP"
+source_url = "https://raw.githubusercontent.com/g1lbertJB/g1lbertJB/6216ad517d42df7a046f54d6c180fec4726a9f5e/payload/9B206_J2aAP/jb"
+source_commit = "6216ad517d42df7a046f54d6c180fec4726a9f5e"
+sha256 = "7d58f2f441e19d4852dce7098e648de7149045600d250e4c464bfba85a1ef7e2"
+size = 53824
+purpose = "g1lbertJB on-device kernel exploit/patcher (unthredera1n) for J2aAP on build 9B206; a data asset run at boot, never regenerated"
+redistribution = "download-only"
+
+[[resources]]
+id = "gilbertjb-jb-9B206-K93AP"
+source_url = "https://raw.githubusercontent.com/g1lbertJB/g1lbertJB/6216ad517d42df7a046f54d6c180fec4726a9f5e/payload/9B206_K93AP/jb"
+source_commit = "6216ad517d42df7a046f54d6c180fec4726a9f5e"
+sha256 = "782c2982e59981d78f90879d60b6e113281346126373849c3892423307444bb9"
+size = 53824
+purpose = "g1lbertJB on-device kernel exploit/patcher (unthredera1n) for K93AP on build 9B206; a data asset run at boot, never regenerated"
+redistribution = "download-only"
+
+[[resources]]
+id = "gilbertjb-jb-9B206-K93aAP"
+source_url = "https://raw.githubusercontent.com/g1lbertJB/g1lbertJB/6216ad517d42df7a046f54d6c180fec4726a9f5e/payload/9B206_K93aAP/jb"
+source_commit = "6216ad517d42df7a046f54d6c180fec4726a9f5e"
+sha256 = "dd34d9da8b11f8115c772a2ed0d6deb1936e094632b11b9f7265feaa6ffa32f8"
+size = 53840
+purpose = "g1lbertJB on-device kernel exploit/patcher (unthredera1n) for K93aAP on build 9B206; a data asset run at boot, never regenerated"
+redistribution = "download-only"
+
+[[resources]]
+id = "gilbertjb-jb-9B206-K94AP"
+source_url = "https://raw.githubusercontent.com/g1lbertJB/g1lbertJB/6216ad517d42df7a046f54d6c180fec4726a9f5e/payload/9B206_K94AP/jb"
+source_commit = "6216ad517d42df7a046f54d6c180fec4726a9f5e"
+sha256 = "95f926cbbdbdb206ae6da5fcb713aecb1eb1bb1881b36dbd73503f8194eea104"
+size = 53824
+purpose = "g1lbertJB on-device kernel exploit/patcher (unthredera1n) for K94AP on build 9B206; a data asset run at boot, never regenerated"
+redistribution = "download-only"
+
+[[resources]]
+id = "gilbertjb-jb-9B206-K95AP"
+source_url = "https://raw.githubusercontent.com/g1lbertJB/g1lbertJB/6216ad517d42df7a046f54d6c180fec4726a9f5e/payload/9B206_K95AP/jb"
+source_commit = "6216ad517d42df7a046f54d6c180fec4726a9f5e"
+sha256 = "a97d293266eb773d17810af1f9e58616f40692ceda5c90c8e5954250d97f28f0"
+size = 53824
+purpose = "g1lbertJB on-device kernel exploit/patcher (unthredera1n) for K95AP on build 9B206; a data asset run at boot, never regenerated"
+redistribution = "download-only"
+
+[[resources]]
+id = "gilbertjb-jb-9B206-N94AP"
+source_url = "https://raw.githubusercontent.com/g1lbertJB/g1lbertJB/6216ad517d42df7a046f54d6c180fec4726a9f5e/payload/9B206_N94AP/jb"
+source_commit = "6216ad517d42df7a046f54d6c180fec4726a9f5e"
+sha256 = "db9fdb5b6272712c69c1384af1282fc0d6d415f6aba9c796d85b6ccca9407d3b"
+size = 53824
+purpose = "g1lbertJB on-device kernel exploit/patcher (unthredera1n) for N94AP on build 9B206; a data asset run at boot, never regenerated"
+redistribution = "download-only"
+
+[[resources]]
+id = "gilbertjb-app-info-plist"
+source_url = "https://raw.githubusercontent.com/g1lbertJB/g1lbertJB/6216ad517d42df7a046f54d6c180fec4726a9f5e/payload/g1lbertJB.app/Info.plist"
+source_commit = "6216ad517d42df7a046f54d6c180fec4726a9f5e"
+sha256 = "e987f7ea943c442cd56266f360dbd21db3547f9df2e517ef0d56599adac44353"
+size = 721
+purpose = "g1lbertJB DemoApp bundle metadata placed at /var/mobile/DemoApp.app during stage 1"
+redistribution = "download-only"
+
+[[resources]]
+id = "gilbertjb-app-demoapp"
+source_url = "https://raw.githubusercontent.com/g1lbertJB/g1lbertJB/6216ad517d42df7a046f54d6c180fec4726a9f5e/payload/g1lbertJB.app/DemoApp"
+source_commit = "6216ad517d42df7a046f54d6c180fec4726a9f5e"
+sha256 = "419fdc918ee8ebe767863755f55448169d4a6b117a74a78409b958b38a448019"
+size = 138
+purpose = "g1lbertJB DemoApp launchd-submit remount script run as root when the user taps the home-screen icon"
+redistribution = "download-only"
+
+[[resources]]
+id = "gilbertjb-app-icon"
+source_url = "https://raw.githubusercontent.com/g1lbertJB/g1lbertJB/6216ad517d42df7a046f54d6c180fec4726a9f5e/payload/g1lbertJB.app/Icon.png"
+source_commit = "6216ad517d42df7a046f54d6c180fec4726a9f5e"
+sha256 = "11ba7e4469facfcb6a64cf512a7ed2ff6440d4d5e0dba43cb6f6088329db4911"
+size = 8530
+purpose = "g1lbertJB DemoApp home-screen icon"
+redistribution = "download-only"
+
+[[resources]]
+id = "gilbertjb-app-icon-2x"
+source_url = "https://raw.githubusercontent.com/g1lbertJB/g1lbertJB/6216ad517d42df7a046f54d6c180fec4726a9f5e/payload/g1lbertJB.app/Icon@2x.png"
+source_commit = "6216ad517d42df7a046f54d6c180fec4726a9f5e"
+sha256 = "82347020346f702290d3d06cb9c7d725ada166001827d339b6348e60e17dbed6"
+size = 16939
+purpose = "g1lbertJB DemoApp home-screen icon (2x)"
+redistribution = "download-only"
+
+[[resources]]
+id = "gilbertjb-app-icon-72"
+source_url = "https://raw.githubusercontent.com/g1lbertJB/g1lbertJB/6216ad517d42df7a046f54d6c180fec4726a9f5e/payload/g1lbertJB.app/Icon-72.png"
+source_commit = "6216ad517d42df7a046f54d6c180fec4726a9f5e"
+sha256 = "5859ea704ab019f2400ed5d2f72eb54a435273e81b376ec9abd8817a5237c89c"
+size = 10378
+purpose = "g1lbertJB DemoApp home-screen icon (72pt)"
+redistribution = "download-only"
+
+[[resources]]
+id = "gilbertjb-app-icon-72-2x"
+source_url = "https://raw.githubusercontent.com/g1lbertJB/g1lbertJB/6216ad517d42df7a046f54d6c180fec4726a9f5e/payload/g1lbertJB.app/Icon-72@2x.png"
+source_commit = "6216ad517d42df7a046f54d6c180fec4726a9f5e"
+sha256 = "58cdf4a85d27baddd455347379b749aae71b23e8edbf1600cb23b80d28d0054e"
+size = 22952
+purpose = "g1lbertJB DemoApp home-screen icon (72pt 2x)"
+redistribution = "download-only"
+
+[[resources]]
+id = "gilbertjb-launchd-conf"
+source_url = "https://raw.githubusercontent.com/g1lbertJB/g1lbertJB/6216ad517d42df7a046f54d6c180fec4726a9f5e/payload/common/launchd.conf"
+source_commit = "6216ad517d42df7a046f54d6c180fec4726a9f5e"
+sha256 = "8993d8862ec4c54fccb2624365304ab957a6159dbcd899dd9b53cc4c04a83a7d"
+size = 487
+purpose = "g1lbertJB launchd.conf linked from /private/etc/launchd.conf to run the unthredera1n payload at boot"
+redistribution = "download-only"
+
+[[resources]]
+id = "gilbertjb-amfi-dylib"
+source_url = "https://raw.githubusercontent.com/g1lbertJB/g1lbertJB/6216ad517d42df7a046f54d6c180fec4726a9f5e/payload/common/amfi.dylib"
+source_commit = "6216ad517d42df7a046f54d6c180fec4726a9f5e"
+sha256 = "d667376f0176d9cda6638ce7b68e03f65b54311504546b4efda8c43c971bc4d3"
+size = 4808
+purpose = "g1lbertJB amfi bypass dylib staged into /var/unthreadedjb"
+redistribution = "download-only"
+
+[[resources]]
+id = "gilbertjb-dirhelper"
+source_url = "https://raw.githubusercontent.com/g1lbertJB/g1lbertJB/6216ad517d42df7a046f54d6c180fec4726a9f5e/payload/common/dirhelper"
+source_commit = "6216ad517d42df7a046f54d6c180fec4726a9f5e"
+sha256 = "675bec12bea3e44f0fb0c19c2c650f2ae38e59c4f1c7a99886be9935dfe78992"
+size = 123
+purpose = "g1lbertJB patched dirhelper linked over /usr/libexec/dirhelper"
+redistribution = "download-only"
+
+[[resources]]
+id = "gilbertjb-deb-openssl"
+source_url = "https://raw.githubusercontent.com/g1lbertJB/g1lbertJB/6216ad517d42df7a046f54d6c180fec4726a9f5e/payload/debs/1-openssl.deb"
+source_commit = "6216ad517d42df7a046f54d6c180fec4726a9f5e"
+sha256 = "0e57f4b5968fc32c1fb56c1361d163a1ffdcda9173145551aff839cfc19be664"
+size = 1031128
+purpose = "g1lbertJB Cydia AutoInstall package: OpenSSL"
+redistribution = "download-only"
+
+[[resources]]
+id = "gilbertjb-deb-openssh"
+source_url = "https://raw.githubusercontent.com/g1lbertJB/g1lbertJB/6216ad517d42df7a046f54d6c180fec4726a9f5e/payload/debs/2-openssh.deb"
+source_commit = "6216ad517d42df7a046f54d6c180fec4726a9f5e"
+sha256 = "ff4eb2a1e4453051e52ba56a71c3d4f56d00c1e83095653647a7a4f49b4c3b1f"
+size = 587678
+purpose = "g1lbertJB Cydia AutoInstall package: OpenSSH"
+redistribution = "download-only"
+
+[[resources]]
+id = "gilbertjb-deb-substrate"
+source_url = "https://raw.githubusercontent.com/g1lbertJB/g1lbertJB/6216ad517d42df7a046f54d6c180fec4726a9f5e/payload/debs/substrate4g1lbert.deb"
+source_commit = "6216ad517d42df7a046f54d6c180fec4726a9f5e"
+sha256 = "6feb23a220383b78f3ea71f9acffc43896f2d491733502d6cefe55937c504649"
+size = 112944
+purpose = "g1lbertJB Cydia AutoInstall package: Cydia Substrate for iOS 5"
+redistribution = "download-only"
+
+[[resources]]
+id = "gilbertjb-deb-safemode"
+source_url = "https://raw.githubusercontent.com/g1lbertJB/g1lbertJB/6216ad517d42df7a046f54d6c180fec4726a9f5e/payload/debs/safemode4g1lbert.deb"
+source_commit = "6216ad517d42df7a046f54d6c180fec4726a9f5e"
+sha256 = "e24e82b5815beaf811c3eebd49daf3609ba8712d226b51c68a220de7769a4a44"
+size = 12922
+purpose = "g1lbertJB Cydia AutoInstall package: Substrate Safe Mode for iOS 5"
+redistribution = "download-only"
+

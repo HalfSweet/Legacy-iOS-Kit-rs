@@ -162,7 +162,7 @@ mod tests {
     #[test]
     fn bundled_resources_have_fixed_provenance() {
         let catalog = ResourceCatalog::bundled();
-        assert_eq!(catalog.iter().count(), 187);
+        assert_eq!(catalog.iter().count(), 225);
         let resource = catalog.get(&ResourceId::new("ios4-scab-template")).unwrap();
         assert_eq!(resource.sha256().len(), 64);
         assert_eq!(resource.redistribution(), Redistribution::DownloadOnly);
@@ -206,6 +206,62 @@ mod tests {
                 let resource = catalog.get(&ResourceId::new(&id)).unwrap();
                 assert_eq!(resource.redistribution(), Redistribution::DownloadOnly);
             }
+        }
+    }
+
+    #[test]
+    fn gilbertjb_resources_are_cataloged() {
+        let catalog = ResourceCatalog::bundled();
+        let commit = "6216ad517d42df7a046f54d6c180fec4726a9f5e";
+        // The 25 per-build/per-board on-device payloads of the A5 iOS 5
+        // g1lbertJB support set (no iPod5,1: it never shipped iOS 5).
+        for (build, boards) in [
+            ("9A334", ["K93AP", "K94AP", "K95AP", "N94AP"].as_slice()),
+            ("9A405", ["K93AP", "K94AP", "K95AP", "N94AP"].as_slice()),
+            ("9A406", ["N94AP"].as_slice()),
+            (
+                "9B176",
+                ["J1AP", "J2AP", "J2aAP", "K93AP", "K93aAP", "K94AP", "K95AP"].as_slice(),
+            ),
+            ("9B179", ["N94AP"].as_slice()),
+            (
+                "9B206",
+                [
+                    "J1AP", "J2AP", "J2aAP", "K93AP", "K93aAP", "K94AP", "K95AP", "N94AP",
+                ]
+                .as_slice(),
+            ),
+        ] {
+            for board in boards {
+                let id = format!("gilbertjb-jb-{build}-{board}");
+                let resource = catalog.get(&ResourceId::new(&id)).unwrap();
+                assert_eq!(resource.redistribution(), Redistribution::DownloadOnly);
+                assert_eq!(resource.source_commit(), commit);
+                assert!(
+                    resource
+                        .source_url()
+                        .contains(&format!("payload/{build}_{board}/jb"))
+                );
+            }
+        }
+        for id in [
+            "gilbertjb-app-info-plist",
+            "gilbertjb-app-demoapp",
+            "gilbertjb-app-icon",
+            "gilbertjb-app-icon-2x",
+            "gilbertjb-app-icon-72",
+            "gilbertjb-app-icon-72-2x",
+            "gilbertjb-launchd-conf",
+            "gilbertjb-amfi-dylib",
+            "gilbertjb-dirhelper",
+            "gilbertjb-deb-openssl",
+            "gilbertjb-deb-openssh",
+            "gilbertjb-deb-substrate",
+            "gilbertjb-deb-safemode",
+        ] {
+            let resource = catalog.get(&ResourceId::new(id)).unwrap();
+            assert_eq!(resource.redistribution(), Redistribution::DownloadOnly);
+            assert_eq!(resource.source_commit(), commit);
         }
     }
 }
