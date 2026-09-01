@@ -2520,6 +2520,7 @@ async fn main() -> Result<()> {
                     logo4,
                     jump_iboot_433,
                     dualboot,
+                    skip_rsa: false,
                 };
                 kit.patch_iboot32(source, destination, options).await?;
                 write_status(output, "patched-iboot32")?;

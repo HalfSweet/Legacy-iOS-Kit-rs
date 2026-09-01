@@ -2453,6 +2453,7 @@ dependencies = [
 name = "legacy-ios-kit"
 version = "0.1.0"
 dependencies = [
+ "base64",
  "flate2",
  "futures-util",
  "hfsplus",

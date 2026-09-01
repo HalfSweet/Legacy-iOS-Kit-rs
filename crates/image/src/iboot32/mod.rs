@@ -92,9 +92,10 @@ pub enum BootPartition {
 }
 
 /// Patch selection mirroring the iBoot32Patcher command-line flags. The RSA
-/// check patch is not optional: it is always applied by
-/// [`patch_iboot32_with_options`], since every Legacy iOS Kit invocation
-/// passes `--rsa`.
+/// check patch is applied by [`patch_iboot32_with_options`] unless `skip_rsa`
+/// is set, since nearly every Legacy iOS Kit invocation passes `--rsa`; the
+/// exception is the powdersn0w two-bundle `patch_iboot --logo` re-patch of an
+/// iBoot2 whose RSA check the powdersn0w iBoot patcher already removed.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct Iboot32PatchOptions {
     /// `-b`: hardcode custom boot-args (conflicts with `env_boot_args`).
@@ -127,6 +128,9 @@ pub struct Iboot32PatchOptions {
     pub jump_iboot_433: bool,
     /// `--dualboot`: De Rebus Antiquis dualboot patches for iBSS/iBEC.
     pub dualboot: bool,
+    /// Omit the RSA check patch (upstream's `patch_iboot` drops `--rsa` for
+    /// the `--logo` pass over an already RSA-patched iBoot2).
+    pub skip_rsa: bool,
 }
 
 impl Iboot32PatchOptions {
@@ -145,7 +149,7 @@ impl Iboot32PatchOptions {
 ///    bgcolor, boot mode
 /// 2. logo, logo4, jump-to-iBoot (4.3.3 or lower), ticket
 /// 3. command handler (only with a recovery console)
-/// 4. RSA check (always)
+/// 4. RSA check (unless `skip_rsa`)
 /// 5. boot-partition, boot-ramdisk, setenv, dualboot
 pub fn patch_iboot32_with_options(
     image: &[u8],
@@ -197,8 +201,11 @@ pub fn patch_iboot32_with_options(
         iboot.patch_cmd_handler(command, *pointer)?;
     }
 
-    // All loaders have the RSA check.
-    iboot.patch_rsa_check()?;
+    // All loaders have the RSA check, unless the caller knows it is already
+    // patched out (powdersn0w's two-bundle iBoot2 re-patch).
+    if !options.skip_rsa {
+        iboot.patch_rsa_check()?;
+    }
 
     if let Some(partition) = options.boot_partition {
         iboot.patch_boot_partition(partition)?;
@@ -353,6 +360,25 @@ mod tests {
             iboot.patch_rsa_check(),
             Err(IbootPatchError::AnchorNotFound(_))
         ));
+    }
+
+    #[test]
+    fn skip_rsa_tolerates_a_patched_image() {
+        // The powdersn0w `--logo` re-patch of iBoot2 runs on an image whose
+        // RSA check the powdersn0w iBoot patcher already removed.
+        let mut buf = fixture();
+        IBoot32::new(&mut buf).unwrap().patch_rsa_check().unwrap();
+
+        let options = Iboot32PatchOptions::default();
+        assert!(matches!(
+            patch_iboot32_with_options(&buf, &options),
+            Err(IbootPatchError::AnchorNotFound(_))
+        ));
+        let options = Iboot32PatchOptions {
+            skip_rsa: true,
+            ..Iboot32PatchOptions::default()
+        };
+        assert_eq!(patch_iboot32_with_options(&buf, &options).unwrap(), buf);
     }
 
     #[test]

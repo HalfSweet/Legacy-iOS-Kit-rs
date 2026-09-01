@@ -41,6 +41,18 @@
 //! ios4powder — and the per-hw/per-build exploit as `/exploit`. main.c's
 //! `Update Ramdisk` removal is not modeled because the bundle format never
 //! emits an `Update Ramdisk` entry.
+//!
+//! The build-side finishing steps upstream applies around the powdersn0w
+//! invocation are part of the same build: `ipsw_prepare_battery_images`
+//! copies the base IPSW's battery images into the custom IPSW (appending
+//! names missing from the target BuildManifest to the all_flash manifest);
+//! the non-ramdiskH two-bundle 5.x/6.x builds re-patch the powdersn0w iBoot2
+//! with iBoot32Patcher's `--logo` only; `ipsw_bbreplace` swaps in the latest
+//! baseband with the matching BuildManifest rewrite; and the ios4powder tail
+//! re-patches the dfu iBSS/iBEC with iBoot32Patcher (`ipsw_prepare_ios4patches`,
+//! superseding the powder patcher's iBSS pass), applies the AppleLogo `4g`
+//! tag bytes, and installs the externally patched target iBoot as the
+//! all_flash iBoot2.
 
 use std::{fmt, io::Cursor, path::PathBuf};
 
@@ -57,11 +69,12 @@ use legacy_ios_firmware::{
     system_partition_size, system_version_tar, uses_ramdisk_h,
 };
 use legacy_ios_image::{
-    DmgFirmwareKey, DmgImage, DmgPartitionInput, HfsError, HfsImage, PowderIBootPatchOptions,
-    compress_lzss, decompress_lzss, decrypt_firmware_image, extract_image_payload,
-    is_lzss_compressed, patch_asr, patch_kernel32, patch_powder_iboot, replace_image_payload,
+    DmgFirmwareKey, DmgImage, DmgPartitionInput, HfsError, HfsImage, Iboot32PatchOptions,
+    PowderIBootPatchOptions, compress_lzss, decompress_lzss, decrypt_firmware_image,
+    extract_image_payload, is_lzss_compressed, patch_asr, patch_iboot32_with_options,
+    patch_kernel32, patch_powder_iboot, replace_image_payload,
 };
-use tracing::{debug, info};
+use tracing::{debug, info, warn};
 
 use crate::{FirmwareSummary, KitError, OperationHandle, operation::OperationEmitter};
 
@@ -116,6 +129,8 @@ pub struct PowderPrepareRequest {
     apticket: Option<Vec<u8>>,
     drav6: bool,
     latest_version: Option<IosVersion>,
+    disable_baseband_update: bool,
+    baseband_replacement: Option<(String, Vec<u8>)>,
 }
 
 impl PowderPrepareRequest {
@@ -145,6 +160,8 @@ impl PowderPrepareRequest {
             apticket: None,
             drav6: false,
             latest_version: None,
+            disable_baseband_update: false,
+            baseband_replacement: None,
         }
     }
 
@@ -246,6 +263,29 @@ impl PowderPrepareRequest {
         self.latest_version = Some(version);
         self
     }
+
+    /// Mirror of `--disable-bbupdate`/`--dead-bb` (`device_disable_bbupdate`):
+    /// skips the `ipsw_bbreplace` latest-baseband swap.
+    pub fn with_disable_baseband_update(mut self, enabled: bool) -> Self {
+        self.disable_baseband_update = enabled;
+        self
+    }
+
+    /// The latest baseband firmware swapped in by `ipsw_bbreplace` for
+    /// two-bundle builds targeting a non-latest version: `file_name` is the
+    /// baseband file name the BuildManifest is pointed at (upstream's
+    /// `device_use_bb`, e.g. `Mav5-11.80.00.Release.bbfw`), `data` the .bbfw
+    /// bytes. Only planned for baseband devices on A5+ with a known manifest
+    /// rewrite; otherwise the target baseband is kept, like upstream's early
+    /// return.
+    pub fn with_baseband_replacement(
+        mut self,
+        file_name: impl Into<String>,
+        data: Vec<u8>,
+    ) -> Self {
+        self.baseband_replacement = Some((file_name.into(), data));
+        self
+    }
 }
 
 impl fmt::Debug for PowderPrepareRequest {
@@ -266,6 +306,8 @@ impl fmt::Debug for PowderPrepareRequest {
             .field("base", &self.base)
             .field("drav6", &self.drav6)
             .field("latest_version", &self.latest_version)
+            .field("disable_baseband_update", &self.disable_baseband_update)
+            .field("baseband_replacement", &self.baseband_replacement.is_some())
             .finish_non_exhaustive()
     }
 }
@@ -278,6 +320,34 @@ struct DaibutsuStage {
     untether: Vec<u8>,
     reboot: Vec<u8>,
     hwmodel: String,
+}
+
+/// The `ipsw_bbreplace` latest-baseband swap of a two-bundle plan: the .bbfw
+/// file installed at `file` and the BuildManifest rewrite matching it.
+struct BasebandReplace {
+    file: String,
+    data: Vec<u8>,
+    rewrite: crate::baseband::BasebandRewrite,
+}
+
+/// A dfu image (iBSS/iBEC) of the ios4powder tail, resolved at plan time from
+/// the target (or, for cross-device special flows, the base) firmware keys.
+struct Ios4DfuImage {
+    /// `Firmware/dfu/<name>` path inside the IPSW.
+    file: String,
+    iv: [u8; 16],
+    key: Vec<u8>,
+}
+
+/// The ios4powder tail of `ipsw_prepare_ios4powder` (restore.sh:5680-5696):
+/// the `ipsw_prepare_ios4patches` iBSS/iBEC re-patch and the externally
+/// patched target iBoot added as the all_flash iBoot2 (absent on iPad1,1).
+struct Ios4Tail {
+    /// IPSW the pristine dfu images are read from: the target IPSW, or the
+    /// base IPSW for cross-device special flows (`device_type_special`).
+    dfu_source: PathBuf,
+    dfu_images: [Ios4DfuImage; 2],
+    iboot2: Option<Vec<u8>>,
 }
 
 /// Resolved base side of a two-bundle build: the base bundle (FirmwarePath
@@ -351,6 +421,9 @@ pub struct PowderPreparePlan {
     root_size_mb: u64,
     update_baseband: bool,
     ramdisk_grow_blocks: u64,
+    iboot2_logo_pass: bool,
+    baseband: Option<BasebandReplace>,
+    ios4_tail: Option<Ios4Tail>,
 }
 
 impl PowderPreparePlan {
@@ -421,6 +494,9 @@ impl fmt::Debug for PowderPreparePlan {
             .field("base", &self.base)
             .field("root_size_mb", &self.root_size_mb)
             .field("update_baseband", &self.update_baseband)
+            .field("iboot2_logo_pass", &self.iboot2_logo_pass)
+            .field("baseband", &self.baseband.is_some())
+            .field("ios4_tail", &self.ios4_tail.is_some())
             .finish_non_exhaustive()
     }
 }
@@ -549,6 +625,17 @@ pub(crate) async fn plan(request: PowderPrepareRequest) -> Result<PowderPrepareP
         unreachable!("single-IPSW and target bundles always carry a config");
     };
 
+    // The `ipsw_bbreplace` early-return conditions (restore.sh:4350-4353),
+    // computed before `latest_version` moves into the base bundle request.
+    let baseband_applies = baseband_replace_applies(
+        profile.has_baseband(),
+        profile.soc(),
+        &version,
+        &latest_version,
+        request.disable_baseband_update,
+    );
+
+    let mut base_keys = None;
     let base = match (
         &request.base,
         base_archive,
@@ -568,7 +655,7 @@ pub(crate) async fn plan(request: PowderPrepareRequest) -> Result<PowderPrepareP
                 build = %base_build,
                 "fetching base powder component keys"
             );
-            let base_keys = key_provider
+            let fetched_base_keys = key_provider
                 .fetch(&request.product_type, &base_build)
                 .await?;
             let base_identity =
@@ -576,7 +663,7 @@ pub(crate) async fn plan(request: PowderPrepareRequest) -> Result<PowderPrepareP
             let base_system_partition = ramdisk_system_partition(
                 &base_archive,
                 base_identity,
-                &base_keys,
+                &fetched_base_keys,
                 &request.board_config,
             )
             .await?;
@@ -597,7 +684,7 @@ pub(crate) async fn plan(request: PowderPrepareRequest) -> Result<PowderPrepareP
                 )
                 .with_drav6(request.drav6)
                 .with_base_build(base_build.clone()),
-                &base_keys,
+                &fetched_base_keys,
                 Some(base_identity),
             )?;
 
@@ -638,6 +725,7 @@ pub(crate) async fn plan(request: PowderPrepareRequest) -> Result<PowderPrepareP
                     }
                 }
             };
+            base_keys = Some(fetched_base_keys);
             Some(PowderBasePlan {
                 source: base_path.clone(),
                 version: base_version,
@@ -656,6 +744,48 @@ pub(crate) async fn plan(request: PowderPrepareRequest) -> Result<PowderPrepareP
     if mode == PowderMode::Ios4 && request.iboot_sidecar.is_none() {
         return Err(KitError::PowderMissingIbootSidecar);
     }
+
+    // Post-build steps upstream applies around the powdersn0w invocation: the
+    // non-ramdiskH `patch_iboot --logo` re-patch of iBoot2
+    // (restore.sh:5807-5817), the ios4powder tail (restore.sh:5680-5696), and
+    // the `ipsw_bbreplace` latest-baseband swap (restore.sh:5820).
+    let iboot2_logo_pass = match &base {
+        Some(base) if mode == PowderMode::TwoBundle => {
+            let target_major = version
+                .as_str()
+                .split('.')
+                .next()
+                .and_then(|major| major.parse::<u32>().ok())
+                .unwrap_or(0);
+            needs_iboot2_logo_pass(&request.product_type, base.version.as_str(), target_major)
+        }
+        _ => false,
+    };
+    let ios4_tail = match (mode, &base, &base_keys) {
+        (PowderMode::Ios4, Some(base), Some(base_keys)) => Some(resolve_ios4_tail(
+            &request, &manifest, &keys, base, base_keys,
+        )?),
+        _ => None,
+    };
+    let baseband = match &request.baseband_replacement {
+        Some((name, bytes)) if mode == PowderMode::TwoBundle && baseband_applies => {
+            let rewrite =
+                crate::baseband::baseband_rewrite(&request.product_type).ok_or_else(|| {
+                    KitError::PowderUnsupportedBasebandReplace(request.product_type.to_string())
+                })?;
+            info!(baseband = name, "planning latest-baseband swap");
+            Some(BasebandReplace {
+                file: format!("Firmware/{name}"),
+                data: bytes.clone(),
+                rewrite,
+            })
+        }
+        Some(_) => {
+            debug!("latest-baseband swap not applicable; keeping the target baseband");
+            None
+        }
+        None => None,
+    };
     // The scab reseal runs when the target bundle declares an APTicket
     // replacement (4.x targets); upstream requires `-apticket` there.
     let needs_apticket = bundle
@@ -831,6 +961,87 @@ pub(crate) async fn plan(request: PowderPrepareRequest) -> Result<PowderPrepareP
         root_size_mb,
         update_baseband: request.update_baseband,
         ramdisk_grow_blocks: request.ramdisk_grow_blocks,
+        iboot2_logo_pass,
+        baseband,
+        ios4_tail,
+    })
+}
+
+/// The `ipsw_bbreplace` early-return conditions (restore.sh:4350-4353):
+/// devices without a baseband, targets at the latest version, disabled
+/// baseband updates, and A4-and-older devices keep the target baseband.
+fn baseband_replace_applies(
+    has_baseband: bool,
+    soc: Soc,
+    target: &IosVersion,
+    latest: &IosVersion,
+    disabled: bool,
+) -> bool {
+    has_baseband && !matches!(soc, Soc::A4) && target != latest && !disabled
+}
+
+/// Gate of the post-build `patch_iboot --logo` re-patch of iBoot2
+/// (restore.sh:5807-5817): two-bundle builds for non-ramdiskH devices — not
+/// iPhone5,* except the iPhone5,3/5,4 7.0-base case (`ipsw_powder_5c70`), and
+/// never iPad1,1 — targeting iOS 5.x/6.x.
+fn needs_iboot2_logo_pass(
+    product_type: &ProductType,
+    base_version: &str,
+    target_major: u32,
+) -> bool {
+    !uses_ramdisk_h(product_type, base_version)
+        && product_type.as_str() != "iPad1,1"
+        && !matches!(target_major, 7..=9)
+}
+
+/// Resolve the ios4powder tail (restore.sh:5680-5696). Cross-device special
+/// flows (`device_type_special`, e.g. iPad1,1 building from an iPad2,1 target
+/// IPSW) take the pristine dfu images from the base IPSW with the base build
+/// keys, like `ipsw_prepare_ios4patches` (restore.sh:5536-5539).
+fn resolve_ios4_tail(
+    request: &PowderPrepareRequest,
+    manifest: &legacy_ios_firmware::BuildManifest,
+    keys: &FirmwareKeySet,
+    base: &PowderBasePlan,
+    base_keys: &FirmwareKeySet,
+) -> Result<Ios4Tail, KitError> {
+    let special = !manifest
+        .supported_product_types()
+        .contains(&request.product_type);
+    let (dfu_source, dfu_keys) = if special {
+        (base.source.clone(), base_keys)
+    } else {
+        (request.source.clone(), keys)
+    };
+    Ok(Ios4Tail {
+        dfu_source,
+        dfu_images: [dfu_image(dfu_keys, "iBSS")?, dfu_image(dfu_keys, "iBEC")?],
+        iboot2: if request.product_type.as_str() == "iPad1,1" {
+            None
+        } else {
+            let (_, bytes) = request
+                .iboot_sidecar
+                .as_ref()
+                .expect("ios4powder requires the iBoot sidecar");
+            Some(bytes.clone())
+        },
+    })
+}
+
+/// Resolve one dfu image of `ipsw_prepare_ios4patches`: path, IV, and key.
+fn dfu_image(keys: &FirmwareKeySet, image: &'static str) -> Result<Ios4DfuImage, KitError> {
+    let key = keys
+        .key(image)
+        .ok_or(KitError::PowderMissingComponent(image))?;
+    let missing = || {
+        KitError::PowderBundle(legacy_ios_firmware::PowderBundleError::MissingKeyMaterial(
+            image.to_owned(),
+        ))
+    };
+    Ok(Ios4DfuImage {
+        file: format!("Firmware/dfu/{}", key.filename()),
+        iv: key.iv().copied().ok_or_else(missing)?,
+        key: key.key().map(<[u8]>::to_vec).ok_or_else(missing)?,
     })
 }
 
@@ -988,6 +1199,10 @@ fn assemble(
     if let Some(base) = &plan.base {
         completed = apply_base_stage(plan, base, &archive, &mut replacements, completed)?;
         progress(emitter, completed);
+        // `ipsw_prepare_battery_images` runs on the built IPSW after the
+        // powdersn0w invocation; its manifest appends land on the all_flash
+        // manifest the base stage just produced.
+        apply_battery_images(plan, base, &archive, &mut replacements)?;
     }
 
     for entry in plan.bundle.firmware() {
@@ -1091,6 +1306,35 @@ fn assemble(
             "BuildManifest.plist".to_owned(),
             rewrite_manifest_paths(&manifest, &rewrites)?,
         ));
+    }
+
+    // The ios4powder tail (restore.sh:5680-5696) overrides the Firmware-loop
+    // dfu iBSS with iBoot32Patcher builds of the pristine images and rewrites
+    // the base stage's NewAppleLogo/NewiBoot, so it runs after both.
+    if let Some(tail) = &plan.ios4_tail {
+        apply_ios4_tail(plan, tail, &mut replacements)?;
+    }
+
+    // `ipsw_bbreplace` rewrites the BuildManifest of the built IPSW, after
+    // the manifest path rewrites above.
+    if let Some(baseband) = &plan.baseband {
+        let manifest = match replacements
+            .iter()
+            .find(|(name, _)| name == "BuildManifest.plist")
+        {
+            Some((_, data)) => data.clone(),
+            None => archive.read_entry("BuildManifest.plist")?,
+        };
+        info!(baseband = %baseband.file, "swapping in the latest baseband");
+        replacements.push((
+            "BuildManifest.plist".to_owned(),
+            crate::baseband::rewrite_baseband_manifest(
+                &manifest,
+                &baseband.rewrite,
+                &baseband.file,
+            )?,
+        ));
+        replacements.push((baseband.file.clone(), baseband.data.clone()));
     }
 
     info!("personalizing root filesystem");
@@ -1198,10 +1442,11 @@ fn apply_base_stage(
                             },
                         )?)
                     })?;
-                    replacements.push((
-                        new_iboot.file().to_owned(),
-                        decrypt_rewrap(&patched, encryption)?,
-                    ));
+                    let mut container = decrypt_rewrap(&patched, encryption)?;
+                    if plan.iboot2_logo_pass {
+                        container = patch_iboot2_logo(&container, encryption)?;
+                    }
+                    replacements.push((new_iboot.file().to_owned(), container));
                 }
                 // The base IPSW's original iBoot takes the target iBoot path.
                 replacements.push((ibot.file().to_owned(), data));
@@ -1232,6 +1477,221 @@ fn rewrite_img3_type_base(data: &mut [u8], component: &'static str) -> Result<()
     }
     data[0x10] = b'b';
     data[0x20] = b'b';
+    Ok(())
+}
+
+/// The non-ramdiskH `patch_iboot --logo` re-patch of the powdersn0w-produced
+/// iBoot2 (restore.sh:5807-5817): the decrypted payload is patched with
+/// iBoot32Patcher's `--logo` only — no `--rsa`, the powdersn0w iBoot patcher
+/// already removed the RSA check — and re-encrypted with the iBoot keys.
+/// Like the xpwntool rewrap, the payload is not LZSS-recompressed.
+fn patch_iboot2_logo(
+    container: &[u8],
+    encryption: Option<(&[u8], &[u8])>,
+) -> Result<Vec<u8>, KitError> {
+    let payload = extract_image_payload(container, None)?;
+    let raw = if is_lzss_compressed(&payload) {
+        decompress_lzss(&payload)?
+    } else {
+        payload
+    };
+    let patched = patch_iboot32_with_options(
+        &raw,
+        &Iboot32PatchOptions {
+            logo: true,
+            skip_rsa: true,
+            ..Iboot32PatchOptions::default()
+        },
+    )?;
+    Ok(replace_image_payload(container, &patched, encryption)?)
+}
+
+/// Battery components of `ipsw_prepare_battery_images`, in upstream order.
+/// These are BuildManifest component names (`BatteryCharging` is the
+/// GlyphCharging image, absent on iOS 7+ bases).
+const BATTERY_COMPONENTS: [&str; 7] = [
+    "BatteryCharging0",
+    "BatteryCharging1",
+    "BatteryFull",
+    "BatteryLow0",
+    "BatteryLow1",
+    "BatteryCharging",
+    "BatteryPlugin",
+];
+
+/// Per-component decision of `ipsw_prepare_battery_images`
+/// (restore.sh:5573-5599).
+enum BatteryImageAction {
+    /// The base manifest lacks the component (e.g. BatteryCharging on iOS
+    /// 7+): leave the existing image unchanged.
+    Skip,
+    /// Copy the base image onto the target-named path.
+    Copy { base: String, target: String },
+    /// Copy the base image onto the base-named path and append that name to
+    /// the all_flash manifest (the target manifest lacks the component).
+    CopyAndAppend { base: String },
+}
+
+fn battery_image_action(
+    base_name: Option<String>,
+    target_name: Option<String>,
+) -> BatteryImageAction {
+    let Some(base) = base_name else {
+        return BatteryImageAction::Skip;
+    };
+    match target_name {
+        Some(target) => BatteryImageAction::Copy { base, target },
+        None => BatteryImageAction::CopyAndAppend { base },
+    }
+}
+
+/// Basename of a BuildManifest component path, mirroring the PlistBuddy +
+/// basename lookup of `ipsw_prepare_battery_images`; absent or empty paths
+/// behave like upstream's empty lookup result.
+fn manifest_component_name(identity: Option<&BuildIdentity>, component: &str) -> Option<String> {
+    identity?
+        .component_path(component)
+        .ok()?
+        .rsplit('/')
+        .next()
+        .filter(|name| !name.is_empty())
+        .map(str::to_owned)
+}
+
+/// `ipsw_prepare_battery_images` (restore.sh:5560-5602), applied to every
+/// `-base` build: copy the base IPSW's battery images over the target paths
+/// of the built IPSW, appending the base file name to the all_flash manifest
+/// for components the target BuildManifest lacks. Upstream reads
+/// BuildIdentities:0 of both manifests via PlistBuddy; do the same (the
+/// battery image file names are SoC-named and shared across boards).
+fn apply_battery_images(
+    plan: &PowderPreparePlan,
+    base: &PowderBasePlan,
+    archive: &FirmwareArchive,
+    replacements: &mut Vec<(String, Vec<u8>)>,
+) -> Result<(), KitError> {
+    let manifest_entry = plan
+        .bundle
+        .firmware_replacements()
+        .iter()
+        .find(|entry| entry.component() == "manifest")
+        .ok_or(KitError::PowderMissingComponent("manifest"))?;
+    let all_flash = manifest_entry
+        .file()
+        .strip_suffix("/manifest")
+        .ok_or(KitError::PowderMissingComponent("all_flash manifest"))?
+        .to_owned();
+    let base_archive = FirmwareArchive::open(base.source())?;
+    let base_identity = base_archive.build_manifest()?.identities().first().cloned();
+    let target_identity = archive.build_manifest()?.identities().first().cloned();
+
+    let mut appended: Vec<String> = Vec::new();
+    for component in BATTERY_COMPONENTS {
+        let action = battery_image_action(
+            manifest_component_name(base_identity.as_ref(), component),
+            manifest_component_name(target_identity.as_ref(), component),
+        );
+        let (base_name, target_name) = match action {
+            BatteryImageAction::Skip => {
+                debug!(
+                    component,
+                    "no base battery image; leaving the existing image unchanged"
+                );
+                continue;
+            }
+            BatteryImageAction::Copy { base, target } => (base, target),
+            BatteryImageAction::CopyAndAppend { base } => {
+                debug!(
+                    component,
+                    "no target battery image; adding it to the manifest"
+                );
+                // Upstream appends to the manifest before the extraction
+                // check, so a failed extraction still leaves the entry.
+                appended.push(base.clone());
+                (base.clone(), base)
+            }
+        };
+        match base_archive.read_entry(&format!("{all_flash}/{base_name}")) {
+            Ok(data) if !data.is_empty() => {
+                replacements.push((format!("{all_flash}/{target_name}"), data));
+            }
+            _ => {
+                warn!(
+                    component,
+                    "failed to extract the base battery image; leaving the existing image unchanged"
+                );
+            }
+        }
+    }
+    if !appended.is_empty() {
+        let (_, manifest) = replacements
+            .iter_mut()
+            .find(|(name, _)| name == manifest_entry.file())
+            .ok_or(KitError::PowderMissingComponent("all_flash manifest"))?;
+        *manifest = all_flash_manifest(manifest, &appended);
+    }
+    Ok(())
+}
+
+/// Boot-args of the `ipsw_prepare_ios4patches` iBSS/iBEC patch
+/// (restore.sh:5555); `--ticket` never applies because ios4powder targets
+/// are 4.3.x (`target_vers_maj >= 5` is never true there).
+const IOS4_DFU_BOOT_ARGS: &str = "rd=md0 -v amfi=0xff cs_enforcement_disable=1 pio-error=0";
+
+/// The ios4powder tail of `ipsw_prepare_ios4powder` (restore.sh:5680-5696):
+/// `ipsw_prepare_ios4patches` replaces the dfu iBSS/iBEC with iBoot32Patcher
+/// builds of the pristine images (superseding the powder patcher's iBSS patch
+/// of the Firmware loop, which ios4patches overwrites upstream too), the
+/// target-name AppleLogo gets its iOS 4 `4g` tag bytes, and the externally
+/// patched target iBoot replaces the NewiBoot as the all_flash iBoot2.
+fn apply_ios4_tail(
+    plan: &PowderPreparePlan,
+    tail: &Ios4Tail,
+    replacements: &mut Vec<(String, Vec<u8>)>,
+) -> Result<(), KitError> {
+    let archive = FirmwareArchive::open(&tail.dfu_source)?;
+    for image in &tail.dfu_images {
+        let container = archive.read_entry(&image.file)?;
+        let payload = extract_image_payload(&container, Some((&image.key, &image.iv)))?;
+        let patched = legacy_ios_image::patch_iboot32(&payload, Some(IOS4_DFU_BOOT_ARGS), None)?;
+        // xpwntool rewraps against the original container without keys.
+        replacements.push((
+            image.file.clone(),
+            replace_image_payload(&container, &patched, None)?,
+        ));
+    }
+
+    let replacement = |component: &'static str| {
+        plan.bundle
+            .firmware_replacements()
+            .iter()
+            .find(|entry| entry.component() == component)
+            .ok_or(KitError::PowderMissingComponent(component))
+    };
+
+    // Patch AppleLogo (restore.sh:5684-5690): the same two-byte `4g` mangle
+    // at 0x10/0x20 that `crate::multipart` applies to the part 1 logo.
+    let new_logo = replacement("NewAppleLogo")?;
+    let (_, logo) = replacements
+        .iter_mut()
+        .find(|(name, _)| name == new_logo.file())
+        .ok_or(KitError::PowderMissingComponent("NewAppleLogo"))?;
+    if logo.len() <= 0x20 {
+        return Err(KitError::PowderTruncatedNorImage("NewAppleLogo"));
+    }
+    logo[0x10..0x12].copy_from_slice(b"4g");
+    logo[0x20..0x22].copy_from_slice(b"4g");
+
+    // Add the iboot32-patched target iBoot as iBoot2 (restore.sh:5692-5696);
+    // the bundle manifest already lists the iBoot2 name.
+    if let Some(iboot2) = &tail.iboot2 {
+        let new_iboot = replacement("NewiBoot")?;
+        let (_, entry) = replacements
+            .iter_mut()
+            .find(|(name, _)| name == new_iboot.file())
+            .ok_or(KitError::PowderMissingComponent("NewiBoot"))?;
+        *entry = iboot2.clone();
+    }
     Ok(())
 }
 
@@ -2037,6 +2497,155 @@ mod tests {
             Img3::parse(&resealed).unwrap().elements()[0].data(),
             b"scab"
         );
+    }
+
+    #[test]
+    fn battery_image_action_matches_upstream_branches() {
+        // Base lacks the component (BatteryCharging on iOS 7+): unchanged.
+        assert!(matches!(
+            battery_image_action(None, Some("batterycharging.s5l8930x.img3".to_owned())),
+            BatteryImageAction::Skip
+        ));
+        assert!(matches!(
+            battery_image_action(None, None),
+            BatteryImageAction::Skip
+        ));
+        // Both manifests carry the component: copy base onto the target name.
+        match battery_image_action(
+            Some("batteryfull.s5l8940x.img3".to_owned()),
+            Some("batteryfull.s5l8930x.img3".to_owned()),
+        ) {
+            BatteryImageAction::Copy { base, target } => {
+                assert_eq!(base, "batteryfull.s5l8940x.img3");
+                assert_eq!(target, "batteryfull.s5l8930x.img3");
+            }
+            _ => panic!("expected a plain copy"),
+        }
+        // Target manifest lacks the component: copy under the base name and
+        // append that name to the manifest.
+        match battery_image_action(Some("batterycharging.s5l8940x.img3".to_owned()), None) {
+            BatteryImageAction::CopyAndAppend { base } => {
+                assert_eq!(base, "batterycharging.s5l8940x.img3");
+            }
+            _ => panic!("expected a copy with manifest append"),
+        }
+    }
+
+    #[test]
+    fn manifest_component_name_takes_the_basename() {
+        // A manifest path resolves to its basename; missing components and
+        // empty paths behave like upstream's empty PlistBuddy output.
+        let manifest = br#"<?xml version="1.0" encoding="UTF-8"?>
+<plist version="1.0"><dict>
+<key>ProductVersion</key><string>7.1.2</string>
+<key>ProductBuildVersion</key><string>11D257</string>
+<key>SupportedProductTypes</key><array><string>iPhone3,1</string></array>
+<key>BuildIdentities</key><array><dict>
+<key>Info</key><dict><key>DeviceClass</key><string>n90ap</string><key>RestoreBehavior</key><string>Erase</string></dict>
+<key>Manifest</key><dict>
+    <key>BatteryFull</key><dict><key>Info</key><dict><key>Path</key><string>Firmware/all_flash/all_flash.n90ap.production/batteryfull.s5l8930x.img3</string></dict></dict>
+</dict>
+</dict></array></dict></plist>"#;
+        let manifest =
+            legacy_ios_firmware::BuildManifest::from_reader(Cursor::new(manifest)).unwrap();
+        let identity = manifest.identities().first();
+        assert_eq!(
+            manifest_component_name(identity, "BatteryFull").as_deref(),
+            Some("batteryfull.s5l8930x.img3")
+        );
+        assert_eq!(manifest_component_name(identity, "BatteryCharging"), None);
+        assert_eq!(manifest_component_name(None, "BatteryFull"), None);
+    }
+
+    #[test]
+    fn iboot2_logo_pass_gate_matches_upstream() {
+        // ramdiskH devices (iPhone5,* on a non-7.0 base) skip the pass.
+        assert!(!needs_iboot2_logo_pass(
+            &ProductType::from("iPhone5,1"),
+            "8.4.1",
+            6
+        ));
+        // The iPhone5,3/5,4 7.0-base exception (`ipsw_powder_5c70`) runs it.
+        assert!(needs_iboot2_logo_pass(
+            &ProductType::from("iPhone5,3"),
+            "7.0.4",
+            6
+        ));
+        // iPad1,1 never runs it.
+        assert!(!needs_iboot2_logo_pass(
+            &ProductType::from("iPad1,1"),
+            "5.1.1",
+            5
+        ));
+        // Non-ramdiskH devices on 5.x/6.x targets run it.
+        assert!(needs_iboot2_logo_pass(
+            &ProductType::from("iPhone4,1"),
+            "8.4.1",
+            5
+        ));
+        assert!(needs_iboot2_logo_pass(
+            &ProductType::from("iPad3,1"),
+            "9.3.5",
+            6
+        ));
+        // 7.x/8.x/9.x targets skip it (upstream's `[789]* ) :;;`).
+        for major in [7, 8, 9] {
+            assert!(!needs_iboot2_logo_pass(
+                &ProductType::from("iPhone4,1"),
+                "8.4.1",
+                major
+            ));
+        }
+    }
+
+    #[test]
+    fn baseband_replace_gate_matches_upstream_early_return() {
+        let target = IosVersion::from("6.1.3");
+        let latest = IosVersion::from("8.4.1");
+        assert!(baseband_replace_applies(
+            true,
+            Soc::A5,
+            &target,
+            &latest,
+            false
+        ));
+        // No baseband, A4, target == latest, or disabled bbupdate: keep the
+        // target baseband.
+        assert!(!baseband_replace_applies(
+            false,
+            Soc::A5,
+            &target,
+            &latest,
+            false
+        ));
+        assert!(!baseband_replace_applies(
+            true,
+            Soc::A4,
+            &target,
+            &latest,
+            false
+        ));
+        assert!(!baseband_replace_applies(
+            true,
+            Soc::A5,
+            &latest,
+            &latest,
+            false
+        ));
+        assert!(!baseband_replace_applies(
+            true,
+            Soc::A5,
+            &target,
+            &latest,
+            true
+        ));
+        assert!(baseband_replace_applies(
+            true,
+            Soc::A6x,
+            &target,
+            &latest,
+            false
+        ));
     }
 
     #[test]

@@ -3,6 +3,7 @@
 //! Public facade for embedding Legacy iOS Kit workflows.
 
 mod alloc8;
+mod baseband;
 mod bootstrap;
 mod device;
 mod erase;

@@ -66,6 +66,10 @@ pub enum KitError {
     PowderMissingRamdiskOptions,
     #[error("the firmware bundle has no {0} entry")]
     PowderMissingComponent(&'static str),
+    #[error("the BuildManifest has no BuildIdentities array")]
+    PowderInvalidManifest,
+    #[error("no latest-baseband manifest rewrite is known for {0}")]
+    PowderUnsupportedBasebandReplace(String),
     #[error("powdersn0w iBoot patch failed: {0}")]
     PowderIbootPatch(#[from] legacy_ios_image::PowderIBootError),
     #[error("powdersn0w ASR patch failed: {0}")]
@@ -274,7 +278,9 @@ impl KitError {
             | Self::PowderMissingApTicket
             | Self::PowderInvalidPartitionScript
             | Self::PowderMissingRamdiskOptions
-            | Self::PowderMissingComponent(_) => OperationPhase::Planning,
+            | Self::PowderMissingComponent(_)
+            | Self::PowderInvalidManifest
+            | Self::PowderUnsupportedBasebandReplace(_) => OperationPhase::Planning,
             Self::MultipartStageTimeout => OperationPhase::WaitingForDevice,
             Self::RamdiskPreparation(_) => OperationPhase::Preflight,
             Self::RamdiskBoot(_) => OperationPhase::Booting,
@@ -422,6 +428,8 @@ impl KitError {
             | Self::PowderInvalidPartitionScript
             | Self::PowderMissingRamdiskOptions
             | Self::PowderMissingComponent(_)
+            | Self::PowderInvalidManifest
+            | Self::PowderUnsupportedBasebandReplace(_)
             | Self::PowderTruncatedNorImage(_) => Recoverability::NotRecoverable,
             Self::MultipartStageTimeout => Recoverability::ReenterDfu,
         }
