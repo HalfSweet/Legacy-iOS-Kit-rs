@@ -96,11 +96,22 @@ pub struct Progress {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case", tag = "kind")]
 pub enum ActionKind {
-    FollowDfuInstructions { steps: Vec<String> },
+    FollowDfuInstructions {
+        steps: Vec<String>,
+    },
     TrustDevice,
     ReconnectDevice,
-    ProvideCredential { name: String },
-    UseExternalPwnHardware { family: String },
+    /// The user must run the jailbreak app the operation placed on the home
+    /// screen (g1lbertJB's DemoApp remount step).
+    RunJailbreakApp {
+        name: String,
+    },
+    ProvideCredential {
+        name: String,
+    },
+    UseExternalPwnHardware {
+        family: String,
+    },
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]

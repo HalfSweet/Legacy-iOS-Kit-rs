@@ -5,6 +5,7 @@
 mod activation;
 mod app;
 mod backup;
+mod file_relay;
 mod files;
 mod mbdb;
 mod mount;

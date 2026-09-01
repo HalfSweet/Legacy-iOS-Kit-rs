@@ -20,7 +20,7 @@ use idevice::{
 };
 use legacy_ios_core::{BoardConfig, DeviceMode, Ecid, ProductType, Udid};
 use legacy_ios_transport::classify_apple_mode;
-use plist::Dictionary;
+use plist::{Dictionary, Value};
 use rusbmux::{device::Device, provider::RusbmuxProvider, usb_backend::AnyDeviceInfo};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -487,6 +487,34 @@ impl NormalDevice {
         Ok(())
     }
 
+    /// Whether the device encrypts its backups (`WillEncrypt` in the
+    /// `com.apple.mobile.backup` lockdown domain).
+    pub async fn will_encrypt_backup(&self) -> Result<bool, ServiceError> {
+        let mut lockdown = LockdownClient::connect(self.provider.as_ref()).await?;
+        let value = lockdown
+            .get_value(Some("WillEncrypt"), Some("com.apple.mobile.backup"))
+            .await?;
+        Ok(value.as_boolean().unwrap_or(false))
+    }
+
+    /// Crash iOS 5-era lockdownd with a malformed Pair request (PairRecord
+    /// must be a dictionary; a boolean dereferences a null plist node).
+    /// lockdownd restarts itself shortly after. Used by the g1lbertJB
+    /// jailbreak to race launchd socket creation.
+    pub async fn crash_lockdownd(&self) -> Result<(), ServiceError> {
+        let stream = self.connect_port(LockdownClient::LOCKDOWND_PORT).await?;
+        let mut lockdown = PropertyListService::new(stream);
+        let mut request = Dictionary::new();
+        request.insert("Label".into(), "legacy-ios-kit".into());
+        request.insert("Request".into(), "Pair".into());
+        request.insert("PairRecord".into(), Value::Boolean(false));
+        lockdown.send(&request).await?;
+        // The daemon may crash without replying; either a reply or an I/O
+        // error means the packet landed.
+        let _ = tokio::time::timeout(std::time::Duration::from_secs(5), lockdown.receive()).await;
+        Ok(())
+    }
+
     pub async fn shutdown(&self) -> Result<(), ServiceError> {
         let mut diagnostics = DiagnosticsRelayClient::connect(self.provider.as_ref()).await?;
         diagnostics.shutdown().await?;
@@ -674,6 +702,8 @@ pub enum ServiceError {
     },
     #[error("device rejected EnterRecovery")]
     EnterRecoveryRejected,
+    #[error("file relay rejected the source request: {0}")]
+    FileRelayRejected(String),
 }
 
 #[cfg(test)]

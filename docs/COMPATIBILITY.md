@@ -51,7 +51,7 @@ Legend: ✅ implemented · 🟡 partial / bounded · ❌ not implemented ·
 | Feature | Status | Notes |
 |---|---|---|
 | SSH ramdisk jailbreak 3.1.3–9.3.4 | ✅ | aquila/everuntether/daibutsu/greenpois0n matrix |
-| g1lbertJB (A5 iOS 5.x) | ❌ | |
+| g1lbertJB (A5 iOS 5.x) | ✅ ⚠️ | untethered userland chain over lockdown/AFC/file_relay/mobilebackup2 for iPhone4,1, iPad2,1–2,4, iPad3,1–3,3 on iOS 5.0–5.1.1 (`lik device jailbreak-gilbert`); interactive DemoApp remount step is surfaced as an `ActionRequired` event with AFC polling; unit-tested only — not yet run against a live device |
 | bootstrap 64-bit iOS 7/8/9 | ✅ | Cydia + OpenSSH |
 | iOS 7 untethers | ✅ | panguaxe / evasi0n7 |
 | TrollStore (iOS 14/15) | ✅ | Tips persistence helper |

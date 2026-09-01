@@ -11,6 +11,7 @@ mod error;
 mod exploit;
 mod firmware;
 mod fourthree;
+mod gilbertjb;
 mod hacktivate;
 mod hfs;
 mod image_payload;
@@ -50,6 +51,7 @@ pub use fourthree::{
     TwistedMind2Output, fourthree_board_config, fourthree_data_partition_bytes,
     fourthree_lockdownd_patch_id, fourthree_patch_id, point_restore_device_tree_at_downgrade,
 };
+pub use gilbertjb::{GilbertJbConsent, GilbertJbPlan, gilbertjb_support};
 pub use hacktivate::{HacktivateMethod, hacktivate_method};
 pub use hfs::{HfsEntrySummary, HfsKind, HfsMutation, HfsStatSummary};
 pub use image_payload::{ImageCipher, ImageCipherError};
@@ -563,6 +565,34 @@ impl LegacyIosKit {
         app: &str,
     ) -> Result<TrollRestorePlan, KitError> {
         trollrestore::plan(&self.devices, udid, app).await
+    }
+
+    /// Plan a g1lbertJB jailbreak: gate the device and build to the A5 iOS
+    /// 5.0-5.1.1 set and refuse unactivated, backup-encrypted, or already
+    /// jailbroken devices.
+    pub async fn plan_gilbertjb(&self, udid: Udid) -> Result<GilbertJbPlan, KitError> {
+        gilbertjb::plan(&self.devices, udid).await
+    }
+
+    /// Run the g1lbertJB jailbreak over AFC/file_relay/mobilebackup2. The
+    /// operation reboots the device once, asks the user to run the g1lbertJB
+    /// home-screen icon via an `ActionRequired` event, and restarts the
+    /// device when done.
+    pub fn execute_gilbertjb(
+        &self,
+        plan: GilbertJbPlan,
+        consent: GilbertJbConsent,
+        cache_root: impl Into<std::path::PathBuf>,
+        work_directory: impl Into<std::path::PathBuf>,
+    ) -> OperationHandle {
+        gilbertjb::spawn(
+            self.devices.clone(),
+            self.leases.clone(),
+            plan,
+            consent,
+            cache_root.into(),
+            work_directory.into(),
+        )
     }
 
     /// Install the TrollStore persistence helper over the planned system app

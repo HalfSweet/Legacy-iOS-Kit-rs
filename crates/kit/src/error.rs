@@ -227,6 +227,34 @@ pub enum KitError {
         "Find My must be disabled to install TrollStore; disable it in Settings > [Your Name] > Find My and retry"
     )]
     TrollRestoreFindMyEnabled,
+    #[error("backup record encoding failed: {0}")]
+    Mbdb(#[from] legacy_ios_services::MbdbError),
+    #[error("g1lbertJB consent does not belong to the g1lbertJB plan")]
+    GilbertJbConsentMismatch,
+    #[error(
+        "g1lbertJB does not support {product_type} on iOS {version} ({build}); it supports iPhone4,1, iPad2,1-2,4, and iPad3,1-3,3 on iOS 5.0-5.1.1"
+    )]
+    GilbertJbUnsupported {
+        product_type: String,
+        version: String,
+        build: String,
+    },
+    #[error("the device is not activated; activate it before jailbreaking with g1lbertJB")]
+    GilbertJbUnactivated,
+    #[error(
+        "the device encrypts its backups; disable the backup password in iTunes/Finder before jailbreaking with g1lbertJB"
+    )]
+    GilbertJbBackupEncrypted,
+    #[error("the device is already jailbroken (a stash or an existing untether was detected)")]
+    GilbertJbAlreadyJailbroken,
+    #[error(
+        "a previous g1lbertJB attempt left /HackStore behind; the media directories were moved back, so re-run the jailbreak"
+    )]
+    GilbertJbCleanedUp,
+    #[error("the g1lbertJB file relay dump is unusable: {0}")]
+    GilbertJbInvalidDump(&'static str),
+    #[error("the g1lbertJB operation was cancelled")]
+    GilbertJbCancelled,
     #[error("both device discovery backends failed (bootloader: {bootloader}; normal: {normal})")]
     DeviceDiscovery { bootloader: String, normal: String },
 }
@@ -247,9 +275,15 @@ impl KitError {
             | Self::UnknownBoardConfig { .. }
             | Self::MissingDeviceSelector
             | Self::UnknownDeveloperTeam(_) => OperationPhase::Planning,
-            Self::EraseConsentMismatch | Self::TrollRestoreConsentMismatch => {
-                OperationPhase::Preflight
-            }
+            Self::EraseConsentMismatch
+            | Self::TrollRestoreConsentMismatch
+            | Self::GilbertJbConsentMismatch => OperationPhase::Preflight,
+            Self::GilbertJbUnsupported { .. }
+            | Self::GilbertJbUnactivated
+            | Self::GilbertJbBackupEncrypted
+            | Self::GilbertJbAlreadyJailbroken => OperationPhase::Planning,
+            Self::GilbertJbCleanedUp | Self::GilbertJbInvalidDump(_) => OperationPhase::Preflight,
+            Self::GilbertJbCancelled => OperationPhase::Restoring,
             Self::TrollRestoreUnsupported { .. }
             | Self::TrollRestoreAppNotFound(_)
             | Self::TrollRestoreAppNotRemovable(_) => OperationPhase::Planning,
@@ -323,7 +357,7 @@ impl KitError {
             | Self::DeviceDiscovery { .. }
             | Self::SparseBackup(_)
             | Self::Io(_) => OperationPhase::Preflight,
-            Self::Backup(_) => OperationPhase::TransferringFilesystem,
+            Self::Backup(_) | Self::Mbdb(_) => OperationPhase::TransferringFilesystem,
             Self::RestoreExecution(_) => OperationPhase::Restoring,
             Self::Recovery(_) => OperationPhase::Booting,
             Self::Limera1n(_)
@@ -362,9 +396,13 @@ impl KitError {
             }
             Self::Plist(_)
             | Self::Backup(_)
+            | Self::Mbdb(_)
             | Self::Resign(_)
             | Self::RestoreExecution(_)
             | Self::Task(_) => Recoverability::RestartOperation,
+            Self::GilbertJbCleanedUp | Self::GilbertJbInvalidDump(_) | Self::GilbertJbCancelled => {
+                Recoverability::RestartOperation
+            }
             Self::VerificationTimeout => Recoverability::ReconnectDevice,
             Self::PwnageVerificationTimeout | Self::KdfuTimeout => Recoverability::ReenterDfu,
             Self::PwnageWtfDigest | Self::Alloc8IbssDigest => Recoverability::NotRecoverable,
@@ -407,6 +445,11 @@ impl KitError {
             | Self::TrollRestoreUnsupported { .. }
             | Self::TrollRestoreAppNotFound(_)
             | Self::TrollRestoreAppNotRemovable(_)
+            | Self::GilbertJbConsentMismatch
+            | Self::GilbertJbUnsupported { .. }
+            | Self::GilbertJbUnactivated
+            | Self::GilbertJbBackupEncrypted
+            | Self::GilbertJbAlreadyJailbroken
             | Self::UnsupportedBootstrapVersion(_)
             | Self::MissingBootstrapPackage(_)
             | Self::AlreadyJailbroken

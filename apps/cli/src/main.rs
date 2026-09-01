@@ -553,6 +553,17 @@ enum DeviceCommand {
         #[arg(long)]
         yes: bool,
     },
+    /// Jailbreak an A5/A5X device on iOS 5.0-5.1.1 (iPhone4,1, iPad2,1-2,4,
+    /// iPad3,1-3,3) with g1lbertJB. The device reboots once and you must tap
+    /// the g1lbertJB home-screen icon when prompted. No data is lost, but
+    /// back up your data just in case.
+    JailbreakGilbert {
+        udid: Udid,
+        #[arg(long)]
+        work_dir: Option<PathBuf>,
+        #[arg(long)]
+        yes: bool,
+    },
     /// Ask lockdownd to reboot a normal-mode device into Recovery mode.
     EnterRecovery {
         udid: Udid,
@@ -1905,6 +1916,36 @@ async fn main() -> Result<()> {
             consume_operation(
                 output,
                 kit.execute_trollrestore(plan, consent, cache, work_directory),
+            )
+            .await?;
+        }
+        Command::Device {
+            command:
+                DeviceCommand::JailbreakGilbert {
+                    udid,
+                    work_dir,
+                    yes,
+                },
+        } => {
+            let plan = kit.plan_gilbertjb(udid).await?;
+            confirm(
+                &format!(
+                    "jailbreak the {} on iOS {} ({}) with g1lbertJB and reboot it, with plan {}",
+                    plan.product_type(),
+                    plan.version(),
+                    plan.build(),
+                    plan.id()
+                ),
+                yes,
+            )?;
+            let consent = plan.confirm_destructive();
+            let cache = config.artifact_cache_dir()?;
+            let work_directory = work_dir
+                .or_else(|| config.storage.work_dir.clone())
+                .unwrap_or_else(|| std::env::temp_dir().join("legacy-ios-kit-gilbertjb"));
+            consume_operation(
+                output,
+                kit.execute_gilbertjb(plan, consent, cache, work_directory),
             )
             .await?;
         }

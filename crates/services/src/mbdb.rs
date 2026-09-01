@@ -28,6 +28,13 @@ pub struct MbdbRecord {
     link: String,
     hash: Vec<u8>,
     key: Vec<u8>,
+    /// Whether the link/hash/key fields are encoded as absent (`0xffff`)
+    /// rather than empty (`0x0000`). Device backups and the C backup tools
+    /// use the absent marker; the marker state is preserved when a parsed
+    /// record is re-encoded.
+    link_absent: bool,
+    hash_absent: bool,
+    key_absent: bool,
     mode: u16,
     inode: u64,
     user_id: u32,
@@ -48,6 +55,9 @@ impl MbdbRecord {
             link: String::new(),
             hash: Vec::new(),
             key: Vec::new(),
+            link_absent: false,
+            hash_absent: false,
+            key_absent: false,
             mode,
             inode: 0,
             user_id: 0,
@@ -63,11 +73,23 @@ impl MbdbRecord {
 
     pub fn with_link(mut self, link: impl Into<String>) -> Self {
         self.link = link.into();
+        self.link_absent = false;
+        self
+    }
+
+    /// Mark the link, hash, and key fields absent (`0xffff` length markers),
+    /// matching the records written by the C backup tools; a later
+    /// `with_link`/`with_hash` makes its field concrete again.
+    pub fn with_absent_markers(mut self) -> Self {
+        self.link_absent = true;
+        self.hash_absent = true;
+        self.key_absent = true;
         self
     }
 
     pub fn with_hash(mut self, hash: Vec<u8>) -> Self {
         self.hash = hash;
+        self.hash_absent = false;
         self
     }
 
@@ -91,6 +113,11 @@ impl MbdbRecord {
 
     pub fn with_size(mut self, size: u64) -> Self {
         self.size = size;
+        self
+    }
+
+    pub fn with_flags(mut self, flags: u8) -> Self {
+        self.flags = flags;
         self
     }
 
@@ -131,6 +158,10 @@ impl MbdbRecord {
         self.size
     }
 
+    pub const fn flags(&self) -> u8 {
+        self.flags
+    }
+
     pub fn hash(&self) -> &[u8] {
         &self.hash
     }
@@ -138,9 +169,9 @@ impl MbdbRecord {
     pub fn encode(&self, output: &mut Vec<u8>) -> Result<(), MbdbError> {
         write_string(output, &self.domain)?;
         write_string(output, &self.filename)?;
-        write_string(output, &self.link)?;
-        write_bytes(output, &self.hash)?;
-        write_bytes(output, &self.key)?;
+        write_optional_bytes(output, self.link.as_bytes(), self.link_absent)?;
+        write_optional_bytes(output, &self.hash, self.hash_absent)?;
+        write_optional_bytes(output, &self.key, self.key_absent)?;
         output.extend_from_slice(&self.mode.to_be_bytes());
         output.extend_from_slice(&self.inode.to_be_bytes());
         output.extend_from_slice(&self.user_id.to_be_bytes());
@@ -168,9 +199,9 @@ impl MbdbRecord {
     fn decode(cursor: &mut Cursor<'_>) -> Result<Self, MbdbError> {
         let domain = cursor.string()?;
         let filename = cursor.string()?;
-        let link = cursor.string_or_absent()?;
-        let hash = cursor.bytes_or_absent()?;
-        let key = cursor.bytes_or_absent()?;
+        let (link, link_absent) = cursor.string_with_absence()?;
+        let (hash, hash_absent) = cursor.bytes_with_absence()?;
+        let (key, key_absent) = cursor.bytes_with_absence()?;
         let mode = cursor.u16()?;
         let inode = cursor.u64()?;
         let user_id = cursor.u32()?;
@@ -193,6 +224,9 @@ impl MbdbRecord {
             link,
             hash,
             key,
+            link_absent,
+            hash_absent,
+            key_absent,
             mode,
             inode,
             user_id,
@@ -260,6 +294,17 @@ fn write_bytes(output: &mut Vec<u8>, value: &[u8]) -> Result<(), MbdbError> {
     Ok(())
 }
 
+/// Write a field, using the absent marker (`0xffff`) instead of an empty
+/// length when the record carries no value for it.
+fn write_optional_bytes(output: &mut Vec<u8>, value: &[u8], absent: bool) -> Result<(), MbdbError> {
+    if absent {
+        output.extend_from_slice(&ABSENT.to_be_bytes());
+        Ok(())
+    } else {
+        write_bytes(output, value)
+    }
+}
+
 struct Cursor<'a> {
     data: &'a [u8],
     offset: usize,
@@ -305,19 +350,21 @@ impl Cursor<'_> {
     }
 
     fn string_or_absent(&mut self) -> Result<String, MbdbError> {
-        let length = self.u16()?;
-        if length == ABSENT {
-            return Ok(String::new());
-        }
-        String::from_utf8(self.take(length as usize)?.to_vec()).map_err(|_| MbdbError::InvalidUtf8)
+        Ok(self.string_with_absence()?.0)
     }
 
-    fn bytes_or_absent(&mut self) -> Result<Vec<u8>, MbdbError> {
+    fn string_with_absence(&mut self) -> Result<(String, bool), MbdbError> {
+        let (bytes, absent) = self.bytes_with_absence()?;
+        let string = String::from_utf8(bytes).map_err(|_| MbdbError::InvalidUtf8)?;
+        Ok((string, absent))
+    }
+
+    fn bytes_with_absence(&mut self) -> Result<(Vec<u8>, bool), MbdbError> {
         let length = self.u16()?;
         if length == ABSENT {
-            return Ok(Vec::new());
+            return Ok((Vec::new(), true));
         }
-        Ok(self.take(length as usize)?.to_vec())
+        Ok((self.take(length as usize)?.to_vec(), false))
     }
 }
 
@@ -408,6 +455,41 @@ mod tests {
         let parsed = Mbdb::from_bytes(&[b"mbdb\x05\x00".to_vec(), record].concat()).unwrap();
         assert_eq!(parsed.records()[0].link(), "");
         assert_eq!(parsed.records()[0].hash(), b"");
+    }
+
+    #[test]
+    fn preserves_absent_markers_on_reencode() {
+        let mut record = directory_record().to_bytes().unwrap();
+        let link_length = 2 + 10 + 2 + 7;
+        for offset in [link_length, link_length + 2, link_length + 4] {
+            record[offset] = 0xff;
+            record[offset + 1] = 0xff;
+        }
+        let data = [b"mbdb\x05\x00".to_vec(), record].concat();
+        let parsed = Mbdb::from_bytes(&data).unwrap();
+        assert_eq!(parsed.to_bytes().unwrap(), data);
+    }
+
+    #[test]
+    fn absent_markers_encode_like_the_c_backup_tools() {
+        let record = directory_record().with_absent_markers().to_bytes().unwrap();
+        let link_length = 2 + 10 + 2 + 7;
+        assert_eq!(
+            &record[link_length..link_length + 6],
+            b"\xff\xff\xff\xff\xff\xff"
+        );
+
+        // A concrete link makes only that field present again.
+        let record = directory_record()
+            .with_absent_markers()
+            .with_link("/target")
+            .to_bytes()
+            .unwrap();
+        assert_eq!(&record[link_length..link_length + 9], b"\x00\x07/target");
+        assert_eq!(
+            &record[link_length + 9..link_length + 13],
+            b"\xff\xff\xff\xff"
+        );
     }
 
     #[test]

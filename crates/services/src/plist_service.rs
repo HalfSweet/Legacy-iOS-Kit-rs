@@ -40,4 +40,10 @@ where
             .into_dictionary()
             .ok_or(ServiceError::PlistNotDictionary)
     }
+
+    /// Hand back the underlying stream, e.g. after a handshake that switches
+    /// the connection to a raw byte stream (file_relay).
+    pub(crate) fn into_inner(self) -> S {
+        self.stream
+    }
 }
