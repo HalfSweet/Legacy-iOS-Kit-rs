@@ -70,6 +70,12 @@ pub enum KitError {
     PowderInvalidManifest,
     #[error("no latest-baseband manifest rewrite is known for {0}")]
     PowderUnsupportedBasebandReplace(String),
+    #[error("powder restores support A4/A5/A5X/A6/A6X devices, found {0}")]
+    PowderRestoreUnsupportedDevice(String),
+    #[error("powder restore of {0} goes through the two-stage multipart flow (restore multipart)")]
+    PowderRestoreRequiresMultipart(String),
+    #[error("live latest-version ticket fetches are only valid for A4 powder restores, found {0}")]
+    PowderRestoreTicketFetchUnsupported(String),
     #[error("powdersn0w iBoot patch failed: {0}")]
     PowderIbootPatch(#[from] legacy_ios_image::PowderIBootError),
     #[error("powdersn0w ASR patch failed: {0}")]
@@ -284,6 +290,9 @@ impl KitError {
             | Self::PowderMissingComponent(_)
             | Self::PowderInvalidManifest
             | Self::PowderUnsupportedBasebandReplace(_) => OperationPhase::Planning,
+            Self::PowderRestoreUnsupportedDevice(_)
+            | Self::PowderRestoreRequiresMultipart(_)
+            | Self::PowderRestoreTicketFetchUnsupported(_) => OperationPhase::Planning,
             Self::MultipartStageTimeout => OperationPhase::WaitingForDevice,
             Self::RamdiskPreparation(_) => OperationPhase::Preflight,
             Self::RamdiskBoot(_) => OperationPhase::Booting,
@@ -435,6 +444,9 @@ impl KitError {
             | Self::PowderInvalidManifest
             | Self::PowderUnsupportedBasebandReplace(_)
             | Self::PowderTruncatedNorImage(_) => Recoverability::NotRecoverable,
+            Self::PowderRestoreUnsupportedDevice(_)
+            | Self::PowderRestoreRequiresMultipart(_)
+            | Self::PowderRestoreTicketFetchUnsupported(_) => Recoverability::NotRecoverable,
             Self::MultipartStageTimeout => Recoverability::ReenterDfu,
         }
     }

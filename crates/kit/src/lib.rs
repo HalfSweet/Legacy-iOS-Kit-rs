@@ -21,6 +21,7 @@ mod multipart;
 mod operation;
 mod pairing;
 mod powder;
+mod powder_restore;
 mod pwnage;
 mod ramdisk;
 mod ramdisk_boot;
@@ -93,6 +94,9 @@ pub use operation::OperationHandle;
 pub use pairing::PairingStore;
 pub use powder::{
     DEFAULT_RAMDISK_GROW_BLOCKS, PowderBasePlan, PowderPreparePlan, PowderPrepareRequest,
+};
+pub use powder_restore::{
+    PowderPwnMethod, PowderRestorePlan, PowderRestoreRequest, PowderTicketSource,
 };
 pub use ramdisk::{RamdiskBuildRequest, RamdiskBuildSummary};
 pub use ramdisk_boot::RamdiskBootExecutionRequest;
@@ -370,6 +374,32 @@ impl LegacyIosKit {
             self.leases.clone(),
             self.tss.clone(),
             request,
+        )
+    }
+
+    /// Plan a powder restore: gate the device class, resolve the signing
+    /// ticket per upstream's provenance rules (a live latest-version TSS
+    /// fetch on A4, a provided base-version blob elsewhere), and plan the
+    /// restore with the pwned-chain exploit policy of the entry method.
+    pub async fn plan_powder_restore(
+        &self,
+        request: PowderRestoreRequest,
+    ) -> Result<PowderRestorePlan, KitError> {
+        powder_restore::plan(&self.tss, request).await
+    }
+
+    /// Execute a powder restore with final verification on.
+    pub fn execute_powder_restore(
+        &self,
+        plan: PowderRestorePlan,
+        consent: DestructiveConsent,
+        work_directory: impl Into<std::path::PathBuf>,
+    ) -> OperationHandle {
+        restore_execution::spawn(
+            self.devices.clone(),
+            self.leases.clone(),
+            self.tss.clone(),
+            plan.into_execution_request(consent, work_directory),
         )
     }
 
