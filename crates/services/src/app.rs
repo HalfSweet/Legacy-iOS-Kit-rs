@@ -40,6 +40,8 @@ pub struct InstalledApp {
     name: Option<String>,
     version: Option<String>,
     application_type: Option<String>,
+    #[serde(default)]
+    path: Option<String>,
 }
 
 impl InstalledApp {
@@ -57,6 +59,11 @@ impl InstalledApp {
 
     pub fn application_type(&self) -> Option<&str> {
         self.application_type.as_deref()
+    }
+
+    /// On-disk path of the app bundle reported by the installation proxy.
+    pub fn path(&self) -> Option<&str> {
+        self.path.as_deref()
     }
 }
 
@@ -86,6 +93,7 @@ impl NormalDevice {
                     version: string(&dictionary, "CFBundleShortVersionString")
                         .or_else(|| string(&dictionary, "CFBundleVersion")),
                     application_type: string(&dictionary, "ApplicationType"),
+                    path: string(&dictionary, "Path"),
                 }
             })
             .collect::<Vec<_>>();

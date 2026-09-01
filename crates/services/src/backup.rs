@@ -69,6 +69,11 @@ impl BackupRestoreOptions {
         self
     }
 
+    pub fn copy_backup(mut self, enabled: bool) -> Self {
+        self.copy_backup = enabled;
+        self
+    }
+
     pub fn preserve_settings(mut self, enabled: bool) -> Self {
         self.preserve_settings = enabled;
         self
