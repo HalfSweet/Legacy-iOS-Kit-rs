@@ -17,12 +17,13 @@ use legacy_ios_kit::{
     FourThreeComponentSource, FourThreePrepareRequest, HfsEntrySummary, HfsMutation,
     HfsStatSummary, HostKeyPolicy, Iboot32PatchOptions, ImageCipher, InstalledApp, LegacyIosKit,
     MountOptions, MultipartPrepareRequest, MultipartRestoreRequest, NoncePolicy, NorSource,
-    OperationEvent, OperationHandle, OperationOutcome, ProductType, RamdiskBootExecutionRequest,
+    OperationEvent, OperationHandle, OperationOutcome, PowderPrepareRequest, PowderPwnMethod,
+    PowderRestoreRequest, PowderTicketSource, ProductType, RamdiskBootExecutionRequest,
     RamdiskBootRequest, RamdiskBuildRequest, RamdiskBuildSummary, RamdiskSsh, RecoveryDeviceInfo,
     RecoveryUploadResult, RemoteFirmwareSummary, ResourceId, RestoreBehavior,
     RestoreExecutionRequest, RestorePlan, RestoreRequest, ScpPath, SepPolicy, ShshRequest,
-    ShshSummary, SigningTicket, SshCommandOutput, SshPassword, SshTarget, TicketPolicy, Udid,
-    UsbHostDiagnostics,
+    ShshSummary, SigningTicket, Soc, SshCommandOutput, SshPassword, SshTarget, TicketPolicy, Udid,
+    UsbHostDiagnostics, extract_apticket_der,
 };
 use tracing::level_filters::LevelFilter;
 use tracing::{debug, info, warn};
@@ -915,6 +916,61 @@ enum FirmwareCommand {
         #[arg(long)]
         skip_first: bool,
     },
+    /// Build a powdersn0w custom IPSW: a single-IPSW build without --base-ipsw,
+    /// a two-bundle (-base) build with one, or the 4.3.x ios4powder variant
+    /// when the target is 4.3.x and --apticket is supplied.
+    #[command(name = "powder-prepare")]
+    PowderPrepare {
+        #[arg(long)]
+        device: ProductType,
+        #[arg(long)]
+        board: BoardConfig,
+        /// Original IPSW of the target iOS version.
+        #[arg(long)]
+        target_ipsw: PathBuf,
+        /// IPSW of the base iOS version of a two-bundle build.
+        #[arg(long)]
+        base_ipsw: Option<PathBuf>,
+        /// Saved signing ticket (SHSH blob) whose APTicket is resealed into
+        /// the scab template; required for the 4.3.x ios4powder variant.
+        #[arg(long)]
+        apticket: Option<PathBuf>,
+        /// Resolve the jailbreak payload matrix.
+        #[arg(long)]
+        jailbreak: bool,
+        /// Include the OpenSSH payload tar set (upstream default).
+        #[arg(long, default_value_t = true, overrides_with = "no_openssh")]
+        openssh: bool,
+        /// Omit the OpenSSH payload tar set.
+        #[arg(long)]
+        no_openssh: bool,
+        /// Accepted for parity with upstream's --memory; the builder always
+        /// assembles payloads in memory.
+        #[arg(long)]
+        memory: bool,
+        /// Verbose boot-args variant (pio-error=0 -v).
+        #[arg(long)]
+        ipsw_verbose: bool,
+        /// Extra boot-args appended to the boot-args string.
+        #[arg(long)]
+        bootargs: Option<String>,
+        /// Skip the latest-baseband swap (device_disable_bbupdate).
+        #[arg(long)]
+        disable_bbupdate: bool,
+        /// Activation records tar merged into the root filesystem.
+        #[arg(long)]
+        activation_records: Option<PathBuf>,
+        /// Externally patched iBoot binary merged as iBoot.tar (named iBEC on
+        /// iPad1,1); required for ios4powder and ramdiskH two-bundle builds.
+        #[arg(long)]
+        iboot: Option<PathBuf>,
+        /// Output path of the custom IPSW.
+        #[arg(long, short = 'o')]
+        output_ipsw: PathBuf,
+        /// Artifact cache for firmware keys and catalog resources.
+        #[arg(long)]
+        cache_dir: Option<PathBuf>,
+    },
     /// Build the FourThree custom 6.1.3 IPSW and the patched 4.3.x dualboot
     /// components (kernelcache, LLB, RootFS) of a FourThree install.
     #[command(name = "fourthree-prepare")]
@@ -1188,6 +1244,49 @@ enum RestoreCommand {
         #[arg(long)]
         yes: bool,
     },
+    /// Restore a powdersn0w custom IPSW (from `lik firmware powder-prepare`):
+    /// resolve the signing ticket per device class and the pwned-chain entry
+    /// method, then run the single-stage erase restore with verification.
+    Powder {
+        #[arg(long)]
+        device: ProductType,
+        #[arg(long)]
+        board: BoardConfig,
+        #[arg(long)]
+        ecid: Ecid,
+        /// powdersn0w-built custom IPSW of the target version.
+        #[arg(long)]
+        firmware: PathBuf,
+        /// Base-version signing ticket (SHSH blob); required on
+        /// A5/A5X/A6/A6X, on A4 it replaces the --latest-ipsw TSS fetch.
+        #[arg(long, conflicts_with_all = ["latest_ipsw", "cpid", "bdid"])]
+        ticket: Option<PathBuf>,
+        /// A4 only: IPSW of the device's latest iOS version; its (OTA-signed)
+        /// ticket is fetched from TSS and used for the restore.
+        #[arg(long, requires_all = ["cpid", "bdid"])]
+        latest_ipsw: Option<PathBuf>,
+        #[arg(long, value_parser = parse_integer)]
+        cpid: Option<u64>,
+        #[arg(long, value_parser = parse_integer)]
+        bdid: Option<u64>,
+        /// Pwned-chain entry method; defaults to kDFU on A5/A5X/A6/A6X and
+        /// pwnDFU on A4, mirroring upstream's recommended menu order.
+        #[arg(long, value_enum)]
+        pwn: Option<PowderPwnArg>,
+        /// Directory the fetched latest-version ticket is saved to
+        /// (defaults to the artifact cache's shsh directory).
+        #[arg(long)]
+        ticket_dir: Option<PathBuf>,
+        #[arg(long)]
+        work_dir: Option<PathBuf>,
+        #[arg(long)]
+        limera1n_payload: Option<PathBuf>,
+        /// Do not send baseband firmware during the restore.
+        #[arg(long)]
+        no_baseband: bool,
+        #[arg(long)]
+        yes: bool,
+    },
     /// Execute a two-stage iOS 3.x/4.x multipart restore: the part 1 NOR
     /// flash IPSW first, then the multipatched part 2 target IPSW after the
     /// device re-enters DFU/recovery.
@@ -1220,6 +1319,12 @@ enum RestoreCommand {
         /// powdersn0w 4.2.x and lower restores.
         #[arg(long)]
         skip_first: bool,
+        /// Also supply the --ticket blob to the part 2 restore, matching
+        /// upstream's `-w` behavior. By default part 2 restores ticket-free:
+        /// the multipatched boot chain is RSA-patched and never validates the
+        /// blob, so this flag only matters for exact upstream parity.
+        #[arg(long)]
+        part2_ticket: bool,
         #[arg(long)]
         yes: bool,
     },
@@ -1278,6 +1383,21 @@ enum ExploitArg {
     Auto,
     None,
     AlreadyPwned,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
+enum PowderPwnArg {
+    Kdfu,
+    Pwndfu,
+}
+
+impl From<PowderPwnArg> for PowderPwnMethod {
+    fn from(value: PowderPwnArg) -> Self {
+        match value {
+            PowderPwnArg::Kdfu => Self::Kdfu,
+            PowderPwnArg::Pwndfu => Self::PwnDfu,
+        }
+    }
 }
 
 impl From<ExploitArg> for ExploitPolicy {
@@ -2751,6 +2871,95 @@ async fn main() -> Result<()> {
         }
         Command::Firmware {
             command:
+                FirmwareCommand::PowderPrepare {
+                    device,
+                    board,
+                    target_ipsw,
+                    base_ipsw,
+                    apticket,
+                    jailbreak,
+                    openssh,
+                    no_openssh,
+                    memory,
+                    ipsw_verbose,
+                    bootargs,
+                    disable_bbupdate,
+                    activation_records,
+                    iboot,
+                    output_ipsw,
+                    cache_dir,
+                },
+        } => {
+            if memory {
+                debug!("--memory is inherent to the in-memory Rust builder");
+            }
+            let cache_root = match cache_dir {
+                Some(path) => path,
+                None => config.artifact_cache_dir()?,
+            };
+            let mut request = PowderPrepareRequest::new(
+                device.clone(),
+                board,
+                target_ipsw,
+                output_ipsw.clone(),
+                cache_root,
+            )
+            .with_jailbreak(jailbreak)
+            .with_openssh(openssh && !no_openssh)
+            .with_verbose_boot_args(ipsw_verbose)
+            .with_disable_baseband_update(disable_bbupdate);
+            if let Some(args) = bootargs {
+                request = request.with_boot_args(args);
+            }
+            if let Some(base) = base_ipsw {
+                request = request.with_base(base);
+            }
+            if let Some(path) = apticket {
+                let ticket =
+                    SigningTicket::open(&path).context("failed to read the -apticket SHSH blob")?;
+                request = request.with_apticket(extract_apticket_der(&ticket));
+            }
+            if let Some(path) = activation_records {
+                let name = path
+                    .file_name()
+                    .map(|name| name.to_string_lossy().into_owned())
+                    .unwrap_or_else(|| "activation.tar".to_owned());
+                let data = tokio::fs::read(&path)
+                    .await
+                    .with_context(|| format!("failed to read {}", path.display()))?;
+                request = request.with_extra_tars(vec![(name, data)]);
+            }
+            if let Some(path) = iboot {
+                let data = tokio::fs::read(&path)
+                    .await
+                    .with_context(|| format!("failed to read {}", path.display()))?;
+                // Upstream merges the patched iBoot as iBEC on iPad1,1 and as
+                // iBoot elsewhere (restore.sh:5701 ipsw_prepare_powder).
+                let name = if device.as_str() == "iPad1,1" {
+                    "iBEC"
+                } else {
+                    "iBoot"
+                };
+                request = request.with_iboot_sidecar(name, data);
+            }
+            let plan = kit
+                .plan_powder_ipsw(request)
+                .await
+                .context("failed to plan the powder custom IPSW")?;
+            info!(
+                version = %plan.version(),
+                build = %plan.build_id(),
+                mode = ?plan.mode(),
+                "powder build planned"
+            );
+            consume_operation(output, kit.execute_powder_prepare(plan)).await?;
+            let summary = kit
+                .inspect_firmware(output_ipsw)
+                .context("failed to inspect the built powder IPSW")?;
+            write_firmware(output, &summary)?;
+        }
+        Command::Firmware {
+            command:
                 FirmwareCommand::FourThreePrepare {
                     device,
                     target_ipsw,
@@ -2947,6 +3156,7 @@ async fn main() -> Result<()> {
                     limera1n_payload,
                     no_baseband,
                     skip_first,
+                    part2_ticket,
                     yes,
                 },
         } => {
@@ -2970,8 +3180,14 @@ async fn main() -> Result<()> {
                     firmware: part2,
                     behavior: RestoreBehavior::Erase,
                     // The multipatched boot chain is RSA-patched; part 2
-                    // restores without a blob on the pwned device.
-                    ticket: TicketPolicy::Skip,
+                    // restores without a blob on the pwned device by default.
+                    // With --part2-ticket the blob is supplied to part 2 as
+                    // well, matching upstream's `-w` (restore.sh:6596-6616).
+                    ticket: if part2_ticket {
+                        TicketPolicy::Provided(ticket.clone())
+                    } else {
+                        TicketPolicy::Skip
+                    },
                     baseband: if no_baseband {
                         BasebandPolicy::None
                     } else {
@@ -2999,11 +3215,20 @@ async fn main() -> Result<()> {
                 SigningTicket::open(&ticket).context("failed to read signing ticket")?,
                 work_directory.clone(),
             );
-            let mut part2_request = RestoreExecutionRequest::skip_blob(
-                part2_plan.clone(),
-                part2_plan.confirm_destructive(),
-                work_directory,
-            );
+            let mut part2_request = if part2_ticket {
+                RestoreExecutionRequest::new(
+                    part2_plan.clone(),
+                    part2_plan.confirm_destructive(),
+                    SigningTicket::open(&ticket).context("failed to read signing ticket")?,
+                    work_directory,
+                )
+            } else {
+                RestoreExecutionRequest::skip_blob(
+                    part2_plan.clone(),
+                    part2_plan.confirm_destructive(),
+                    work_directory,
+                )
+            };
             if let Some(path) = limera1n_payload {
                 let payload = tokio::fs::read(&path)
                     .await
@@ -3017,6 +3242,96 @@ async fn main() -> Result<()> {
                     MultipartRestoreRequest::new(part1_request, part2_request)
                         .with_skip_first(skip_first),
                 ),
+            )
+            .await?;
+        }
+        Command::Restore {
+            command:
+                RestoreCommand::Powder {
+                    device,
+                    board,
+                    ecid,
+                    firmware,
+                    ticket,
+                    latest_ipsw,
+                    cpid,
+                    bdid,
+                    pwn,
+                    ticket_dir,
+                    work_dir,
+                    limera1n_payload,
+                    no_baseband,
+                    yes,
+                },
+        } => {
+            let device = kit.resolve_device_identity(device, board)?.with_ecid(ecid);
+            let ticket = if let Some(ticket) = ticket {
+                PowderTicketSource::Provided(ticket)
+            } else if let Some(latest_ipsw) = latest_ipsw {
+                let destination_dir = match ticket_dir {
+                    Some(path) => path,
+                    None => config.artifact_cache_dir()?.join("shsh"),
+                };
+                PowderTicketSource::FetchLatest {
+                    firmware: latest_ipsw,
+                    destination_dir,
+                    chip_id: cpid.expect("clap requires --cpid with --latest-ipsw"),
+                    board_id: bdid.expect("clap requires --bdid with --latest-ipsw"),
+                }
+            } else {
+                return Err(anyhow!(
+                    "one of --ticket (base-version blob) or --latest-ipsw (A4 TSS fetch) is required"
+                ));
+            };
+            // Upstream's menu order (device_buttons, restore.sh:6435-6474):
+            // kDFU recommended on A5/A5X/A6/A6X, pwnDFU first on A4.
+            let pwn = pwn.map_or_else(
+                || match device.soc() {
+                    Soc::A5 | Soc::A5x | Soc::A6 | Soc::A6x => PowderPwnMethod::Kdfu,
+                    _ => PowderPwnMethod::PwnDfu,
+                },
+                PowderPwnMethod::from,
+            );
+            let mut plan = kit
+                .plan_powder_restore(
+                    PowderRestoreRequest::new(device, firmware, ticket, pwn).with_baseband(
+                        if no_baseband {
+                            BasebandPolicy::None
+                        } else {
+                            BasebandPolicy::Auto
+                        },
+                    ),
+                )
+                .await
+                .context("failed to plan the powder restore")?;
+            if let Some(version) = plan.ticket_version() {
+                info!(
+                    ticket = %plan.ticket_path().display(),
+                    %version,
+                    "fetched the latest-version ticket"
+                );
+            }
+            confirm(
+                &format!(
+                    "erase/restore the selected device with powder plan {}",
+                    plan.id().as_str()
+                ),
+                yes,
+            )?;
+            let consent = plan.confirm_destructive();
+            if let Some(path) = limera1n_payload {
+                plan = plan.with_limera1n_payload(
+                    tokio::fs::read(&path)
+                        .await
+                        .with_context(|| format!("failed to read {}", path.display()))?,
+                );
+            }
+            let work_directory = work_dir
+                .or_else(|| config.storage.work_dir.clone())
+                .unwrap_or_else(|| std::env::temp_dir().join("legacy-ios-kit"));
+            consume_operation(
+                output,
+                kit.execute_powder_restore(plan, consent, work_directory),
             )
             .await?;
         }

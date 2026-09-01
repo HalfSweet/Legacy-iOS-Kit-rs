@@ -40,8 +40,8 @@ Legend: ✅ implemented · 🟡 partial / bounded · ❌ not implemented ·
 | skip-blob pwned restore | ✅ | `--skip-blob` requires pwned boot chain |
 | SEP from file / no SEP | ✅ | `--sep` / `--no-sep` |
 | set-nonce from ticket generator | ✅ | `--set-nonce` |
-| iOS 3.x/4.x multipart two-stage restore | 🟡 | part1 NOR IPSW complete (5.1.1 components, target iBoot/DeviceTree/AppleLogo, bundled ASR patch, APTicket scab); part2 needs an externally prepared powder IPSW |
-| powdersn0w (iOS 4.3.x powder) | ❌ | missing exploit/ASR patch resources |
+| iOS 3.x/4.x multipart two-stage restore | ✅ ⚠️ | part1 NOR IPSW (5.1.1 components, target iBoot/DeviceTree/AppleLogo, bundled ASR patch, APTicket scab); part2 built by `lik firmware powder-prepare`; `--skip-first` resume; optional `--part2-ticket` for upstream `-w` parity; hardware-unverified |
+| powdersn0w custom IPSW + restore | ✅ ⚠️ | builder (single/two-bundle/ios4powder) via `lik firmware powder-prepare`; single-stage powder restore via `lik restore powder` (A4 fetches the latest-version ticket from TSS, A5/A5X/A6/A6X take a base-version blob; kDFU/pwnDFU entry, external checkm8-a5/litera1n guidance); hardware-unverified |
 | RSEP / Cryptex policies | ❌ | |
 | iPhone X restored_external | ❌ | |
 | FourThree dualboot (iPad2) | 🟡 | step 1 custom IPSW + dualboot components ✅ (`lik firmware fourthree-prepare`, unit-tested only — no end-to-end fixture test with real IPSWs yet); steps 2/3/app/boot ✅ |
