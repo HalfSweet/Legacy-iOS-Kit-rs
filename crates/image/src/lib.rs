@@ -14,7 +14,10 @@ mod lzss;
 mod mbn;
 mod onboard;
 mod patch;
+mod patchfinder;
 mod payload;
+mod powder_asr;
+mod powder_iboot;
 
 pub use crypto::{CryptoError, decrypt_cbc, encrypt_cbc};
 pub use dmg::{
@@ -38,4 +41,9 @@ pub use patch::{PatchError, apply_bsdiff};
 pub use payload::{
     ImagePayloadError, decrypt_img3_payload, extract_image_payload, repair_truncated_img3,
     replace_image_payload,
+};
+pub use powder_asr::{PowderAsrError, patch_asr};
+pub use powder_iboot::{
+    MAX_BOOTARGS_LEN, PowderIBootError, PowderIBootPatchOptions, RAMDISK_BOOT_ARGS,
+    patch_powder_iboot,
 };
