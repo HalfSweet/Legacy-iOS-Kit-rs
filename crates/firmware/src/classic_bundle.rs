@@ -900,6 +900,217 @@ fn validate_sha1(sha1: &str) -> Result<(), ClassicBundleError> {
     }
 }
 
+/// A payload tar merged into the root filesystem of a classic build, in
+/// `ipsw` tool argument order.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum ClassicTar {
+    /// A cataloged jailbreak resource.
+    Resource(ResourceId),
+    /// The generated beta `systemversion.tar`; the caller builds it from the
+    /// target's `SystemVersion.plist`.
+    SystemVersion,
+    /// The generated `iBoot.tar` holding the externally patched iBoot (`iBEC`
+    /// on iPad1,1); the caller supplies the patched image.
+    IBoot,
+}
+
+/// The ordered payload selection for one classic build: the tar list merged
+/// into the root filesystem plus the `-punchd` flag of the `ipsw` tool.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ClassicPayloadPlan {
+    tars: Vec<ClassicTar>,
+    punchd: bool,
+}
+
+impl ClassicPayloadPlan {
+    /// Ordered payload tars: `iBoot.tar`/`systemversion.tar` first, then the
+    /// jailbreak payload tars. The caller's per-device baseband/activation
+    /// tars precede them, mirroring upstream's `ExtraArgs`-before-`JBFiles`
+    /// argument order in `ipsw_prepare_jailbreak`.
+    pub fn tars(&self) -> &[ClassicTar] {
+        &self.tars
+    }
+
+    /// `-punchd`: move `/sbin/launchd` to `/sbin/punchd` in the root
+    /// filesystem (4.2.x greenpois0n targets except iPhone1,2).
+    pub const fn punchd(&self) -> bool {
+        self.punchd
+    }
+
+    /// Mirror of the jailbreak payload matrix of upstream's
+    /// `ipsw_prepare_jailbreak` (restore.sh) for the classic `ipsw` tool
+    /// path. The 24kpwn early-bootrom branch of upstream's greenpois0n
+    /// selection is covered by [`ClassicPayloadRequest::with_24kpwn_old_bootrom`].
+    pub fn resolve(request: &ClassicPayloadRequest) -> Result<Self, ClassicBundleError> {
+        let version = request.target_version.as_str();
+        let (major, minor, patch) = version_parts(version)?;
+        let device = request.product_type.as_str();
+        let mut plan = Self {
+            tars: Vec::new(),
+            punchd: false,
+        };
+
+        // ExtraArgs order: iBoot.tar, then systemversion.tar.
+        if request.iboot_sidecar {
+            plan.tars.push(ClassicTar::IBoot);
+        }
+        if request.beta {
+            plan.tars.push(ClassicTar::SystemVersion);
+        }
+        if !request.jailbreak {
+            return Ok(plan);
+        }
+
+        let first = match (major, minor) {
+            (6, _) => Some(ResourceId::new("jailbreak-aquila-6")),
+            (5, _) => Some(ResourceId::new("jailbreak-aquila-5")),
+            (4, 3) => Some(ResourceId::new("jailbreak-aquila-4")),
+            (4, 0 | 1) | (3, 2) => Some(greenpois0n_tar(
+                &request.product_type,
+                &request.target_build,
+            )?),
+            _ => None,
+        };
+        if let Some(first) = first {
+            plan.tars.push(ClassicTar::Resource(first));
+        }
+        plan.tars
+            .push(ClassicTar::Resource(ResourceId::new(match major {
+                3 | 4 => "jailbreak-fstab-old",
+                _ => "jailbreak-fstab-rw",
+            })));
+        plan.tars.push(ClassicTar::Resource(ResourceId::new(
+            "jailbreak-bootstrap-freeze",
+        )));
+        if major == 4 && minor == 2 && matches!(patch, Some(1 | 6 | 7 | 8)) && device != "iPhone1,2"
+        {
+            plan.punchd = true;
+            plan.tars.push(ClassicTar::Resource(greenpois0n_tar(
+                &request.product_type,
+                &request.target_build,
+            )?));
+        }
+        if (major, minor) == (3, 1)
+            && device != "iPhone1,2"
+            && device != "iPhone2,1"
+            && !request.old_bootrom_24kpwn
+        {
+            plan.tars.push(ClassicTar::Resource(greenpois0n_tar(
+                &request.product_type,
+                &request.target_build,
+            )?));
+        }
+        if matches!(major, 3..=5) {
+            plan.tars.push(ClassicTar::Resource(ResourceId::new(
+                "jailbreak-cydiasubstrate",
+            )));
+        }
+        if major == 3 {
+            plan.tars.push(ClassicTar::Resource(ResourceId::new(
+                "jailbreak-cydiahttpatch",
+            )));
+        }
+        if request.openssh {
+            plan.tars
+                .push(ClassicTar::Resource(ResourceId::new("jailbreak-sshdeb")));
+            if major >= 4 {
+                for id in ["jailbreak-openssh", "jailbreak-openssl"] {
+                    plan.tars.push(ClassicTar::Resource(ResourceId::new(id)));
+                }
+            }
+        }
+        if !matches!(major, 3 | 4) {
+            plan.tars
+                .push(ClassicTar::Resource(ResourceId::new("jailbreak-lukezgd")));
+        }
+        Ok(plan)
+    }
+}
+
+/// Inputs for [`ClassicPayloadPlan::resolve`].
+#[derive(Clone, Debug)]
+pub struct ClassicPayloadRequest {
+    product_type: ProductType,
+    target_version: IosVersion,
+    target_build: BuildId,
+    jailbreak: bool,
+    openssh: bool,
+    beta: bool,
+    old_bootrom_24kpwn: bool,
+    iboot_sidecar: bool,
+}
+
+impl ClassicPayloadRequest {
+    pub fn new(
+        product_type: ProductType,
+        target_version: IosVersion,
+        target_build: BuildId,
+    ) -> Self {
+        Self {
+            product_type,
+            target_version,
+            target_build,
+            jailbreak: false,
+            openssh: false,
+            beta: false,
+            old_bootrom_24kpwn: false,
+            iboot_sidecar: false,
+        }
+    }
+
+    /// Merge the jailbreak payload tars into the root filesystem.
+    pub fn with_jailbreak(mut self, enabled: bool) -> Self {
+        self.jailbreak = enabled;
+        self
+    }
+
+    /// Merge the OpenSSH payload (`sshdeb.tar`, plus `openssh.tar` and
+    /// `openssl.tar` on iOS 4+).
+    pub fn with_openssh(mut self, enabled: bool) -> Self {
+        self.openssh = enabled;
+        self
+    }
+
+    /// Merge the generated `systemversion.tar` for beta targets.
+    pub fn with_beta(mut self, enabled: bool) -> Self {
+        self.beta = enabled;
+        self
+    }
+
+    /// The device has an old-bootrom iPhone3GS/iPod2,1-style 24kpwn bootrom
+    /// (upstream `$ipsw_24o`), suppressing the 3.1.x greenpois0n package.
+    pub fn with_24kpwn_old_bootrom(mut self, enabled: bool) -> Self {
+        self.old_bootrom_24kpwn = enabled;
+        self
+    }
+
+    /// Merge the generated `iBoot.tar` holding an externally patched iBoot.
+    pub fn with_iboot_sidecar(mut self, enabled: bool) -> Self {
+        self.iboot_sidecar = enabled;
+        self
+    }
+}
+
+/// Catalog resource id of the device's greenpois0n package:
+/// `greenpois0n-<device>-<build>`.
+fn greenpois0n_tar(
+    product_type: &ProductType,
+    build: &BuildId,
+) -> Result<ResourceId, ClassicBundleError> {
+    let id = ResourceId::new(format!(
+        "greenpois0n-{}-{}",
+        product_type.as_str().replace(',', "-"),
+        build.as_str()
+    ));
+    if ResourceCatalog::bundled().get(&id).is_none() {
+        return Err(ClassicBundleError::MissingUntether {
+            device: product_type.as_str().to_owned(),
+            build: build.as_str().to_owned(),
+        });
+    }
+    Ok(id)
+}
+
 #[derive(Debug, Error)]
 pub enum ClassicBundleError {
     #[error("invalid iOS version {0}")]
@@ -916,6 +1127,8 @@ pub enum ClassicBundleError {
         build: String,
         patch: String,
     },
+    #[error("no greenpois0n package cataloged for {device} {build}")]
+    MissingUntether { device: String, build: String },
 }
 
 #[cfg(test)]
@@ -1424,6 +1637,228 @@ mod tests {
         assert!(matches!(
             ClassicBundle::resolve(&bad_version, &test_keys("n88"), None),
             Err(ClassicBundleError::InvalidVersion(_))
+        ));
+    }
+
+    fn payload_request(device: &str, version: &str, build: &str) -> ClassicPayloadRequest {
+        ClassicPayloadRequest::new(
+            ProductType::from(device),
+            IosVersion::from(version),
+            BuildId::from(build),
+        )
+        .with_jailbreak(true)
+    }
+
+    fn tar_ids(plan: &ClassicPayloadPlan) -> Vec<String> {
+        plan.tars()
+            .iter()
+            .map(|tar| match tar {
+                ClassicTar::Resource(id) => id.as_str().to_owned(),
+                ClassicTar::SystemVersion => "<systemversion>".to_owned(),
+                ClassicTar::IBoot => "<iboot>".to_owned(),
+            })
+            .collect()
+    }
+
+    #[test]
+    fn payload_616_iphone21() {
+        let plan =
+            ClassicPayloadPlan::resolve(&payload_request("iPhone2,1", "6.1.6", "10B500")).unwrap();
+        assert_eq!(
+            tar_ids(&plan),
+            [
+                "jailbreak-aquila-6",
+                "jailbreak-fstab-rw",
+                "jailbreak-bootstrap-freeze",
+                "jailbreak-lukezgd",
+            ]
+        );
+        assert!(!plan.punchd());
+    }
+
+    #[test]
+    fn payload_616_openssh() {
+        let plan = ClassicPayloadPlan::resolve(
+            &payload_request("iPhone2,1", "6.1.6", "10B500").with_openssh(true),
+        )
+        .unwrap();
+        assert_eq!(
+            tar_ids(&plan),
+            [
+                "jailbreak-aquila-6",
+                "jailbreak-fstab-rw",
+                "jailbreak-bootstrap-freeze",
+                "jailbreak-sshdeb",
+                "jailbreak-openssh",
+                "jailbreak-openssl",
+                "jailbreak-lukezgd",
+            ]
+        );
+    }
+
+    #[test]
+    fn payload_511_ipod31() {
+        let plan =
+            ClassicPayloadPlan::resolve(&payload_request("iPod3,1", "5.1.1", "9B206")).unwrap();
+        assert_eq!(
+            tar_ids(&plan),
+            [
+                "jailbreak-aquila-5",
+                "jailbreak-fstab-rw",
+                "jailbreak-bootstrap-freeze",
+                "jailbreak-cydiasubstrate",
+                "jailbreak-lukezgd",
+            ]
+        );
+    }
+
+    #[test]
+    fn payload_433_ipad11() {
+        let plan =
+            ClassicPayloadPlan::resolve(&payload_request("iPad1,1", "4.3.3", "8J2")).unwrap();
+        assert_eq!(
+            tar_ids(&plan),
+            [
+                "jailbreak-aquila-4",
+                "jailbreak-fstab-old",
+                "jailbreak-bootstrap-freeze",
+                "jailbreak-cydiasubstrate",
+            ]
+        );
+    }
+
+    #[test]
+    fn payload_41_iphone12_greenpois0n_first() {
+        let plan =
+            ClassicPayloadPlan::resolve(&payload_request("iPhone1,2", "4.1", "8B117")).unwrap();
+        assert_eq!(
+            tar_ids(&plan),
+            [
+                "greenpois0n-iPhone1-2-8B117",
+                "jailbreak-fstab-old",
+                "jailbreak-bootstrap-freeze",
+                "jailbreak-cydiasubstrate",
+            ]
+        );
+        assert!(!plan.punchd());
+    }
+
+    #[test]
+    fn payload_421_iphone21_punchd() {
+        let plan =
+            ClassicPayloadPlan::resolve(&payload_request("iPhone2,1", "4.2.1", "8C148a")).unwrap();
+        assert_eq!(
+            tar_ids(&plan),
+            [
+                "jailbreak-fstab-old",
+                "jailbreak-bootstrap-freeze",
+                "greenpois0n-iPhone2-1-8C148a",
+                "jailbreak-cydiasubstrate",
+            ]
+        );
+        assert!(plan.punchd());
+    }
+
+    #[test]
+    fn payload_421_iphone12_not_punched() {
+        let plan =
+            ClassicPayloadPlan::resolve(&payload_request("iPhone1,2", "4.2.1", "8C148")).unwrap();
+        assert_eq!(
+            tar_ids(&plan),
+            [
+                "jailbreak-fstab-old",
+                "jailbreak-bootstrap-freeze",
+                "jailbreak-cydiasubstrate",
+            ]
+        );
+        assert!(!plan.punchd());
+    }
+
+    #[test]
+    fn payload_313_iphone11() {
+        let plan =
+            ClassicPayloadPlan::resolve(&payload_request("iPhone1,1", "3.1.3", "7E18")).unwrap();
+        assert_eq!(
+            tar_ids(&plan),
+            [
+                "jailbreak-fstab-old",
+                "jailbreak-bootstrap-freeze",
+                "greenpois0n-iPhone1-1-7E18",
+                "jailbreak-cydiasubstrate",
+                "jailbreak-cydiahttpatch",
+            ]
+        );
+    }
+
+    #[test]
+    fn payload_313_openssh_is_sshdeb_only() {
+        let plan = ClassicPayloadPlan::resolve(
+            &payload_request("iPhone1,1", "3.1.3", "7E18").with_openssh(true),
+        )
+        .unwrap();
+        assert!(tar_ids(&plan).contains(&"jailbreak-sshdeb".to_owned()));
+        assert!(!tar_ids(&plan).contains(&"jailbreak-openssh".to_owned()));
+    }
+
+    #[test]
+    fn payload_313_iphone12_excluded() {
+        let plan =
+            ClassicPayloadPlan::resolve(&payload_request("iPhone1,2", "3.1.3", "7E18")).unwrap();
+        assert!(
+            !tar_ids(&plan)
+                .iter()
+                .any(|id| id.starts_with("greenpois0n-"))
+        );
+    }
+
+    #[test]
+    fn payload_313_ipod21_old_bootrom_excluded() {
+        let plan = ClassicPayloadPlan::resolve(
+            &payload_request("iPod2,1", "3.1.3", "7E18").with_24kpwn_old_bootrom(true),
+        )
+        .unwrap();
+        assert!(
+            !tar_ids(&plan)
+                .iter()
+                .any(|id| id.starts_with("greenpois0n-"))
+        );
+    }
+
+    #[test]
+    fn payload_313_ipod21_new_bootrom_gets_greenpois0n() {
+        let plan =
+            ClassicPayloadPlan::resolve(&payload_request("iPod2,1", "3.1.3", "7E18")).unwrap();
+        assert!(tar_ids(&plan).contains(&"greenpois0n-iPod2-1-7E18".to_owned()));
+    }
+
+    #[test]
+    fn payload_no_jailbreak_is_empty() {
+        let plan = ClassicPayloadPlan::resolve(&ClassicPayloadRequest::new(
+            ProductType::from("iPhone2,1"),
+            IosVersion::from("6.1.6"),
+            BuildId::from("10B500"),
+        ))
+        .unwrap();
+        assert!(plan.tars().is_empty());
+        assert!(!plan.punchd());
+    }
+
+    #[test]
+    fn payload_beta_and_iboot_sidecar_precede_jailbreak_tars() {
+        let plan = ClassicPayloadPlan::resolve(
+            &payload_request("iPhone2,1", "6.1.6", "10B500")
+                .with_beta(true)
+                .with_iboot_sidecar(true),
+        )
+        .unwrap();
+        assert_eq!(tar_ids(&plan)[..2], ["<iboot>", "<systemversion>"]);
+    }
+
+    #[test]
+    fn payload_uncataloged_greenpois0n_errors() {
+        assert!(matches!(
+            ClassicPayloadPlan::resolve(&payload_request("iPhone1,2", "4.1", "0B000")),
+            Err(ClassicBundleError::MissingUntether { .. })
         ));
     }
 }

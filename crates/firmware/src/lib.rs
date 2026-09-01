@@ -18,8 +18,8 @@ pub use archive::FirmwareArchive;
 pub use artifact::{ArtifactError, ArtifactSpec, ArtifactStore, Digest};
 pub use classic_bundle::{
     ClassicBundle, ClassicBundleError, ClassicBundleRequest, ClassicComponent,
-    ClassicFilesystemPatch, ClassicFirmwareEntry, ClassicPatch, ClassicProcessor,
-    ClassicRamdiskPatch,
+    ClassicFilesystemPatch, ClassicFirmwareEntry, ClassicPatch, ClassicPayloadPlan,
+    ClassicPayloadRequest, ClassicProcessor, ClassicRamdiskPatch, ClassicTar,
 };
 pub use custom::{CustomIpswBuilder, CustomIpswError};
 pub use keys::{FirmwareKey, FirmwareKeyError, FirmwareKeyProvider, FirmwareKeySet};
