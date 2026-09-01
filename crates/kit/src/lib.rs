@@ -19,6 +19,7 @@ mod lease;
 mod multipart;
 mod operation;
 mod pairing;
+mod powder;
 mod pwnage;
 mod ramdisk;
 mod ramdisk_boot;
@@ -88,6 +89,7 @@ pub use multipart::{
 };
 pub use operation::OperationHandle;
 pub use pairing::PairingStore;
+pub use powder::{DEFAULT_RAMDISK_GROW_BLOCKS, PowderPreparePlan, PowderPrepareRequest};
 pub use ramdisk::{RamdiskBuildRequest, RamdiskBuildSummary};
 pub use ramdisk_boot::RamdiskBootExecutionRequest;
 pub use recovery::{RecoveryDevice, RecoveryManager, RecoveryUploadResult};
@@ -326,6 +328,24 @@ impl LegacyIosKit {
         request: MultipartPrepareRequest,
     ) -> Result<MultipartIpswSummary, KitError> {
         multipart::prepare(request).await
+    }
+
+    /// Plan a powdersn0w single-IPSW custom build (upstream's
+    /// `ipsw_prepare_32bit` without `-base`): gate the device and version,
+    /// resolve the firmware bundle/config/payload plan, and fetch the
+    /// jailbreak payload resources.
+    pub async fn plan_powder_ipsw(
+        &self,
+        request: PowderPrepareRequest,
+    ) -> Result<PowderPreparePlan, KitError> {
+        powder::plan(request).await
+    }
+
+    /// Execute a powder plan: personalize the boot chain, root filesystem,
+    /// and restore ramdisk, then write the custom IPSW, reporting progress
+    /// over the returned handle.
+    pub fn execute_powder_prepare(&self, plan: PowderPreparePlan) -> OperationHandle {
+        powder::spawn(plan)
     }
 
     /// Execute a two-stage multipart restore: part 1 (NOR flash) without

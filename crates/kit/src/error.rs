@@ -50,6 +50,24 @@ pub enum KitError {
     ImagePayload(#[from] legacy_ios_image::ImagePayloadError),
     #[error("iBoot patch failed: {0}")]
     IbootPatch(#[from] legacy_ios_image::IbootPatchError),
+    #[error("powdersn0w bundle resolution failed: {0}")]
+    PowderBundle(#[from] legacy_ios_firmware::PowderBundleError),
+    #[error("powdersn0w single-IPSW builds support A4/A5/A5X/A6/A6X devices, found {0}")]
+    PowderUnsupportedDevice(String),
+    #[error("the payload plan expects an iBoot.tar sidecar but none was provided")]
+    PowderMissingIbootSidecar,
+    #[error("the restore ramdisk has no options plist at the per-board or default path")]
+    PowderMissingRamdiskOptions,
+    #[error("the firmware bundle has no {0} entry")]
+    PowderMissingComponent(&'static str),
+    #[error("powdersn0w iBoot patch failed: {0}")]
+    PowderIbootPatch(#[from] legacy_ios_image::PowderIBootError),
+    #[error("powdersn0w ASR patch failed: {0}")]
+    PowderAsrPatch(#[from] legacy_ios_image::PowderAsrError),
+    #[error("powdersn0w kernel patch failed: {0}")]
+    PowderKernelPatch(#[from] legacy_ios_image::Kernel32Error),
+    #[error("LZSS payload processing failed: {0}")]
+    Lzss(#[from] legacy_ios_image::LzssError),
     #[error("signing ticket operation failed: {0}")]
     Ticket(#[from] legacy_ios_firmware::TicketError),
     #[error("restore execution ticket does not match the plan ticket policy")]
@@ -244,6 +262,11 @@ impl KitError {
             | Self::MultipartInvalidManifest
             | Self::MultipartMissingKey(_)
             | Self::MultipartMissingIbootOutput => OperationPhase::Planning,
+            Self::PowderBundle(_)
+            | Self::PowderUnsupportedDevice(_)
+            | Self::PowderMissingIbootSidecar
+            | Self::PowderMissingRamdiskOptions
+            | Self::PowderMissingComponent(_) => OperationPhase::Planning,
             Self::MultipartStageTimeout => OperationPhase::WaitingForDevice,
             Self::RamdiskPreparation(_) => OperationPhase::Preflight,
             Self::RamdiskBoot(_) => OperationPhase::Booting,
@@ -256,6 +279,10 @@ impl KitError {
             | Self::Hfs(_)
             | Self::ImagePayload(_)
             | Self::IbootPatch(_)
+            | Self::PowderIbootPatch(_)
+            | Self::PowderAsrPatch(_)
+            | Self::PowderKernelPatch(_)
+            | Self::Lzss(_)
             | Self::Ticket(_)
             | Self::TicketPolicyMismatch
             | Self::MissingSigningDeviceInfo(_) => OperationPhase::Personalizing,
@@ -333,6 +360,10 @@ impl KitError {
             | Self::Hfs(_)
             | Self::ImagePayload(_)
             | Self::IbootPatch(_)
+            | Self::PowderIbootPatch(_)
+            | Self::PowderAsrPatch(_)
+            | Self::PowderKernelPatch(_)
+            | Self::Lzss(_)
             | Self::Ticket(_)
             | Self::TicketPolicyMismatch
             | Self::MissingSigningDeviceInfo(_)
@@ -375,6 +406,11 @@ impl KitError {
             | Self::MultipartInvalidManifest
             | Self::MultipartMissingKey(_)
             | Self::MultipartMissingIbootOutput => Recoverability::NotRecoverable,
+            Self::PowderBundle(_)
+            | Self::PowderUnsupportedDevice(_)
+            | Self::PowderMissingIbootSidecar
+            | Self::PowderMissingRamdiskOptions
+            | Self::PowderMissingComponent(_) => Recoverability::NotRecoverable,
             Self::MultipartStageTimeout => Recoverability::ReenterDfu,
         }
     }

@@ -30,6 +30,18 @@ impl HfsImage {
         &self.data
     }
 
+    /// Allocation block size of the volume in bytes.
+    pub fn block_size(&self) -> Result<u32, HfsError> {
+        Ok(self.volume()?.volume_header().block_size)
+    }
+
+    /// Total allocation blocks of the volume, mirroring the volume header's
+    /// `totalBlocks` (used by xpwn's `(totalBlocks + grow) * blockSize`
+    /// growth arithmetic).
+    pub fn total_blocks(&self) -> Result<u32, HfsError> {
+        Ok(self.volume()?.volume_header().total_blocks)
+    }
+
     pub fn into_bytes(self) -> Vec<u8> {
         self.data
     }
