@@ -153,6 +153,25 @@ impl Img3 {
         Ok(image)
     }
 
+    /// Replace the DATA payload with a block-padded body, recording the real
+    /// payload length in the element's data-size field (Apple's layout: the
+    /// encrypted body covers the padding, the declared size does not).
+    pub(crate) fn with_padded_payload(
+        &self,
+        body: Vec<u8>,
+        data_size: usize,
+    ) -> Result<Self, Img3Error> {
+        let mut image = self.clone();
+        let element = image
+            .elements
+            .iter_mut()
+            .find(|element| element.tag == Img3Tag::DATA)
+            .ok_or(Img3Error::MissingPayload)?;
+        element.data_size = data_size as u32;
+        element.body = body;
+        Ok(image)
+    }
+
     pub fn personalize(&self, signature: &[u8]) -> Result<Self, Img3Error> {
         if self.is_personalized() {
             return Ok(self.clone());

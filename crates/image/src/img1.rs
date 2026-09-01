@@ -8,10 +8,10 @@
 //! flipping two certificate bytes, extending the certificate with a 0x54-byte
 //! exploit trailer, and re-signing the header.
 //!
-//! Deviation from the C: `close8900` additionally fixes up the
-//! `dataLenPadded`/header checksum of IMG2 payloads before re-encrypting.
-//! The WTF payload is a raw ARM image, never IMG2, so that branch is not
-//! ported.
+//! `close8900` additionally fixes up the `dataLenPadded`/header checksum of
+//! IMG2 payloads before re-encrypting ([`crate::img2::fixup_nested_payload`]);
+//! the WTF payload is a raw ARM image, so the branch only fires for the
+//! IMG2-wrapped iBSS/iBEC images patched through an 8900 container.
 
 use sha1::{Digest, Sha1};
 use thiserror::Error;
@@ -146,6 +146,12 @@ impl Img1 {
     fn build(&self, payload: &[u8], exploit: bool) -> Result<Vec<u8>, Img1Error> {
         let mut data = payload.to_vec();
         if self.is_encrypted() {
+            if data.starts_with(crate::img2::IMG2_MAGIC) {
+                // close8900's IMG2-payload fixup: realign the inner
+                // dataLenPadded and refresh the IMG2 checksum before the
+                // whole payload is block-aligned and re-encrypted.
+                crate::img2::fixup_nested_payload(&mut data)?;
+            }
             // Block-align with zero padding or AES-CBC cannot re-encrypt.
             data.resize(data.len().next_multiple_of(16), 0);
             data = encrypt_cbc(&data, &KEY_0X837, &[0u8; 16])?;
@@ -224,6 +230,8 @@ pub enum Img1Error {
     UnalignedData,
     #[error("footer certificate too small for the WTF exploit")]
     CertificateTooSmall,
+    #[error("nested IMG2 payload is malformed: {0}")]
+    NestedImg2(#[from] crate::img2::Img2Error),
     #[error("8900 payload crypto failed: {0}")]
     Crypto(#[from] CryptoError),
 }
@@ -343,6 +351,86 @@ mod tests {
         // The payload survives the decrypt/re-encrypt round trip.
         let reparsed = Img1::parse(&exploited).unwrap();
         assert_eq!(reparsed.payload(), plaintext_payload());
+    }
+
+    /// Build an encrypted 8900 container around an arbitrary (padded,
+    /// encrypted) payload, signed like the C close8900.
+    fn synthetic_wrapping(payload: &[u8]) -> Vec<u8> {
+        let mut padded = payload.to_vec();
+        padded.resize(padded.len().next_multiple_of(16), 0);
+        let size_of_data = padded.len();
+        let mut header = [0u8; HEADER_SIZE];
+        header[..4].copy_from_slice(MAGIC);
+        header[OFFSET_FORMAT] = FORMAT_ENCRYPTED;
+        write_u32(&mut header, OFFSET_SIZE_OF_DATA, size_of_data as u32);
+        write_u32(&mut header, OFFSET_FOOTER_SIGNATURE, size_of_data as u32);
+        write_u32(
+            &mut header,
+            OFFSET_FOOTER_CERT,
+            (size_of_data + FOOTER_SIGNATURE_SIZE) as u32,
+        );
+        write_u32(&mut header, OFFSET_FOOTER_CERT_LEN, CERT_LEN as u32);
+        let digest = Sha1::digest(&header[..OFFSET_HEADER_SIGNATURE]);
+        let signature = encrypt_cbc(&digest[..16], &KEY_0X837, &[0u8; 16]).unwrap();
+        header[OFFSET_HEADER_SIGNATURE..OFFSET_HEADER_SIGNATURE + 16].copy_from_slice(&signature);
+
+        let encrypted = encrypt_cbc(&padded, &KEY_0X837, &[0u8; 16]).unwrap();
+        let mut image = Vec::new();
+        image.extend_from_slice(&header);
+        image.extend_from_slice(&encrypted);
+        image.extend_from_slice(&[0x77; FOOTER_SIGNATURE_SIZE]);
+        image.extend(std::iter::repeat_n(0x11, CERT_LEN));
+        image
+    }
+
+    #[test]
+    fn reseal_fixes_up_nested_img2_payload() {
+        // IMG2 payload with an unaligned dataLenPadded, as written by the
+        // inner IMG2 layer of a doPatch re-stack before close8900 runs.
+        let mut img2 = vec![0u8; crate::img2::IMG2_HEADER_SIZE + 3];
+        img2[..4].copy_from_slice(crate::img2::IMG2_MAGIC);
+        img2[0x10..0x14].copy_from_slice(&3u32.to_le_bytes()); // dataLenPadded
+        img2[0x14..0x18].copy_from_slice(&3u32.to_le_bytes()); // dataLen
+        img2[crate::img2::IMG2_HEADER_SIZE..].copy_from_slice(b"abc");
+
+        let image = synthetic_wrapping(&img2);
+        let container = Img1::parse(&image).unwrap();
+        let output = container.reseal(container.payload()).unwrap();
+        let reparsed = Img1::parse(&output).unwrap();
+        let payload = reparsed.payload();
+
+        assert!(payload.starts_with(crate::img2::IMG2_MAGIC));
+        // dataLenPadded is block-aligned and the gap zero-filled.
+        assert_eq!(
+            u32::from_le_bytes(payload[0x10..0x14].try_into().unwrap()),
+            16
+        );
+        assert_eq!(
+            u32::from_le_bytes(payload[0x14..0x18].try_into().unwrap()),
+            3
+        );
+        assert_eq!(
+            &payload[crate::img2::IMG2_HEADER_SIZE..crate::img2::IMG2_HEADER_SIZE + 3],
+            b"abc"
+        );
+        assert!(
+            payload[crate::img2::IMG2_HEADER_SIZE + 3..crate::img2::IMG2_HEADER_SIZE + 16]
+                .iter()
+                .all(|&byte| byte == 0)
+        );
+        // The IMG2 header checksum covers the aligned dataLenPadded.
+        let checksum = crc32fast::hash(&payload[..0x64]);
+        assert_eq!(
+            u32::from_le_bytes(payload[0x64..0x68].try_into().unwrap()),
+            checksum
+        );
+    }
+
+    #[test]
+    fn reseal_leaves_non_img2_payloads_alone() {
+        let image = synthetic_image(FORMAT_ENCRYPTED);
+        let container = Img1::parse(&image).unwrap();
+        assert_eq!(container.reseal(container.payload()).unwrap(), image);
     }
 
     #[test]
