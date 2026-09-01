@@ -35,7 +35,7 @@ use legacy_ios_assets::ResourceId;
 use legacy_ios_core::{ActionId, ActionKind, BoardConfig, BuildId, Ecid, ProductType};
 use legacy_ios_firmware::{
     BuildManifest, CustomIpswBuilder, FirmwareArchive, FirmwareKey, FirmwareKeyProvider,
-    FirmwareKeySet, RemoteFirmwareArchive, SigningTicket, TssClient,
+    FirmwareKeySet, RemoteFirmwareArchive, SigningTicket, TssClient, UstarBuilder,
 };
 use legacy_ios_image::{
     BootPartition, HfsImage, Iboot32PatchOptions, apply_bsdiff, extract_image_payload,
@@ -264,26 +264,9 @@ fn edit_all_flash_manifest(text: &str, add_iboot2: bool, applelogo: &AppleLogoEn
 /// Build a ustar archive holding a single file, mirroring upstream's
 /// `tar -cvf iBoot.tar iBEC` for iPad1,1 iOS 4 targets.
 fn tar_single_file(name: &str, data: &[u8]) -> Vec<u8> {
-    assert!(name.len() <= 100, "ustar file name too long");
-    let mut header = [0u8; 512];
-    header[..name.len()].copy_from_slice(name.as_bytes());
-    header[100..108].copy_from_slice(b"0000644\0");
-    header[108..116].copy_from_slice(b"0000000\0");
-    header[116..124].copy_from_slice(b"0000000\0");
-    header[124..136].copy_from_slice(format!("{:011o}\0", data.len()).as_bytes());
-    header[136..148].copy_from_slice(b"00000000000\0");
-    header[156] = b'0';
-    header[257..263].copy_from_slice(b"ustar\0");
-    header[263..265].copy_from_slice(b"00");
-    header[148..156].copy_from_slice(b"        ");
-    let checksum: u32 = header.iter().map(|byte| u32::from(*byte)).sum();
-    header[148..156].copy_from_slice(format!("{checksum:06o}\0 ").as_bytes());
-    let mut archive = Vec::new();
-    archive.extend_from_slice(&header);
-    archive.extend_from_slice(data);
-    archive.resize(archive.len().next_multiple_of(512), 0);
-    archive.resize(archive.len() + 1024, 0);
-    archive
+    let mut tar = UstarBuilder::new();
+    tar.add_file(name, data).expect("constant ustar entry name");
+    tar.finish()
 }
 
 /// options.plist file name inside the restore ramdisk, mirroring upstream:
