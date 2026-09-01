@@ -58,12 +58,13 @@ impl RestoredConnector {
                         continue;
                     }
                 };
-                let hardware = match client.query_value("HardwareInfo").await {
-                    Ok(Value::Dictionary(hardware)) => hardware,
-                    _ => continue,
-                };
-                if hardware_ecid(&hardware) != Some(ecid) {
-                    continue;
+                match restored_matches_ecid(&mut client, ecid).await {
+                    Ok(true) => {}
+                    Ok(false) => continue,
+                    Err(error) => {
+                        debug!(device_id = device.id(), %error, "restored device check failed");
+                        continue;
+                    }
                 }
                 info!(
                     protocol = service.protocol_version(),
@@ -268,6 +269,34 @@ fn hardware_ecid(hardware: &Dictionary) -> Option<Ecid> {
         .map(Ecid::new)
 }
 
+/// ECID match of a mux device against the selected device. Pre-iOS 3 restored
+/// does not implement the HardwareInfo query; when the device reports a
+/// pre-iOS 3 ProductVersion, accept it without the ECID check (idevicerestore
+/// restore.c:447-459 does the same off the target version, noting that
+/// restoring multiple pre-iOS 3 devices at once is unsupported).
+async fn restored_matches_ecid<S>(
+    client: &mut RestoredClient<S>,
+    ecid: Ecid,
+) -> Result<bool, RestoredError>
+where
+    S: AsyncRead + AsyncWrite + Unpin,
+{
+    if let Ok(Value::Dictionary(hardware)) = client.query_value("HardwareInfo").await {
+        return Ok(hardware_ecid(&hardware) == Some(ecid));
+    }
+    if let Ok(Value::String(version)) = client.query_value("ProductVersion").await
+        && is_pre_ios3(&version)
+    {
+        debug!(%version, "pre-iOS 3 restored has no HardwareInfo; skipping the ECID check");
+        return Ok(true);
+    }
+    Ok(false)
+}
+
+fn is_pre_ios3(version: &str) -> bool {
+    matches!(version.split('.').next(), Some("1" | "2"))
+}
+
 #[derive(Debug, Error)]
 pub enum RestoredConnectError {
     #[error("timed out waiting for the selected device in Restore mode")]
@@ -293,11 +322,76 @@ pub enum FdrServiceError {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::PlistFramed;
 
     #[test]
     fn reads_hardware_ecid() {
         let mut hardware = Dictionary::new();
         hardware.insert("UniqueChipID".into(), 42_u64.into());
         assert_eq!(hardware_ecid(&hardware), Some(Ecid::new(42)));
+    }
+
+    #[test]
+    fn detects_pre_ios3_versions() {
+        assert!(is_pre_ios3("2.2.1"));
+        assert!(is_pre_ios3("1.1.4"));
+        assert!(!is_pre_ios3("3.1.3"));
+        assert!(!is_pre_ios3("10.3.3"));
+    }
+
+    #[tokio::test]
+    async fn pre_ios3_restored_skips_the_hardware_info_check() {
+        let (client_stream, server_stream) = tokio::io::duplex(4096);
+        let mut client = RestoredClient::new(client_stream, "test");
+        let server = tokio::spawn(async move {
+            let mut framed = PlistFramed::new(server_stream);
+            let request = framed.receive().await.unwrap();
+            assert_eq!(
+                request.get("QueryKey").and_then(Value::as_string),
+                Some("HardwareInfo")
+            );
+            // Pre-iOS 3 restored answers with no value for unknown keys.
+            framed.send(&Dictionary::new()).await.unwrap();
+
+            let request = framed.receive().await.unwrap();
+            assert_eq!(
+                request.get("QueryKey").and_then(Value::as_string),
+                Some("ProductVersion")
+            );
+            let mut response = Dictionary::new();
+            response.insert("ProductVersion".into(), "2.2.1".into());
+            framed.send(&response).await.unwrap();
+        });
+
+        let matches = restored_matches_ecid(&mut client, Ecid::new(42))
+            .await
+            .unwrap();
+        server.await.unwrap();
+        assert!(matches);
+    }
+
+    #[tokio::test]
+    async fn modern_restored_still_requires_a_matching_ecid() {
+        let (client_stream, server_stream) = tokio::io::duplex(4096);
+        let mut client = RestoredClient::new(client_stream, "test");
+        let server = tokio::spawn(async move {
+            let mut framed = PlistFramed::new(server_stream);
+            let request = framed.receive().await.unwrap();
+            assert_eq!(
+                request.get("QueryKey").and_then(Value::as_string),
+                Some("HardwareInfo")
+            );
+            let mut response = Dictionary::new();
+            let mut hardware = Dictionary::new();
+            hardware.insert("UniqueChipID".into(), 43_u64.into());
+            response.insert("HardwareInfo".into(), hardware.into());
+            framed.send(&response).await.unwrap();
+        });
+
+        let matches = restored_matches_ecid(&mut client, Ecid::new(42))
+            .await
+            .unwrap();
+        server.await.unwrap();
+        assert!(!matches);
     }
 }

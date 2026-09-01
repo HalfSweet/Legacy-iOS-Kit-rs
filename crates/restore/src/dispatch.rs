@@ -1,7 +1,7 @@
 use plist::{Dictionary, Value};
 use thiserror::Error;
 
-use crate::DataType;
+use crate::{DataRequest, DataType};
 
 #[derive(Clone, Debug, Default)]
 pub struct PreparedRestoreData {
@@ -11,6 +11,7 @@ pub struct PreparedRestoreData {
     system_image_root_hash: Option<Vec<u8>>,
     system_image_canonical_metadata: Option<Vec<u8>>,
     nor: Option<Dictionary>,
+    nor_version_1: Option<Dictionary>,
     baseband: Option<Dictionary>,
     fud: Option<Dictionary>,
     firmware_updater: Option<Dictionary>,
@@ -47,6 +48,14 @@ impl PreparedRestoreData {
         self
     }
 
+    /// Alternative NOR response for requests whose `Arguments` carry the
+    /// `FlashVersion1` flag (old devices): `NorImageData` is a dictionary
+    /// keyed by component name instead of an array.
+    pub fn with_nor_version_1(mut self, response: Dictionary) -> Self {
+        self.nor_version_1 = Some(response);
+        self
+    }
+
     pub fn with_baseband(mut self, response: Dictionary) -> Self {
         self.baseband = Some(response);
         self
@@ -62,8 +71,8 @@ impl PreparedRestoreData {
         self
     }
 
-    pub fn dispatch(&self, data_type: &DataType) -> Result<DispatchAction, RestoreDispatchError> {
-        match data_type {
+    pub fn dispatch(&self, request: &DataRequest) -> Result<DispatchAction, RestoreDispatchError> {
+        match request.data_type() {
             DataType::SystemImage => Ok(DispatchAction::SystemImage),
             DataType::RootTicket => {
                 let mut response = Dictionary::new();
@@ -86,7 +95,19 @@ impl PreparedRestoreData {
                 "SystemImageCanonicalMetadataFile",
                 "SystemImageCanonicalMetadata",
             ),
-            DataType::Nor => response(&self.nor, "NORData"),
+            DataType::Nor => {
+                // Old devices request NORData with Arguments.FlashVersion1 and
+                // expect the component-keyed dictionary form; fall back to the
+                // prepared response when no FlashVersion1 form was prepared.
+                let nor = if request.flash_version_1() {
+                    self.nor_version_1.as_ref().or(self.nor.as_ref())
+                } else {
+                    self.nor.as_ref()
+                };
+                nor.cloned()
+                    .map(DispatchAction::Send)
+                    .ok_or(RestoreDispatchError::MissingData("NORData"))
+            }
             DataType::Baseband => response(&self.baseband, "BasebandData"),
             DataType::FdrTrust => Ok(DispatchAction::Send(Dictionary::new())),
             DataType::Fud => response(&self.fud, "FUDData"),
@@ -139,11 +160,29 @@ pub enum RestoreDispatchError {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::RestoredMessage;
+
+    fn data_request(data_type: &str, flash_version_1: bool) -> DataRequest {
+        let mut message = Dictionary::new();
+        message.insert("MsgType".into(), "DataRequestMsg".into());
+        message.insert("DataType".into(), data_type.into());
+        if flash_version_1 {
+            let mut arguments = Dictionary::new();
+            arguments.insert("FlashVersion1".into(), true.into());
+            message.insert("Arguments".into(), arguments.into());
+        }
+        let RestoredMessage::DataRequest(request) = RestoredMessage::parse(message) else {
+            panic!("expected data request");
+        };
+        request
+    }
 
     #[test]
     fn builds_root_ticket_response() {
         let prepared = PreparedRestoreData::default().with_root_ticket(vec![1, 2, 3]);
-        let DispatchAction::Send(response) = prepared.dispatch(&DataType::RootTicket).unwrap()
+        let DispatchAction::Send(response) = prepared
+            .dispatch(&data_request("RootTicket", false))
+            .unwrap()
         else {
             panic!("expected plist response");
         };
@@ -151,5 +190,63 @@ mod tests {
             response.get("RootTicketData").and_then(Value::as_data),
             Some([1, 2, 3].as_slice())
         );
+    }
+
+    #[test]
+    fn nor_response_follows_the_flash_version_1_flag() {
+        let mut array_nor = Dictionary::new();
+        array_nor.insert("LlbImageData".into(), Value::Data(vec![1]));
+        array_nor.insert(
+            "NorImageData".into(),
+            Value::Array(vec![Value::Data(vec![2])]),
+        );
+        let mut dict_nor = Dictionary::new();
+        dict_nor.insert("LlbImageData".into(), Value::Data(vec![1]));
+        let mut images = Dictionary::new();
+        images.insert("iBoot".into(), Value::Data(vec![2]));
+        dict_nor.insert("NorImageData".into(), images.into());
+        let prepared = PreparedRestoreData::default()
+            .with_nor(array_nor)
+            .with_nor_version_1(dict_nor);
+
+        let DispatchAction::Send(response) =
+            prepared.dispatch(&data_request("NORData", true)).unwrap()
+        else {
+            panic!("expected plist response");
+        };
+        assert!(
+            response
+                .get("NorImageData")
+                .and_then(Value::as_dictionary)
+                .is_some_and(|images| images.contains_key("iBoot")),
+            "FlashVersion1 requests expect the component-keyed dictionary"
+        );
+
+        let DispatchAction::Send(response) =
+            prepared.dispatch(&data_request("NORData", false)).unwrap()
+        else {
+            panic!("expected plist response");
+        };
+        assert!(
+            response
+                .get("NorImageData")
+                .and_then(Value::as_array)
+                .is_some(),
+            "requests without FlashVersion1 keep the array form"
+        );
+    }
+
+    #[test]
+    fn flash_version_1_falls_back_to_the_prepared_nor_response() {
+        let mut array_nor = Dictionary::new();
+        array_nor.insert("LlbImageData".into(), Value::Data(vec![1]));
+        let prepared = PreparedRestoreData::default().with_nor(array_nor);
+
+        let DispatchAction::Send(response) =
+            prepared.dispatch(&data_request("NORData", true)).unwrap()
+        else {
+            panic!("expected plist response");
+        };
+        assert!(response.contains_key("LlbImageData"));
     }
 }

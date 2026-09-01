@@ -92,7 +92,7 @@ where
                         .map_err(RestoreRunError::data_provider)?;
                     Ok(DispatchAction::Send(response))
                 } else {
-                    Ok(prepared_data.dispatch(request.data_type())?)
+                    Ok(prepared_data.dispatch(&request)?)
                 }
             }
         },

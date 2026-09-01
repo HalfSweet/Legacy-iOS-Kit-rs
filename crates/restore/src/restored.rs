@@ -172,6 +172,17 @@ impl DataRequest {
     pub fn data_port(&self) -> Option<u16> {
         unsigned(&self.message, "DataPort").and_then(|port| u16::try_from(port).ok())
     }
+
+    /// Whether the request's `Arguments` carry the `FlashVersion1` flag, in
+    /// which case the NOR response's `NorImageData` is a dictionary keyed by
+    /// component name instead of an array (idevicerestore `restore_send_nor`,
+    /// restore.c:1626 checks key presence, not the value).
+    pub fn flash_version_1(&self) -> bool {
+        self.message
+            .get("Arguments")
+            .and_then(Value::as_dictionary)
+            .is_some_and(|arguments| arguments.contains_key("FlashVersion1"))
+    }
 }
 
 #[derive(Clone, Debug)]

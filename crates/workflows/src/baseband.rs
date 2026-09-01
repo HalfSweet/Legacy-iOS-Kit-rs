@@ -116,6 +116,24 @@ impl BasebandResolver {
         Self::from_firmware(plan, plan.firmware(), tss)
     }
 
+    /// Resolve against an already-opened archive and build identity (used by
+    /// callers without a [`RestorePlan`], e.g. classic foreign restores).
+    pub fn from_identity(
+        archive: FirmwareArchive,
+        identity: BuildIdentity,
+        tss: TssClient,
+        ecid: legacy_ios_core::Ecid,
+    ) -> Result<Self, BasebandRequestError> {
+        let firmware_path = identity.component_path("BasebandFirmware")?.to_owned();
+        Ok(Self {
+            archive,
+            identity,
+            firmware_path,
+            tss,
+            ecid,
+        })
+    }
+
     pub fn from_firmware(
         plan: &RestorePlan,
         firmware: &std::path::Path,
@@ -128,18 +146,11 @@ impl BasebandResolver {
             .board_config()
             .ok_or(BasebandRequestError::MissingBoardConfig)?;
         let identity = manifest.select_identity(board, plan.behavior())?.clone();
-        let firmware_path = identity.component_path("BasebandFirmware")?.to_owned();
         let ecid = plan
             .device()
             .ecid()
             .ok_or(BasebandRequestError::MissingEcid)?;
-        Ok(Self {
-            archive,
-            identity,
-            firmware_path,
-            tss,
-            ecid,
-        })
+        Self::from_identity(archive, identity, tss, ecid)
     }
 
     pub async fn resolve(&self, request: &DataRequest) -> Result<Dictionary, BasebandRequestError> {
@@ -148,24 +159,7 @@ impl BasebandResolver {
             .get("Arguments")
             .and_then(Value::as_dictionary)
             .ok_or(BasebandRequestError::MissingArgument("Arguments"))?;
-        let chip_id = required_unsigned(arguments, "ChipID")?;
-        let chip_id =
-            u32::try_from(chip_id).map_err(|_| BasebandRequestError::MissingArgument("ChipID"))?;
-        let certificate_id = required_unsigned(arguments, "CertID")?;
-        let serial_number = arguments
-            .get("ChipSerialNo")
-            .and_then(Value::as_data)
-            .ok_or(BasebandRequestError::MissingArgument("ChipSerialNo"))?
-            .to_vec();
-        let nonce = arguments
-            .get("Nonce")
-            .and_then(Value::as_data)
-            .map(ToOwned::to_owned);
-        let mut parameters =
-            BasebandParameters::new(self.ecid, u64::from(chip_id), certificate_id, serial_number);
-        if let Some(nonce) = &nonce {
-            parameters = parameters.with_nonce(nonce.clone());
-        }
+        let (parameters, nonce, chip_id) = baseband_parameters(arguments, self.ecid)?;
         let request = TssRequest::for_baseband(&self.identity, &parameters)?;
         let response = self.tss.send(&request).await?;
         let archive = self.archive.clone();
@@ -184,6 +178,33 @@ impl BasebandResolver {
         .map_err(|error| BasebandRequestError::Task(error.to_string()))??;
         Ok(signed.into_restore_response())
     }
+}
+
+/// Live baseband TSS parameters of a restored BasebandData request
+/// (idevicerestore `restore_send_baseband_data`, restore.c:2314-2346).
+fn baseband_parameters(
+    arguments: &Dictionary,
+    ecid: legacy_ios_core::Ecid,
+) -> Result<(BasebandParameters, Option<Vec<u8>>, u32), BasebandRequestError> {
+    let chip_id = required_unsigned(arguments, "ChipID")?;
+    let chip_id =
+        u32::try_from(chip_id).map_err(|_| BasebandRequestError::MissingArgument("ChipID"))?;
+    let certificate_id = required_unsigned(arguments, "CertID")?;
+    let serial_number = arguments
+        .get("ChipSerialNo")
+        .and_then(Value::as_data)
+        .ok_or(BasebandRequestError::MissingArgument("ChipSerialNo"))?
+        .to_vec();
+    let nonce = arguments
+        .get("Nonce")
+        .and_then(Value::as_data)
+        .map(ToOwned::to_owned);
+    let mut parameters =
+        BasebandParameters::new(ecid, u64::from(chip_id), certificate_id, serial_number);
+    if let Some(nonce) = &nonce {
+        parameters = parameters.with_nonce(nonce.clone());
+    }
+    Ok((parameters, nonce, chip_id))
 }
 
 fn required_unsigned(
@@ -314,7 +335,39 @@ pub enum BasebandError {
 
 #[cfg(test)]
 mod tests {
+    use legacy_ios_core::Ecid;
+
     use super::*;
+
+    #[test]
+    fn parses_baseband_tss_parameters_from_request_arguments() {
+        let mut arguments = Dictionary::new();
+        arguments.insert("ChipID".into(), 0x5a00e1_u64.into());
+        arguments.insert("CertID".into(), 257_u64.into());
+        arguments.insert("ChipSerialNo".into(), Value::Data(vec![1, 2, 3, 4]));
+        arguments.insert("Nonce".into(), Value::Data(vec![5, 6]));
+
+        let (parameters, nonce, chip_id) = baseband_parameters(&arguments, Ecid::new(42)).unwrap();
+        assert_eq!(parameters.ecid, Ecid::new(42));
+        assert_eq!(parameters.chip_id, 0x5a00e1);
+        assert_eq!(parameters.gold_cert_id, 257);
+        assert_eq!(parameters.serial_number, [1, 2, 3, 4]);
+        assert_eq!(nonce.as_deref(), Some([5, 6].as_slice()));
+        assert_eq!(parameters.nonce.as_deref(), Some([5, 6].as_slice()));
+        assert_eq!(chip_id, 0x5a00e1);
+    }
+
+    #[test]
+    fn baseband_parameters_require_chip_serial_number() {
+        let mut arguments = Dictionary::new();
+        arguments.insert("ChipID".into(), 1_u64.into());
+        arguments.insert("CertID".into(), 2_u64.into());
+
+        assert!(matches!(
+            baseband_parameters(&arguments, Ecid::new(42)),
+            Err(BasebandRequestError::MissingArgument("ChipSerialNo"))
+        ));
+    }
 
     #[test]
     fn signs_mbn_and_embeds_ticket() {

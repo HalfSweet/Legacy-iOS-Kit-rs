@@ -24,11 +24,7 @@ where
     P: FnMut(RestoreProgress),
 {
     let dispatch = |request: DataRequest| {
-        std::future::ready(
-            prepared
-                .dispatch(request.data_type())
-                .map_err(RestoreRunError::from),
-        )
+        std::future::ready(prepared.dispatch(&request).map_err(RestoreRunError::from))
     };
     run_restored_session_with_dispatcher(session, options, dispatch, send_system_image, progress)
         .await
@@ -83,11 +79,7 @@ where
     P: FnMut(RestoreProgress),
 {
     let dispatch = |request: DataRequest| {
-        std::future::ready(
-            prepared
-                .dispatch(request.data_type())
-                .map_err(RestoreRunError::from),
-        )
+        std::future::ready(prepared.dispatch(&request).map_err(RestoreRunError::from))
     };
     run_restored_with_dispatcher(
         client,
@@ -119,11 +111,7 @@ where
     P: FnMut(RestoreProgress),
 {
     let dispatch = |request: DataRequest| {
-        std::future::ready(
-            prepared
-                .dispatch(request.data_type())
-                .map_err(RestoreRunError::from),
-        )
+        std::future::ready(prepared.dispatch(&request).map_err(RestoreRunError::from))
     };
     run_restored_with_dispatcher(
         client,

@@ -841,7 +841,7 @@ async fn execute(
         &options,
         move |request: DataRequest| {
             let prepared = prepared.clone();
-            async move { Ok(prepared.dispatch(request.data_type())?) }
+            async move { Ok(prepared.dispatch(&request)?) }
         },
         move |port| {
             let data_connector = data_connector.clone();
