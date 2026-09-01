@@ -1422,3 +1422,20 @@ size = 100352
 purpose = "FourThree dualboot companion app installed on iOS 8.4.1"
 redistribution = "download-only"
 
+[[resources]]
+id = "alloc8-shellcode"
+source_url = "https://raw.githubusercontent.com/LukeZGD/ipwndfu/58effb3826e0b668073317b81aa36074f1a6af74/bin/alloc8-shellcode.bin"
+source_commit = "58effb3826e0b668073317b81aa36074f1a6af74"
+sha256 = "9d35bf37d5ed9d453529bcf6ef769f35902f7f9a2265e58cf439ceaa797e7ce7"
+size = 436
+purpose = "alloc8 bootrom exploit NOR-installer shellcode for new-bootrom S5L8920, by axi0mX (ipwndfu, GPL-3.0); trailing constants are placeholders patched at install time"
+redistribution = "download-only"
+
+[[resources]]
+id = "alloc8-ibss-flash-nor-shellcode"
+source_url = "https://raw.githubusercontent.com/LukeZGD/ipwndfu/58effb3826e0b668073317b81aa36074f1a6af74/bin/ibss-flash-nor-shellcode.bin"
+source_commit = "58effb3826e0b668073317b81aa36074f1a6af74"
+sha256 = "4be13348e91e008b40787435f47cf97ee0e44ceac2ade248fa63f13487e4be21"
+size = 128
+purpose = "iBSS payload that writes the alloc8-modified NOR image on S5L8920, by axi0mX (ipwndfu, GPL-3.0)"
+redistribution = "download-only"
