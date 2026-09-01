@@ -1036,6 +1036,10 @@ enum FirmwareCommand {
         /// assembles payloads in memory.
         #[arg(long)]
         memory: bool,
+        /// Local iPhone1,2 4.1 (8B117) IPSW supplying the 4.2.1 patchcomp
+        /// components; fetched from the pinned Apple URL when omitted.
+        #[arg(long)]
+        ios41_ipsw: Option<PathBuf>,
         /// Output path of the custom IPSW.
         #[arg(long, short = 'o')]
         output_ipsw: PathBuf,
@@ -3078,6 +3082,7 @@ async fn main() -> Result<()> {
                     iboot,
                     latest_version,
                     memory,
+                    ios41_ipsw,
                     output_ipsw,
                     cache_dir,
                 },
@@ -3101,7 +3106,8 @@ async fn main() -> Result<()> {
             .with_hacktivate(hacktivate)
             .with_beta(beta)
             .with_24kpwn_old_bootrom(old_bootrom_24kpwn)
-            .with_disable_baseband_update(disable_bbupdate);
+            .with_disable_baseband_update(disable_bbupdate)
+            .with_ios41_ipsw(ios41_ipsw);
             if let Some(version) = latest_version {
                 request = request.with_latest_version(IosVersion::from(version.as_str()));
             }

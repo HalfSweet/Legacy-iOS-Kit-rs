@@ -6,6 +6,7 @@ mod alloc8;
 mod baseband;
 mod bootstrap;
 mod classic;
+mod classic_post;
 mod device;
 mod erase;
 mod error;
@@ -38,6 +39,10 @@ pub use bootstrap::{
     BootstrapPackages, BootstrapSelection, bootstrap_selection, gunzip, select_untether7,
 };
 pub use classic::{ClassicPreparePlan, ClassicPrepareRequest, DEFAULT_CLASSIC_RAMDISK_GROW_BLOCKS};
+pub use classic_post::{
+    IOS4P_BOOT_ARGS, IOS41_BUILD, IOS41_IPSW_URL, IOS41_VERSION, PatchcompComponent,
+    ios4patches_apply, patchcomp_components,
+};
 pub use device::{
     BackendFailure, DeviceDiagnostics, DeviceInventory, DeviceManager, DeviceSummary,
 };

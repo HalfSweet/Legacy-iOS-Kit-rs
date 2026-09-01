@@ -31,16 +31,22 @@
 //! "WTF 2" entry, and gets the rewritten options plist
 //! (`createRestoreOptions`); old mode re-encrypts it with the same keys.
 //!
+//! After the builder's own stages, the patchcomp post-steps of
+//! `ipsw_prepare_s5l8900`/`ipsw_prepare_custom` and the iPhone2,1 >=5.x
+//! `ipsw_prepare_ios4patches` tail replace whole custom-IPSW entries with
+//! precomputed bundle diffs over the stock components
+//! ([`crate::classic_post`]). `ipsw_bbreplace` never applies to a classic
+//! flow (restore.sh:4350-4351 returns early for `device_proc < 5`).
+//!
 //! Not modeled (never reachable from the classic call sites upstream):
 //! main.c's `-s`/`-e`/`-ota`/`-daibutsu`/`-memory` flags (memory output is
 //! inherent), the `Update Ramdisk` and `DeleteBaseband` bundle keys (no
 //! classic bundle emits them), the `IsPlain` entry flag, the ibootim layer of
 //! the container stack (iOS 1.x era), `needPref` (no classic bundle sets it;
-//! the write step is ported but inert), and the post-`ipsw` steps of
-//! `ipsw_prepare_custom`/`ipsw_prepare_s5l8900` (`ipsw_prepare_patchcomp`
-//! LLB/iBoot/kernelcache/WTF2/iBEC/iBSS patching, Cydia package untar). The
-//! output stays a deflated IPSW written through [`CustomIpswBuilder`]
-//! (upstream stores entries; same as the powder builder).
+//! the write step is ported but inert), and the Cydia package untar of the
+//! post-`ipsw` steps. The output stays a deflated IPSW written through
+//! [`CustomIpswBuilder`] (upstream stores entries; same as the powder
+//! builder).
 
 use std::{fmt, io::Cursor, path::PathBuf};
 
@@ -93,6 +99,7 @@ pub struct ClassicPrepareRequest {
     iboot_sidecar: Option<(String, Vec<u8>)>,
     extra_tars: Vec<(String, Vec<u8>)>,
     latest_version: Option<IosVersion>,
+    ios41_ipsw: Option<PathBuf>,
 }
 
 impl ClassicPrepareRequest {
@@ -119,6 +126,7 @@ impl ClassicPrepareRequest {
             iboot_sidecar: None,
             extra_tars: Vec::new(),
             latest_version: None,
+            ios41_ipsw: None,
         }
     }
 
@@ -197,6 +205,14 @@ impl ClassicPrepareRequest {
         self.latest_version = Some(version);
         self
     }
+
+    /// Local iPhone1,2 4.1 (8B117) IPSW override for the 4.2.1 patchcomp
+    /// components (upstream downloads it into `saved/iPhone1,2/8B117` when
+    /// absent). Defaults to fetching from the pinned Apple URL.
+    pub fn with_ios41_ipsw(mut self, path: Option<PathBuf>) -> Self {
+        self.ios41_ipsw = path;
+        self
+    }
 }
 
 impl fmt::Debug for ClassicPrepareRequest {
@@ -249,6 +265,9 @@ pub struct ClassicPreparePlan {
     /// main.c's `needPref`: never set by classic bundles upstream, so the
     /// write step in the root filesystem stage is inert. Kept for parity.
     need_pref: bool,
+    /// The post-build patchcomp / `ipsw_prepare_ios4patches` steps, applied
+    /// after the builder's own stages ([`crate::classic_post`]).
+    post_steps: crate::classic_post::ClassicPostSteps,
 }
 
 impl ClassicPreparePlan {
@@ -522,6 +541,29 @@ pub(crate) async fn plan(request: ClassicPrepareRequest) -> Result<ClassicPrepar
     let update_baseband = profile.has_baseband() && !request.disable_baseband_update;
     let jailbreak = request.jailbreak;
 
+    // Post-`ipsw` steps of ipsw_prepare_s5l8900 / ipsw_prepare_custom /
+    // ipsw_prepare_ios4patches (classic_post). Empty for the devices and
+    // versions that reach none of them.
+    let post_steps = crate::classic_post::ClassicPostSteps {
+        patchcomp: crate::classic_post::resolve_patchcomp(
+            &request.product_type,
+            &request.board_config,
+            version.as_str(),
+            &build,
+            request.jailbreak,
+            request.old_bootrom_24kpwn,
+            request.ios41_ipsw.as_deref(),
+            &request.cache_root,
+        )
+        .await?,
+        ios4_boot: crate::classic_post::resolve_ios4patches(
+            &request.product_type,
+            &request.board_config,
+            version.as_str(),
+            &keys,
+        )?,
+    };
+
     let plan = ClassicPreparePlan {
         source: request.source,
         destination: request.destination,
@@ -541,6 +583,7 @@ pub(crate) async fn plan(request: ClassicPrepareRequest) -> Result<ClassicPrepar
         update_baseband,
         ramdisk_grow_blocks: request.ramdisk_grow_blocks,
         need_pref: false,
+        post_steps,
     };
     info!(
         product = %plan.product_type,
@@ -570,7 +613,7 @@ async fn execute(plan: ClassicPreparePlan, emitter: &OperationEmitter) -> Result
             cancellation: CancellationSafety::UnsafeUntilPhaseEnds,
         })
         .await;
-    let stages = (plan.stages.len() + 2) as u64;
+    let stages = (plan.stages.len() + 2 + usize::from(plan.post_steps.len() > 0)) as u64;
     let source = plan.source.clone();
     let destination = plan.destination.clone();
     let summary_text = format!(
@@ -761,6 +804,20 @@ fn assemble(
         personalize_ramdisk(plan, &ramdisk_container, encryption)?,
     ));
     progress(emitter, completed + 1);
+    completed += 1;
+
+    if plan.post_steps.len() > 0 {
+        // The patchcomp / ios4patches replacements overwrite same-name
+        // entries written by the stages above (CustomIpswBuilder::replace
+        // semantics), like upstream's `zip -r0` updates.
+        info!("applying post-build component patches");
+        replacements.extend(crate::classic_post::apply_post_steps(
+            &plan.post_steps,
+            &archive,
+        )?);
+        completed += 1;
+        progress(emitter, completed);
+    }
 
     Ok(replacements)
 }
