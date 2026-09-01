@@ -94,7 +94,7 @@ pub use legacy_ios_workflows::{
     BasebandPolicy, DestructiveConsent, ExploitPolicy, NoncePolicy, PlanId, RamdiskBootComponent,
     RamdiskBootPlan, RamdiskBootPlanError, RamdiskBootPlanStep, RamdiskBootRequest,
     RamdiskBootStepKind, RestoreComponent, RestorePlan, RestorePlanError, RestoreRequest,
-    RestoreStep, RestoreStepKind, SepPolicy, TicketPolicy,
+    RestoreStep, RestoreStepKind, RsepPolicy, SepPolicy, TicketPolicy,
 };
 pub use multipart::{
     MULTIPART_IBOOT_BOOT_ARGS, MULTIPART_IBOOT_BOOT_ARGS_VERBOSE, MULTIPART_NOR_BUILD,

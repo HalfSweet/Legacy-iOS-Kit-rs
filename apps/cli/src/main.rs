@@ -22,7 +22,7 @@ use legacy_ios_kit::{
     PowderTicketSource, ProductType, RamdiskBootExecutionRequest, RamdiskBootRequest,
     RamdiskBuildRequest, RamdiskBuildSummary, RamdiskSsh, RecoveryDeviceInfo, RecoveryUploadResult,
     RemoteFirmwareSummary, ResourceId, RestoreBehavior, RestoreExecutionRequest, RestorePlan,
-    RestoreRequest, ScpPath, SepPolicy, ShshRequest, ShshSummary, SigningTicket, Soc,
+    RestoreRequest, RsepPolicy, ScpPath, SepPolicy, ShshRequest, ShshSummary, SigningTicket, Soc,
     SshCommandOutput, SshPassword, SshTarget, TicketPolicy, Udid, UsbHostDiagnostics,
     extract_apticket_der,
 };
@@ -1275,6 +1275,14 @@ enum RestoreCommand {
         /// Do not send Restore SEP firmware to the device.
         #[arg(long, conflicts_with = "sep")]
         no_sep: bool,
+        /// Send RestoreSEP when entering restore mode (overrides the
+        /// version-based default, which sends only for iOS 16+ targets).
+        #[arg(long, conflicts_with = "no_rsep")]
+        rsep: bool,
+        /// Do not send RestoreSEP when entering restore mode (futurerestore
+        /// `--no-rsep`).
+        #[arg(long)]
+        no_rsep: bool,
         #[arg(long, value_enum, default_value_t = ExploitArg::Auto)]
         exploit: ExploitArg,
         /// Write the ticket generator to the device boot nonce NVRAM variable.
@@ -1313,6 +1321,14 @@ enum RestoreCommand {
         /// Do not send Restore SEP firmware to the device.
         #[arg(long, conflicts_with = "sep")]
         no_sep: bool,
+        /// Send RestoreSEP when entering restore mode (overrides the
+        /// version-based default, which sends only for iOS 16+ targets).
+        #[arg(long, conflicts_with = "no_rsep")]
+        rsep: bool,
+        /// Do not send RestoreSEP when entering restore mode (futurerestore
+        /// `--no-rsep`).
+        #[arg(long)]
+        no_rsep: bool,
         #[arg(long)]
         flash_version_1: bool,
         /// Write the ticket generator to the device boot nonce NVRAM variable.
@@ -3285,6 +3301,8 @@ async fn main() -> Result<()> {
                     no_baseband,
                     sep,
                     no_sep,
+                    rsep,
+                    no_rsep,
                     exploit,
                     set_nonce,
                 },
@@ -3319,6 +3337,7 @@ async fn main() -> Result<()> {
                     ticket,
                     baseband,
                     sep,
+                    rsep: rsep_policy(rsep, no_rsep),
                     exploit: exploit.into(),
                     nonce: nonce_policy(set_nonce),
                 })
@@ -3342,6 +3361,8 @@ async fn main() -> Result<()> {
                     no_baseband,
                     sep,
                     no_sep,
+                    rsep,
+                    no_rsep,
                     flash_version_1,
                     set_nonce,
                     yes,
@@ -3371,6 +3392,7 @@ async fn main() -> Result<()> {
                 } else {
                     sep.map_or(SepPolicy::Auto, SepPolicy::Provided)
                 },
+                rsep: rsep_policy(rsep, no_rsep),
                 exploit: exploit.into(),
                 nonce: nonce_policy(set_nonce),
             })?;
@@ -3435,6 +3457,7 @@ async fn main() -> Result<()> {
                     // The part 1 ramdisk options disable the baseband update.
                     baseband: BasebandPolicy::None,
                     sep: SepPolicy::Auto,
+                    rsep: RsepPolicy::Auto,
                     exploit: exploit.into(),
                     nonce: NoncePolicy::Manual,
                 })
@@ -3459,6 +3482,7 @@ async fn main() -> Result<()> {
                         BasebandPolicy::Auto
                     },
                     sep: SepPolicy::Auto,
+                    rsep: RsepPolicy::Auto,
                     exploit: exploit.into(),
                     nonce: NoncePolicy::Manual,
                 })
@@ -4228,6 +4252,16 @@ const fn nonce_policy(set_nonce: bool) -> NoncePolicy {
         NoncePolicy::Auto
     } else {
         NoncePolicy::Manual
+    }
+}
+
+const fn rsep_policy(rsep: bool, no_rsep: bool) -> RsepPolicy {
+    if no_rsep {
+        RsepPolicy::Skip
+    } else if rsep {
+        RsepPolicy::Send
+    } else {
+        RsepPolicy::Auto
     }
 }
 

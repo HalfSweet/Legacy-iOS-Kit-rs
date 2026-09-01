@@ -17,6 +17,7 @@ pub struct RestoreRequest {
     pub ticket: TicketPolicy,
     pub baseband: BasebandPolicy,
     pub sep: SepPolicy,
+    pub rsep: RsepPolicy,
     pub exploit: ExploitPolicy,
     pub nonce: NoncePolicy,
 }
@@ -46,6 +47,21 @@ pub enum SepPolicy {
     /// Do not send RestoreSEP during boot or SEP data in the NOR response.
     None,
     Provided(PathBuf),
+}
+
+/// Whether the recovery-mode boot chain uploads RestoreSEP and issues the
+/// `rsepfirmware` command (futurerestore `--no-rsep`; idevicerestore
+/// recovery.c:234-243). Independent of [`SepPolicy`], which also controls the
+/// NOR response.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum RsepPolicy {
+    /// Send RestoreSEP only for iOS 16+ targets (the iPhone X flow, which
+    /// always sends, is not implemented yet).
+    #[default]
+    Auto,
+    Send,
+    Skip,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -90,6 +106,7 @@ pub struct RestorePlan {
     ticket: TicketPolicy,
     baseband: BasebandPolicy,
     sep: SepPolicy,
+    rsep: RsepPolicy,
     exploit: ExploitPolicy,
     nonce: NoncePolicy,
     components: Vec<RestoreComponent>,
@@ -156,6 +173,13 @@ impl RestorePlan {
             return Err(RestorePlanError::UnsupportedProduct);
         }
         let identity = manifest.select_identity(board_config, request.behavior)?;
+        let rsep = match request.rsep {
+            RsepPolicy::Auto => match major_version(manifest.product_version().as_str()) {
+                Some(major) if major >= 16 => RsepPolicy::Send,
+                _ => RsepPolicy::Skip,
+            },
+            policy => policy,
+        };
         let components = identity
             .component_paths()
             .map(|(name, path)| RestoreComponent {
@@ -168,6 +192,7 @@ impl RestorePlan {
             &request,
             manifest.product_version().as_str(),
             manifest.build_id().as_str(),
+            rsep,
         );
 
         Ok(Self {
@@ -181,6 +206,7 @@ impl RestorePlan {
             ticket: request.ticket,
             baseband: request.baseband,
             sep: request.sep,
+            rsep,
             exploit: request.exploit,
             nonce: request.nonce,
             components,
@@ -230,6 +256,11 @@ impl RestorePlan {
 
     pub fn sep_policy(&self) -> &SepPolicy {
         &self.sep
+    }
+
+    /// Resolved RestoreSEP send decision; never [`RsepPolicy::Auto`].
+    pub const fn rsep_policy(&self) -> RsepPolicy {
+        self.rsep
     }
 
     pub const fn exploit_policy(&self) -> ExploitPolicy {
@@ -354,9 +385,14 @@ const fn step(
     }
 }
 
-fn plan_id(request: &RestoreRequest, product_version: &str, build_id: &str) -> PlanId {
+fn plan_id(
+    request: &RestoreRequest,
+    product_version: &str,
+    build_id: &str,
+    rsep: RsepPolicy,
+) -> PlanId {
     let material = format!(
-        "{}|{}|{}|{}|{}|{:?}|{:?}|{:?}|{:?}|{:?}|{:?}",
+        "{}|{}|{}|{}|{}|{:?}|{:?}|{:?}|{:?}|{:?}|{:?}|{:?}",
         request.device.product_type(),
         request
             .device
@@ -369,10 +405,16 @@ fn plan_id(request: &RestoreRequest, product_version: &str, build_id: &str) -> P
         request.ticket,
         request.baseband,
         request.sep,
+        rsep,
         request.exploit,
         request.nonce,
     );
     PlanId(hex::encode(Sha256::digest(material.as_bytes())))
+}
+
+/// Numeric major version of a dotted product version ("16.0.1" -> 16).
+fn major_version(version: &str) -> Option<u64> {
+    version.split('.').next()?.parse().ok()
 }
 
 #[derive(Debug, Error)]
@@ -425,6 +467,7 @@ mod tests {
             ticket: TicketPolicy::Signed,
             baseband: BasebandPolicy::Auto,
             sep: SepPolicy::Auto,
+            rsep: RsepPolicy::Auto,
             exploit: ExploitPolicy::Auto,
             nonce: NoncePolicy::Manual,
         };
@@ -435,6 +478,35 @@ mod tests {
         assert!(plan.accepts(&consent));
         assert_eq!(plan.product_version(), "7.1.2");
         assert_eq!(plan.components()[0].name, "RestoreRamDisk");
+    }
+
+    #[test]
+    fn rsep_auto_follows_the_target_major_version() {
+        let legacy = firmware_fixture();
+        let modern = firmware_fixture_with_version("16.7.10");
+        let request = |firmware: &NamedTempFile, rsep| RestoreRequest {
+            device: DeviceIdentity::new(ProductType::from("iPhone3,1"), Soc::A4)
+                .with_board_config(BoardConfig::from("n90"))
+                .with_ecid(Ecid::new(42)),
+            firmware: firmware.path().to_owned(),
+            behavior: RestoreBehavior::Erase,
+            ticket: TicketPolicy::Signed,
+            baseband: BasebandPolicy::Auto,
+            sep: SepPolicy::Auto,
+            rsep,
+            exploit: ExploitPolicy::Auto,
+            nonce: NoncePolicy::Manual,
+        };
+
+        let plan = RestorePlan::resolve(request(&legacy, RsepPolicy::Auto)).unwrap();
+        assert_eq!(plan.rsep_policy(), RsepPolicy::Skip);
+        let plan = RestorePlan::resolve(request(&modern, RsepPolicy::Auto)).unwrap();
+        assert_eq!(plan.rsep_policy(), RsepPolicy::Send);
+        // Explicit policies are preserved regardless of the target version.
+        let plan = RestorePlan::resolve(request(&legacy, RsepPolicy::Send)).unwrap();
+        assert_eq!(plan.rsep_policy(), RsepPolicy::Send);
+        let plan = RestorePlan::resolve(request(&modern, RsepPolicy::Skip)).unwrap();
+        assert_eq!(plan.rsep_policy(), RsepPolicy::Skip);
     }
 
     #[test]
@@ -449,6 +521,7 @@ mod tests {
             ticket: TicketPolicy::Skip,
             baseband: BasebandPolicy::Auto,
             sep: SepPolicy::Auto,
+            rsep: RsepPolicy::Auto,
             exploit,
             nonce: NoncePolicy::Manual,
         };
@@ -459,6 +532,10 @@ mod tests {
     }
 
     fn firmware_fixture() -> NamedTempFile {
+        firmware_fixture_with_version("7.1.2")
+    }
+
+    fn firmware_fixture_with_version(version: &str) -> NamedTempFile {
         let file = NamedTempFile::new().unwrap();
         let mut writer = ZipWriter::new(file.reopen().unwrap());
         writer
@@ -466,16 +543,19 @@ mod tests {
             .unwrap();
         writer
             .write_all(
-                br#"<?xml version="1.0" encoding="UTF-8"?>
+                format!(
+                    r#"<?xml version="1.0" encoding="UTF-8"?>
 <plist version="1.0"><dict>
-<key>ProductVersion</key><string>7.1.2</string>
+<key>ProductVersion</key><string>{version}</string>
 <key>ProductBuildVersion</key><string>11D257</string>
 <key>SupportedProductTypes</key><array><string>iPhone3,1</string></array>
 <key>BuildIdentities</key><array><dict>
 <key>Info</key><dict><key>DeviceClass</key><string>n90ap</string><key>RestoreBehavior</key><string>Erase</string></dict>
 <key>Manifest</key><dict><key>RestoreRamDisk</key><dict><key>Info</key><dict><key>Path</key><string>ramdisk.dmg</string></dict></dict></dict>
 </dict></array>
-</dict></plist>"#,
+</dict></plist>"#
+                )
+                .as_bytes(),
             )
             .unwrap();
         writer.finish().unwrap();

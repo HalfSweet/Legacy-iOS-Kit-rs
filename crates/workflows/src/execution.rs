@@ -27,6 +27,7 @@ pub struct RestorePreparation {
     recovery_ticket: Option<Vec<u8>>,
     boot_nonce: Option<String>,
     build_major: u32,
+    send_rsep: bool,
     exploit_policy: crate::ExploitPolicy,
 }
 
@@ -171,6 +172,7 @@ impl RestorePreparation {
             recovery_ticket,
             boot_nonce,
             build_major,
+            send_rsep: plan.rsep_policy() == crate::RsepPolicy::Send,
             exploit_policy: plan.exploit_policy(),
         })
     }
@@ -201,6 +203,12 @@ impl RestorePreparation {
 
     pub const fn build_major(&self) -> u32 {
         self.build_major
+    }
+
+    /// Whether the boot chain uploads RestoreSEP and issues `rsepfirmware`
+    /// (the resolved [`crate::RsepPolicy`]).
+    pub const fn send_rsep(&self) -> bool {
+        self.send_rsep
     }
 
     pub const fn exploit_policy(&self) -> crate::ExploitPolicy {
@@ -299,6 +307,7 @@ mod tests {
             ticket: TicketPolicy::Signed,
             baseband: BasebandPolicy::None,
             sep: SepPolicy::Auto,
+            rsep: crate::RsepPolicy::Auto,
             exploit: ExploitPolicy::None,
             nonce: crate::NoncePolicy::Manual,
         })
@@ -316,6 +325,8 @@ mod tests {
         assert_eq!(prepared.filesystem_path(), "filesystem.dmg");
         assert_eq!(prepared.boot_components()[0].name(), "iBSS");
         assert_eq!(prepared.boot_components()[1].name(), "RestoreKernelCache");
+        // iOS 7 targets skip the RestoreSEP upload by default.
+        assert!(!prepared.send_rsep());
     }
 
     fn firmware_fixture() -> NamedTempFile {
@@ -351,6 +362,7 @@ mod tests {
             ticket: TicketPolicy::Skip,
             baseband: BasebandPolicy::None,
             sep: SepPolicy::Auto,
+            rsep: crate::RsepPolicy::Auto,
             exploit: ExploitPolicy::AlreadyPwned,
             nonce: crate::NoncePolicy::Manual,
         })
@@ -380,6 +392,7 @@ mod tests {
             ticket: TicketPolicy::Skip,
             baseband: BasebandPolicy::None,
             sep,
+            rsep: crate::RsepPolicy::Auto,
             exploit: ExploitPolicy::AlreadyPwned,
             nonce: crate::NoncePolicy::Manual,
         };

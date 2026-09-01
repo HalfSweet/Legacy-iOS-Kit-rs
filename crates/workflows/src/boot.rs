@@ -72,7 +72,9 @@ pub async fn boot_restore(
         client.upload_payload(image.data()).await?;
         client.send_command("devicetree").await?;
     }
-    if let Some(image) = find_component(preparation, "RestoreSEP") {
+    if preparation.send_rsep()
+        && let Some(image) = find_component(preparation, "RestoreSEP")
+    {
         client.upload_payload(image.data()).await?;
         client.send_command("rsepfirmware").await?;
     }

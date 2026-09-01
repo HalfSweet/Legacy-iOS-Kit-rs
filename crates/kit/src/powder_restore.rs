@@ -17,7 +17,7 @@ use legacy_ios_core::{DeviceIdentity, IosVersion, Soc};
 use legacy_ios_firmware::{FirmwareArchive, RestoreBehavior, SigningTicket, TssClient};
 use legacy_ios_workflows::{
     BasebandPolicy, DestructiveConsent, ExploitPolicy, NoncePolicy, PlanId, RestorePlan,
-    RestorePlanError, RestoreRequest, SepPolicy, TicketPolicy,
+    RestorePlanError, RestoreRequest, RsepPolicy, SepPolicy, TicketPolicy,
 };
 use tracing::info;
 
@@ -277,6 +277,7 @@ pub(crate) async fn plan(
         ticket: TicketPolicy::Provided(ticket_path.clone()),
         baseband: request.baseband,
         sep: SepPolicy::Auto,
+        rsep: RsepPolicy::Auto,
         exploit,
         nonce: NoncePolicy::Manual,
     })?;
