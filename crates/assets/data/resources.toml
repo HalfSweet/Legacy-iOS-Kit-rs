@@ -2024,3 +2024,2344 @@ size = 12922
 purpose = "g1lbertJB Cydia AutoInstall package: Substrate Safe Mode for iOS 5"
 redistribution = "download-only"
 
+
+[[resources]]
+id = "classic-patch-iPad1-1-7B367-asr"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPad1,1_3.2_7B367.bundle/asr.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "bb8314abae4b0e7d854fcf8254d63e9b8da7edbde25f516a9cb058029f412c12"
+size = 200
+purpose = "bsdiff patch 'asr' of the classic ipsw firmware bundle for iPad1,1 3.2 (7B367)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPad1-1-7B367-iBEC.k48ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPad1,1_3.2_7B367.bundle/iBEC.k48ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "a8f1aacf8144d660541e7c3da5b4da516746199a42c995af9f8432b34d0fa898"
+size = 312
+purpose = "bsdiff patch 'iBEC.k48ap.RELEASE' of the classic ipsw firmware bundle for iPad1,1 3.2 (7B367)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPad1-1-7B367-iBSS.k48ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPad1,1_3.2_7B367.bundle/iBSS.k48ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "538eab2fd165cb2da334b39b6b4f459bc7b2677ba6e44457cfc27fd07bee475c"
+size = 303
+purpose = "bsdiff patch 'iBSS.k48ap.RELEASE' of the classic ipsw firmware bundle for iPad1,1 3.2 (7B367)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPad1-1-7B367-restoredexternal"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPad1,1_3.2_7B367.bundle/restoredexternal.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "e95535a3397ae20e950b6ab44a31d103b625532a00802db081881adc10f91a3c"
+size = 212
+purpose = "bsdiff patch 'restoredexternal' of the classic ipsw firmware bundle for iPad1,1 3.2 (7B367)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPad1-1-7B405-asr"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPad1,1_3.2.1_7B405.bundle/asr.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "bb8314abae4b0e7d854fcf8254d63e9b8da7edbde25f516a9cb058029f412c12"
+size = 200
+purpose = "bsdiff patch 'asr' of the classic ipsw firmware bundle for iPad1,1 3.2.1 (7B405)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPad1-1-7B405-iBEC.k48ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPad1,1_3.2.1_7B405.bundle/iBEC.k48ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "a8f1aacf8144d660541e7c3da5b4da516746199a42c995af9f8432b34d0fa898"
+size = 312
+purpose = "bsdiff patch 'iBEC.k48ap.RELEASE' of the classic ipsw firmware bundle for iPad1,1 3.2.1 (7B405)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPad1-1-7B405-iBSS.k48ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPad1,1_3.2.1_7B405.bundle/iBSS.k48ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "0f071d545738113f7be4fc4eb2fe75f15fe61d9796a4ff7ba4a12b751268d597"
+size = 277
+purpose = "bsdiff patch 'iBSS.k48ap.RELEASE' of the classic ipsw firmware bundle for iPad1,1 3.2.1 (7B405)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPad1-1-7B405-restoredexternal"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPad1,1_3.2.1_7B405.bundle/restoredexternal.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "e95535a3397ae20e950b6ab44a31d103b625532a00802db081881adc10f91a3c"
+size = 212
+purpose = "bsdiff patch 'restoredexternal' of the classic ipsw firmware bundle for iPad1,1 3.2.1 (7B405)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPad1-1-7B500-asr"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPad1,1_3.2.2_7B500.bundle/asr.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "bb8314abae4b0e7d854fcf8254d63e9b8da7edbde25f516a9cb058029f412c12"
+size = 200
+purpose = "bsdiff patch 'asr' of the classic ipsw firmware bundle for iPad1,1 3.2.2 (7B500)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPad1-1-7B500-iBEC.k48ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPad1,1_3.2.2_7B500.bundle/iBEC.k48ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "a8f1aacf8144d660541e7c3da5b4da516746199a42c995af9f8432b34d0fa898"
+size = 312
+purpose = "bsdiff patch 'iBEC.k48ap.RELEASE' of the classic ipsw firmware bundle for iPad1,1 3.2.2 (7B500)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPad1-1-7B500-iBSS.k48ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPad1,1_3.2.2_7B500.bundle/iBSS.k48ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "0f071d545738113f7be4fc4eb2fe75f15fe61d9796a4ff7ba4a12b751268d597"
+size = 277
+purpose = "bsdiff patch 'iBSS.k48ap.RELEASE' of the classic ipsw firmware bundle for iPad1,1 3.2.2 (7B500)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPad1-1-7B500-restoredexternal"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPad1,1_3.2.2_7B500.bundle/restoredexternal.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "e95535a3397ae20e950b6ab44a31d103b625532a00802db081881adc10f91a3c"
+size = 212
+purpose = "bsdiff patch 'restoredexternal' of the classic ipsw firmware bundle for iPad1,1 3.2.2 (7B500)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone1-1-7E18-018-6494-014"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone1,1_3.1.3_7E18.bundle/018-6494-014.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "084fb01e9fd9be32a41a19843e664027d33d7853a731006f6944ad848f1243b9"
+size = 80061
+purpose = "bsdiff patch '018-6494-014' of the classic ipsw firmware bundle for iPhone1,1 3.1.3 (7E18)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone1-1-7E18-asr"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone1,1_3.1.3_7E18.bundle/asr.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "8f12ec7531f96e115b90172fd7a0a2d2d5ee1b48d3a52eeb1476fd87ca6e27fe"
+size = 240
+purpose = "bsdiff patch 'asr' of the classic ipsw firmware bundle for iPhone1,1 3.1.3 (7E18)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone1-1-7E18-iBoot.m68ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone1,1_3.1.3_7E18.bundle/iBoot.m68ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "34cbad1a59f40ca2482e34f359c7ebe5e28703d155c9bbb6a3972ef80e19d32f"
+size = 60163
+purpose = "bsdiff patch 'iBoot.m68ap.RELEASE' of the classic ipsw firmware bundle for iPhone1,1 3.1.3 (7E18)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone1-1-7E18-iBSS.m68ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone1,1_3.1.3_7E18.bundle/iBSS.m68ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "9b8b23dc9589c4dfa2956f62acb0ac9a25298e53ceb531f5f36e9fcfa4b13543"
+size = 159
+purpose = "bsdiff patch 'iBSS.m68ap.RELEASE' of the classic ipsw firmware bundle for iPhone1,1 3.1.3 (7E18)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone1-1-7E18-kernelcache.release"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone1,1_3.1.3_7E18.bundle/kernelcache.release.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "63c0ced58dac89790839dbeb83a33eaf240fff78cba2547030d481d2981ca139"
+size = 169
+purpose = "bsdiff patch 'kernelcache.release' of the classic ipsw firmware bundle for iPhone1,1 3.1.3 (7E18)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone1-1-7E18-LLB.m68ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone1,1_3.1.3_7E18.bundle/LLB.m68ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "830cc6137f5c0cb79db3e748d48526b00b35d75ee48e4cf0e1bbdc20a7bca348"
+size = 157
+purpose = "bsdiff patch 'LLB.m68ap.RELEASE' of the classic ipsw firmware bundle for iPhone1,1 3.1.3 (7E18)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone1-1-7E18-WTF.s5l8900xall.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone1,1_3.1.3_7E18.bundle/WTF.s5l8900xall.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "861fbf8936eaf9164d0bc186bf8098971af5fe50da59f57f1a73e5dfebc2f4b4"
+size = 155
+purpose = "bsdiff patch 'WTF.s5l8900xall.RELEASE' of the classic ipsw firmware bundle for iPhone1,1 3.1.3 (7E18)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone1-2-7E18-018-6494-014"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone1,2_3.1.3_7E18.bundle/018-6494-014.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "2dca88bf568810b8b60145bad2820f87abdc3705435d684a83d0040d6f0c823f"
+size = 79803
+purpose = "bsdiff patch '018-6494-014' of the classic ipsw firmware bundle for iPhone1,2 3.1.3 (7E18)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone1-2-7E18-asr"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone1,2_3.1.3_7E18.bundle/asr.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "8f12ec7531f96e115b90172fd7a0a2d2d5ee1b48d3a52eeb1476fd87ca6e27fe"
+size = 240
+purpose = "bsdiff patch 'asr' of the classic ipsw firmware bundle for iPhone1,2 3.1.3 (7E18)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone1-2-7E18-iBoot.n82ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone1,2_3.1.3_7E18.bundle/iBoot.n82ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "f6c0e072dbf5fc103fcfbe49b369d5af52d700a93f41b5386b90de48f4d1bbe1"
+size = 58911
+purpose = "bsdiff patch 'iBoot.n82ap.RELEASE' of the classic ipsw firmware bundle for iPhone1,2 3.1.3 (7E18)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone1-2-7E18-iBSS.n82ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone1,2_3.1.3_7E18.bundle/iBSS.n82ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "befed6d2e9d90a4a2919c8e8278917f9a6bec99bd35f3b2d3098efce10ef1994"
+size = 157
+purpose = "bsdiff patch 'iBSS.n82ap.RELEASE' of the classic ipsw firmware bundle for iPhone1,2 3.1.3 (7E18)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone1-2-7E18-kernelcache.release"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone1,2_3.1.3_7E18.bundle/kernelcache.release.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "63c0ced58dac89790839dbeb83a33eaf240fff78cba2547030d481d2981ca139"
+size = 169
+purpose = "bsdiff patch 'kernelcache.release' of the classic ipsw firmware bundle for iPhone1,2 3.1.3 (7E18)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone1-2-7E18-LLB.n82ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone1,2_3.1.3_7E18.bundle/LLB.n82ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "0806a671ef36fe874338fdaef2241723015eb3d3416694c8926853d746003423"
+size = 158
+purpose = "bsdiff patch 'LLB.n82ap.RELEASE' of the classic ipsw firmware bundle for iPhone1,2 3.1.3 (7E18)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone1-2-7E18-WTF.s5l8900xall.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone1,2_3.1.3_7E18.bundle/WTF.s5l8900xall.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "861fbf8936eaf9164d0bc186bf8098971af5fe50da59f57f1a73e5dfebc2f4b4"
+size = 155
+purpose = "bsdiff patch 'WTF.s5l8900xall.RELEASE' of the classic ipsw firmware bundle for iPhone1,2 3.1.3 (7E18)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone1-2-8B117-018-7079-079"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone1,2_4.1_8B117.bundle/018-7079-079.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "009c1d578521392de822612013fbab71b7eb5735c0ca440f3c27a7f2a1adb4fd"
+size = 344296
+purpose = "bsdiff patch '018-7079-079' of the classic ipsw firmware bundle for iPhone1,2 4.1 (8B117)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone1-2-8B117-asr"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone1,2_4.1_8B117.bundle/asr.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "454001cb503d782a4a4e7cfef4b57d58fac860ac29bc26ec59046c3775abbd14"
+size = 1633
+purpose = "bsdiff patch 'asr' of the classic ipsw firmware bundle for iPhone1,2 4.1 (8B117)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone1-2-8B117-iBEC.n82ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone1,2_4.1_8B117.bundle/iBEC.n82ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "98aabd1dac6b6fe6f839bbdaea43df1fc80972f9f83df081c87ecebd6c86b6a3"
+size = 183
+purpose = "bsdiff patch 'iBEC.n82ap.RELEASE' of the classic ipsw firmware bundle for iPhone1,2 4.1 (8B117)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone1-2-8B117-iBoot.n82ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone1,2_4.1_8B117.bundle/iBoot.n82ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "8ed216e0985be636f2981382c35b4d8fac63f486679380a16a3e6ecb0b7adbc4"
+size = 128994
+purpose = "bsdiff patch 'iBoot.n82ap.RELEASE' of the classic ipsw firmware bundle for iPhone1,2 4.1 (8B117)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone1-2-8B117-iBSS.n82ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone1,2_4.1_8B117.bundle/iBSS.n82ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "1b1d6d28dce8bed3970ac21b57437c27cf8e4936d1175a357586ec8adadf5bc3"
+size = 315
+purpose = "bsdiff patch 'iBSS.n82ap.RELEASE' of the classic ipsw firmware bundle for iPhone1,2 4.1 (8B117)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone1-2-8B117-kernelcache.release"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone1,2_4.1_8B117.bundle/kernelcache.release.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "ffe85ff524dc1f5e69c49e1b2edbb5f79ff377e79f5c5c39bf2711a39576da9c"
+size = 242
+purpose = "bsdiff patch 'kernelcache.release' of the classic ipsw firmware bundle for iPhone1,2 4.1 (8B117)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone1-2-8B117-LLB.n82ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone1,2_4.1_8B117.bundle/LLB.n82ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "9024d49650a9dfeebeaaa91bde366f7f529f11cd2d097783da07c612cfff140d"
+size = 187
+purpose = "bsdiff patch 'LLB.n82ap.RELEASE' of the classic ipsw firmware bundle for iPhone1,2 4.1 (8B117)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone1-2-8B117-restoredexternal"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone1,2_4.1_8B117.bundle/restoredexternal.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "a78b7a322722b3520acfebd131b344b2cfecb4137d4c463214d938f33ab689f1"
+size = 207
+purpose = "bsdiff patch 'restoredexternal' of the classic ipsw firmware bundle for iPhone1,2 4.1 (8B117)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone1-2-8B117-WTF.s5l8900xall.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone1,2_4.1_8B117.bundle/WTF.s5l8900xall.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "4c62fb5f328c05dfd4a5a4be2983b4413dbc7437eea8ddef0095e5e6a0bcce81"
+size = 264
+purpose = "bsdiff patch 'WTF.s5l8900xall.RELEASE' of the classic ipsw firmware bundle for iPhone1,2 4.1 (8B117)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone1-2-8C148-038-0029-002"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone1,2_4.2.1_8C148.bundle/038-0029-002.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "009c1d578521392de822612013fbab71b7eb5735c0ca440f3c27a7f2a1adb4fd"
+size = 344296
+purpose = "bsdiff patch '038-0029-002' of the classic ipsw firmware bundle for iPhone1,2 4.2.1 (8C148)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone1-2-8C148-asr"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone1,2_4.2.1_8C148.bundle/asr.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "52304278dcd00fe96f7efc61027beb930eb3e27a91acdfe9fa66fb3a4beee594"
+size = 211
+purpose = "bsdiff patch 'asr' of the classic ipsw firmware bundle for iPhone1,2 4.2.1 (8C148)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone1-2-8C148-iBEC.n82ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone1,2_4.2.1_8C148.bundle/iBEC.n82ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "989c3ba5b46e1d9edd7fa0aca20370c5e7c3f11b7f0d0d056ad4b103defaa3c5"
+size = 10847
+purpose = "bsdiff patch 'iBEC.n82ap.RELEASE' of the classic ipsw firmware bundle for iPhone1,2 4.2.1 (8C148)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone1-2-8C148-iBoot.n82ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone1,2_4.2.1_8C148.bundle/iBoot.n82ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "d3578c3f531b982d36791fdedcca7a48c470886613b9e7cbba638ae6ed0ff28d"
+size = 133237
+purpose = "bsdiff patch 'iBoot.n82ap.RELEASE' of the classic ipsw firmware bundle for iPhone1,2 4.2.1 (8C148)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone1-2-8C148-iBSS.n82ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone1,2_4.2.1_8C148.bundle/iBSS.n82ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "186b4e8330609f7793ded711b76d683e40d2c2a40d66f7bc7f9eacf60bede966"
+size = 7740
+purpose = "bsdiff patch 'iBSS.n82ap.RELEASE' of the classic ipsw firmware bundle for iPhone1,2 4.2.1 (8C148)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone1-2-8C148-kernelcache.release"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone1,2_4.2.1_8C148.bundle/kernelcache.release.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "6511fe0adae7da2e84affae3d7c16798deb043c4b1dce2a25ceafd48f2047774"
+size = 536
+purpose = "bsdiff patch 'kernelcache.release' of the classic ipsw firmware bundle for iPhone1,2 4.2.1 (8C148)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone1-2-8C148-LLB.n82ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone1,2_4.2.1_8C148.bundle/LLB.n82ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "e379b49897a487e8e3e6eb61b4669789927f43e4210e72938640fce749ea5665"
+size = 187
+purpose = "bsdiff patch 'LLB.n82ap.RELEASE' of the classic ipsw firmware bundle for iPhone1,2 4.2.1 (8C148)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone1-2-8C148-WTF.s5l8900xall.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone1,2_4.2.1_8C148.bundle/WTF.s5l8900xall.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "4c62fb5f328c05dfd4a5a4be2983b4413dbc7437eea8ddef0095e5e6a0bcce81"
+size = 264
+purpose = "bsdiff patch 'WTF.s5l8900xall.RELEASE' of the classic ipsw firmware bundle for iPhone1,2 4.2.1 (8C148)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-7A341-asr"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_3.0_7A341.bundle/asr.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "09321fb4c352c772c67bd0d5dce16be36077e402cd5889901c09f89542a13798"
+size = 2134
+purpose = "bsdiff patch 'asr' of the classic ipsw firmware bundle for iPhone2,1 3.0 (7A341)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-7A341-iBoot.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_3.0_7A341.bundle/iBoot.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "86222d510ad44c306c7e8069a7dbbe417f5762978969ac45627ad612d9cd2cb9"
+size = 257
+purpose = "bsdiff patch 'iBoot.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 3.0 (7A341)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-7A341-iBSS.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_3.0_7A341.bundle/iBSS.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "3b7051973a896727cd0f6481435051e54b3efe6fd137941d4f3abb1368c06e38"
+size = 300
+purpose = "bsdiff patch 'iBSS.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 3.0 (7A341)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-7A341-kernelcache.release"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_3.0_7A341.bundle/kernelcache.release.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "fea8e30ab3d14a6bc196d30567cfe798b16634575ba0f2999b3f1f7b46e43c78"
+size = 4715538
+purpose = "bsdiff patch 'kernelcache.release' of the classic ipsw firmware bundle for iPhone2,1 3.0 (7A341)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-7A341-LLB.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_3.0_7A341.bundle/LLB.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "f2dfe8cc558fe5c1e577a500129f97a06c77737a976e3e1a8637ab77576f50ad"
+size = 44779
+purpose = "bsdiff patch 'LLB.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 3.0 (7A341)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-7A400-asr"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_3.0.1_7A400.bundle/asr.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "9246f8c6ceabecae1cfdc07f8e10eaf0e6e0b3222152c40c1f2803a5739eb2b1"
+size = 2124
+purpose = "bsdiff patch 'asr' of the classic ipsw firmware bundle for iPhone2,1 3.0.1 (7A400)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-7A400-iBoot.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_3.0.1_7A400.bundle/iBoot.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "86222d510ad44c306c7e8069a7dbbe417f5762978969ac45627ad612d9cd2cb9"
+size = 257
+purpose = "bsdiff patch 'iBoot.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 3.0.1 (7A400)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-7A400-iBSS.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_3.0.1_7A400.bundle/iBSS.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "10e6c4d2614ff4bc5f9099fb41be9b153cbdff9c6f1ce8cededb0a1381839e26"
+size = 283
+purpose = "bsdiff patch 'iBSS.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 3.0.1 (7A400)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-7A400-kernelcache.release"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_3.0.1_7A400.bundle/kernelcache.release.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "7fc3eec144968d55883b221720104e0233ad6ba5b94864682f54203fc3e843da"
+size = 4716661
+purpose = "bsdiff patch 'kernelcache.release' of the classic ipsw firmware bundle for iPhone2,1 3.0.1 (7A400)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-7A400-LLB.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_3.0.1_7A400.bundle/LLB.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "f2dfe8cc558fe5c1e577a500129f97a06c77737a976e3e1a8637ab77576f50ad"
+size = 44779
+purpose = "bsdiff patch 'LLB.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 3.0.1 (7A400)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-7C144-asr"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_3.1_7C144.bundle/asr.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "983c4a321633f14019ef58f50365243f31e6d6c6c362d89924db555a4fe70927"
+size = 17794
+purpose = "bsdiff patch 'asr' of the classic ipsw firmware bundle for iPhone2,1 3.1 (7C144)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-7C144-iBoot.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_3.1_7C144.bundle/iBoot.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "a772d668bcab9f944dd423ed8d6c375a2107a00eb621184f7a028b663fde4679"
+size = 192
+purpose = "bsdiff patch 'iBoot.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 3.1 (7C144)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-7C144-iBSS.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_3.1_7C144.bundle/iBSS.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "6b6a30a06c42279cf9a5c36a6b4c56b4b346768b46ea4e7ca0447a1bbdb557f4"
+size = 311
+purpose = "bsdiff patch 'iBSS.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 3.1 (7C144)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-7C144-kernelcache.release"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_3.1_7C144.bundle/kernelcache.release.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "1bde6d9cc21aa038a887442ea3d5b5c92b51ad0be938862b21003579258314f3"
+size = 228
+purpose = "bsdiff patch 'kernelcache.release' of the classic ipsw firmware bundle for iPhone2,1 3.1 (7C144)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-7C144-LLB.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_3.1_7C144.bundle/LLB.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "153e3a52d65df8e1a032eed2431c9f3fd6fc4b58b58dcd4a7d88f834ad745794"
+size = 43649
+purpose = "bsdiff patch 'LLB.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 3.1 (7C144)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-7D11-asr"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_3.1.2_7D11.bundle/asr.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "6070e72f5acd34f287d89d594f4849b4fb2bf92e759c82e362616b39a71031a0"
+size = 17796
+purpose = "bsdiff patch 'asr' of the classic ipsw firmware bundle for iPhone2,1 3.1.2 (7D11)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-7D11-iBoot.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_3.1.2_7D11.bundle/iBoot.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "a772d668bcab9f944dd423ed8d6c375a2107a00eb621184f7a028b663fde4679"
+size = 192
+purpose = "bsdiff patch 'iBoot.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 3.1.2 (7D11)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-7D11-iBSS.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_3.1.2_7D11.bundle/iBSS.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "6b6a30a06c42279cf9a5c36a6b4c56b4b346768b46ea4e7ca0447a1bbdb557f4"
+size = 311
+purpose = "bsdiff patch 'iBSS.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 3.1.2 (7D11)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-7D11-kernelcache.release"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_3.1.2_7D11.bundle/kernelcache.release.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "714c9bb6b2acc29f0fa37eef8fd11ad3824f7ff707c0868462c00bc9bbe7886a"
+size = 228
+purpose = "bsdiff patch 'kernelcache.release' of the classic ipsw firmware bundle for iPhone2,1 3.1.2 (7D11)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-7D11-LLB.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_3.1.2_7D11.bundle/LLB.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "bdc745aabefbbf801dc3dffb1c3dceef40473d9ac7fa5b9787c4f81a8a346ea7"
+size = 43638
+purpose = "bsdiff patch 'LLB.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 3.1.2 (7D11)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-7E18-asr"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_3.1.3_7E18.bundle/asr.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "cdb9c5a12aca991167b5c1faa4f37df4fdae1b59641b4be040fbe02efa261ae0"
+size = 17797
+purpose = "bsdiff patch 'asr' of the classic ipsw firmware bundle for iPhone2,1 3.1.3 (7E18)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-7E18-iBoot.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_3.1.3_7E18.bundle/iBoot.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "debe81bf25fb32a7168ade71d6a24e6454e8db4aed102cb01562053e5cede611"
+size = 192
+purpose = "bsdiff patch 'iBoot.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 3.1.3 (7E18)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-7E18-iBSS.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_3.1.3_7E18.bundle/iBSS.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "1c32357895b6f522dbc75fc84d00be2ff1261ed07dffd684417c4bab5b2c14b6"
+size = 309
+purpose = "bsdiff patch 'iBSS.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 3.1.3 (7E18)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-7E18-kernelcache.release"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_3.1.3_7E18.bundle/kernelcache.release.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "714c9bb6b2acc29f0fa37eef8fd11ad3824f7ff707c0868462c00bc9bbe7886a"
+size = 228
+purpose = "bsdiff patch 'kernelcache.release' of the classic ipsw firmware bundle for iPhone2,1 3.1.3 (7E18)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-7E18-LLB.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_3.1.3_7E18.bundle/LLB.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "2c2a1e8cb8f98ec8ae74c24bbe9689a02abfb17421be60c239e8d18d9a25e932"
+size = 43631
+purpose = "bsdiff patch 'LLB.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 3.1.3 (7E18)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-8A293-asr"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_4.0_8A293.bundle/asr.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "243ecea05ca878717f18d4b5f045b7949e17adc5741f15610f9ae8c7869b39bf"
+size = 373
+purpose = "bsdiff patch 'asr' of the classic ipsw firmware bundle for iPhone2,1 4.0 (8A293)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-8A293-iBoot.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_4.0_8A293.bundle/iBoot.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "50be3682182b0252bf227f1aac21c0703894b3272bce1caa725a42ebe23af50f"
+size = 207
+purpose = "bsdiff patch 'iBoot.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 4.0 (8A293)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-8A293-iBSS.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_4.0_8A293.bundle/iBSS.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "4ea01f5ef57ba7f0d312413f473d5d67c2b3745c75ad0ebb1d7d3abb7747e426"
+size = 291
+purpose = "bsdiff patch 'iBSS.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 4.0 (8A293)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-8A293-kernelcache.release"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_4.0_8A293.bundle/kernelcache.release.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "5a4121edb0f7618d022cab30a762897b07b0b15558214bea1b3f5f7f2a4c96cd"
+size = 237
+purpose = "bsdiff patch 'kernelcache.release' of the classic ipsw firmware bundle for iPhone2,1 4.0 (8A293)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-8A293-LLB.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_4.0_8A293.bundle/LLB.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "86daafd5b35783def1cf008cc764eaea84ca5b11931fca8edc1834f56f195a96"
+size = 38636
+purpose = "bsdiff patch 'LLB.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 4.0 (8A293)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-8A306-asr"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_4.0.1_8A306.bundle/asr.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "243ecea05ca878717f18d4b5f045b7949e17adc5741f15610f9ae8c7869b39bf"
+size = 373
+purpose = "bsdiff patch 'asr' of the classic ipsw firmware bundle for iPhone2,1 4.0.1 (8A306)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-8A306-iBoot.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_4.0.1_8A306.bundle/iBoot.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "50be3682182b0252bf227f1aac21c0703894b3272bce1caa725a42ebe23af50f"
+size = 207
+purpose = "bsdiff patch 'iBoot.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 4.0.1 (8A306)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-8A306-iBSS.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_4.0.1_8A306.bundle/iBSS.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "4ea01f5ef57ba7f0d312413f473d5d67c2b3745c75ad0ebb1d7d3abb7747e426"
+size = 291
+purpose = "bsdiff patch 'iBSS.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 4.0.1 (8A306)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-8A306-kernelcache.release"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_4.0.1_8A306.bundle/kernelcache.release.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "c561bd2ecd0bafff890fe9bcdff4c8ae2b2492ca88e30208f4debfd1d416d17e"
+size = 237
+purpose = "bsdiff patch 'kernelcache.release' of the classic ipsw firmware bundle for iPhone2,1 4.0.1 (8A306)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-8A306-LLB.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_4.0.1_8A306.bundle/LLB.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "ce8435d7d9cb8189149ee3a169abfd5cad5913335a06bd16ab87c708305768b5"
+size = 38591
+purpose = "bsdiff patch 'LLB.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 4.0.1 (8A306)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-8A400-asr"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_4.0.2_8A400.bundle/asr.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "243ecea05ca878717f18d4b5f045b7949e17adc5741f15610f9ae8c7869b39bf"
+size = 373
+purpose = "bsdiff patch 'asr' of the classic ipsw firmware bundle for iPhone2,1 4.0.2 (8A400)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-8A400-iBoot.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_4.0.2_8A400.bundle/iBoot.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "50be3682182b0252bf227f1aac21c0703894b3272bce1caa725a42ebe23af50f"
+size = 207
+purpose = "bsdiff patch 'iBoot.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 4.0.2 (8A400)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-8A400-iBSS.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_4.0.2_8A400.bundle/iBSS.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "4ea01f5ef57ba7f0d312413f473d5d67c2b3745c75ad0ebb1d7d3abb7747e426"
+size = 291
+purpose = "bsdiff patch 'iBSS.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 4.0.2 (8A400)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-8A400-kernelcache.release"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_4.0.2_8A400.bundle/kernelcache.release.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "aacc7a6de60bcd96545b151ef97aeb13a3ce2d3e0415787ef93928ff689b3ec2"
+size = 217
+purpose = "bsdiff patch 'kernelcache.release' of the classic ipsw firmware bundle for iPhone2,1 4.0.2 (8A400)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-8A400-LLB.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_4.0.2_8A400.bundle/LLB.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "ce8435d7d9cb8189149ee3a169abfd5cad5913335a06bd16ab87c708305768b5"
+size = 38591
+purpose = "bsdiff patch 'LLB.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 4.0.2 (8A400)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-8B117-asr"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_4.1_8B117.bundle/asr.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "6a24ccfbaf3c868729da9f028b50d1787793478c63e41afb3d41443c412e4c1d"
+size = 214
+purpose = "bsdiff patch 'asr' of the classic ipsw firmware bundle for iPhone2,1 4.1 (8B117)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-8B117-iBSS.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_4.1_8B117.bundle/iBSS.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "7d437307c865fe1662d48a3dc75f67561a4f2a16576afc129f2a58c08bdce6b3"
+size = 237
+purpose = "bsdiff patch 'iBSS.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 4.1 (8B117)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-8B117-restoredexternal"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_4.1_8B117.bundle/restoredexternal.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "390d55d12e9a0951f9a2300ad955ee31b441d7faf5a902ed3a34e6cbd0817296"
+size = 202
+purpose = "bsdiff patch 'restoredexternal' of the classic ipsw firmware bundle for iPhone2,1 4.1 (8B117)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-8C148a-asr"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_4.2.1_8C148a.bundle/asr.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "32c0a33610b30b5bbcd334eadac4c07143cbba696288ba3da6711c19c44aca50"
+size = 378
+purpose = "bsdiff patch 'asr' of the classic ipsw firmware bundle for iPhone2,1 4.2.1 (8C148a)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-8C148a-iBoot.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_4.2.1_8C148a.bundle/iBoot.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "489bad868fa3889ede635b59589f602940da9feed6c1a258527eebc4c54b0d3d"
+size = 212
+purpose = "bsdiff patch 'iBoot.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 4.2.1 (8C148a)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-8C148a-iBSS.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_4.2.1_8C148a.bundle/iBSS.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "37a24c39bd2006388ad35fe3a64ec08b1b9287d771aec91d927d1765ab4a6a81"
+size = 313
+purpose = "bsdiff patch 'iBSS.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 4.2.1 (8C148a)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-8C148a-kernelcache.release"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_4.2.1_8C148a.bundle/kernelcache.release.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "1e9e7be9c7c3b0f203f45920c8a964e314818ffba4b6105d1c90c35a9c5ebd1d"
+size = 219
+purpose = "bsdiff patch 'kernelcache.release' of the classic ipsw firmware bundle for iPhone2,1 4.2.1 (8C148a)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-8C148a-LLB.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_4.2.1_8C148a.bundle/LLB.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "24f55a4bff2b185b988fb04825efc54d8a81ebe2354d75bdca2d06f358365335"
+size = 38716
+purpose = "bsdiff patch 'LLB.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 4.2.1 (8C148a)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-8F190-asr"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_4.3_8F190.bundle/asr.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "8fb76bc04bed3089e28a3099997efa2c37e6b61ce68c4cfea6001e3c60c0c1d7"
+size = 198
+purpose = "bsdiff patch 'asr' of the classic ipsw firmware bundle for iPhone2,1 4.3 (8F190)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-8F190-iBoot.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_4.3_8F190.bundle/iBoot.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "6204a592dc542cc569dce9c4bc8794ac10a069ef7850323f42b0615f6fe6598c"
+size = 357
+purpose = "bsdiff patch 'iBoot.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 4.3 (8F190)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-8F190-iBSS.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_4.3_8F190.bundle/iBSS.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "909a04c4cfcd77dcb10b96e43b13b25c203ffcdbe76c134dc323844e87ae4c36"
+size = 299
+purpose = "bsdiff patch 'iBSS.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 4.3 (8F190)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-8F190-kernelcache.release"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_4.3_8F190.bundle/kernelcache.release.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "40ea133e2531dd3c9b0049f7ef9b1e76d50c59d781cfbeb7cee24f7f591855b9"
+size = 252
+purpose = "bsdiff patch 'kernelcache.release' of the classic ipsw firmware bundle for iPhone2,1 4.3 (8F190)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-8F190-LLB.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_4.3_8F190.bundle/LLB.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "fb8a99d586303ea720e867fde785818f4d57e35789540c72b4bb5ca6be19998a"
+size = 39039
+purpose = "bsdiff patch 'LLB.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 4.3 (8F190)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-8G4-asr"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_4.3.1_8G4.bundle/asr.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "8fb76bc04bed3089e28a3099997efa2c37e6b61ce68c4cfea6001e3c60c0c1d7"
+size = 198
+purpose = "bsdiff patch 'asr' of the classic ipsw firmware bundle for iPhone2,1 4.3.1 (8G4)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-8G4-iBoot.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_4.3.1_8G4.bundle/iBoot.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "a856131abe9a808c3225014eb23a6edf9c8118950837908bb943187c21ae177b"
+size = 370
+purpose = "bsdiff patch 'iBoot.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 4.3.1 (8G4)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-8G4-iBSS.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_4.3.1_8G4.bundle/iBSS.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "e809c337308871893b7c9d3a927ac28f6cd0c108d2ae896604dfe7045e7456d5"
+size = 254
+purpose = "bsdiff patch 'iBSS.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 4.3.1 (8G4)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-8G4-kernelcache.release"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_4.3.1_8G4.bundle/kernelcache.release.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "40ea133e2531dd3c9b0049f7ef9b1e76d50c59d781cfbeb7cee24f7f591855b9"
+size = 252
+purpose = "bsdiff patch 'kernelcache.release' of the classic ipsw firmware bundle for iPhone2,1 4.3.1 (8G4)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-8G4-LLB.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_4.3.1_8G4.bundle/LLB.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "4e8f34d5a874cbeef6ca84fb0619131e5571a469d49d38d8c05bedd5dd845dfd"
+size = 39033
+purpose = "bsdiff patch 'LLB.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 4.3.1 (8G4)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-8H7-asr"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_4.3.2_8H7.bundle/asr.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "8fb76bc04bed3089e28a3099997efa2c37e6b61ce68c4cfea6001e3c60c0c1d7"
+size = 198
+purpose = "bsdiff patch 'asr' of the classic ipsw firmware bundle for iPhone2,1 4.3.2 (8H7)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-8H7-iBoot.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_4.3.2_8H7.bundle/iBoot.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "4fe5a9bb8e482308738e7294f089e0690d881f4cca7f643af6c5e5ee78e07fb7"
+size = 194
+purpose = "bsdiff patch 'iBoot.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 4.3.2 (8H7)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-8H7-iBSS.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_4.3.2_8H7.bundle/iBSS.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "f59ada45a948c8e583f97364567f2a3706ff23381fac0865f6ef2eda11dd81b4"
+size = 285
+purpose = "bsdiff patch 'iBSS.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 4.3.2 (8H7)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-8H7-kernelcache.release"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_4.3.2_8H7.bundle/kernelcache.release.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "1c1967a571abe89cb5707a5e0ceaa2bebb548f5c51491426bcd7f596accc5d96"
+size = 232
+purpose = "bsdiff patch 'kernelcache.release' of the classic ipsw firmware bundle for iPhone2,1 4.3.2 (8H7)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-8H7-LLB.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_4.3.2_8H7.bundle/LLB.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "022c40f545c63bd4edc362fdad41e48d57616c358f98a0ec2d5b9380723899a1"
+size = 39052
+purpose = "bsdiff patch 'LLB.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 4.3.2 (8H7)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-8J2-asr"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_4.3.3_8J2.bundle/asr.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "8fb76bc04bed3089e28a3099997efa2c37e6b61ce68c4cfea6001e3c60c0c1d7"
+size = 198
+purpose = "bsdiff patch 'asr' of the classic ipsw firmware bundle for iPhone2,1 4.3.3 (8J2)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-8J2-iBoot.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_4.3.3_8J2.bundle/iBoot.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "470e78e0c89bb5b3f4aacc5ad3c57f54165f6981137af034e450034ba5ae4a3c"
+size = 210
+purpose = "bsdiff patch 'iBoot.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 4.3.3 (8J2)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-8J2-iBSS.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_4.3.3_8J2.bundle/iBSS.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "eb73f25b260186aa6504798898692028a536f3dd3f6850f489f3c48d1edd3cca"
+size = 343
+purpose = "bsdiff patch 'iBSS.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 4.3.3 (8J2)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-8J2-kernelcache.release"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_4.3.3_8J2.bundle/kernelcache.release.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "4ed7cbf27ec5c143ebc9eb60e6dc82988ac8c191e78813bd7815ddc4194bdd53"
+size = 146
+purpose = "bsdiff patch 'kernelcache.release' of the classic ipsw firmware bundle for iPhone2,1 4.3.3 (8J2)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-8J2-LLB.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_4.3.3_8J2.bundle/LLB.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "0a8b8a4b983484a73485eaf7127db0038710e7200889e20f4d6fc9df4b48d42f"
+size = 39052
+purpose = "bsdiff patch 'LLB.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 4.3.3 (8J2)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-8K2-asr"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_4.3.4_8K2.bundle/asr.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "d4035a4c919bee91e29292f07e9e0f26a6847cf80d41ca26a22dab4477a837b6"
+size = 367
+purpose = "bsdiff patch 'asr' of the classic ipsw firmware bundle for iPhone2,1 4.3.4 (8K2)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-8K2-iBoot.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_4.3.4_8K2.bundle/iBoot.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "eba9b43dd56ac7941d04463249044488240b48c0031e09da2f8a77500f6dfe95"
+size = 250
+purpose = "bsdiff patch 'iBoot.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 4.3.4 (8K2)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-8K2-iBSS.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_4.3.4_8K2.bundle/iBSS.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "9fcffbf7e4e14e3509608f5891621f4c46da9e8231f57f28dd8371f5462fcd6c"
+size = 296
+purpose = "bsdiff patch 'iBSS.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 4.3.4 (8K2)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-8K2-kernelcache.release"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_4.3.4_8K2.bundle/kernelcache.release.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "1c1967a571abe89cb5707a5e0ceaa2bebb548f5c51491426bcd7f596accc5d96"
+size = 232
+purpose = "bsdiff patch 'kernelcache.release' of the classic ipsw firmware bundle for iPhone2,1 4.3.4 (8K2)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-8K2-LLB.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_4.3.4_8K2.bundle/LLB.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "173ffad6e824d27b790dfd7023435e58f14210090db181b37350384a31448f04"
+size = 39040
+purpose = "bsdiff patch 'LLB.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 4.3.4 (8K2)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-8L1-asr"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_4.3.5_8L1.bundle/asr.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "d4035a4c919bee91e29292f07e9e0f26a6847cf80d41ca26a22dab4477a837b6"
+size = 367
+purpose = "bsdiff patch 'asr' of the classic ipsw firmware bundle for iPhone2,1 4.3.5 (8L1)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-8L1-iBoot.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_4.3.5_8L1.bundle/iBoot.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "eba9b43dd56ac7941d04463249044488240b48c0031e09da2f8a77500f6dfe95"
+size = 250
+purpose = "bsdiff patch 'iBoot.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 4.3.5 (8L1)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-8L1-iBSS.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_4.3.5_8L1.bundle/iBSS.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "9fcffbf7e4e14e3509608f5891621f4c46da9e8231f57f28dd8371f5462fcd6c"
+size = 296
+purpose = "bsdiff patch 'iBSS.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 4.3.5 (8L1)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-8L1-kernelcache.release"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_4.3.5_8L1.bundle/kernelcache.release.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "1c1967a571abe89cb5707a5e0ceaa2bebb548f5c51491426bcd7f596accc5d96"
+size = 232
+purpose = "bsdiff patch 'kernelcache.release' of the classic ipsw firmware bundle for iPhone2,1 4.3.5 (8L1)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-8L1-LLB.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_4.3.5_8L1.bundle/LLB.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "173ffad6e824d27b790dfd7023435e58f14210090db181b37350384a31448f04"
+size = 39040
+purpose = "bsdiff patch 'LLB.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 4.3.5 (8L1)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-9A334-asr"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_5.0_9A334.bundle/asr.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "c122d413f9a4330dc24376e8b40e8b6b5eb380ba47a0468cded35c67a4a1e27a"
+size = 215
+purpose = "bsdiff patch 'asr' of the classic ipsw firmware bundle for iPhone2,1 5.0 (9A334)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-9A334-iBEC.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_5.0_9A334.bundle/iBEC.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "b3ce4f73c43aa5755173cb89f0f5210f13b1525b74091e0882a5b32a3aa4f204"
+size = 367
+purpose = "bsdiff patch 'iBEC.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 5.0 (9A334)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-9A334-iBoot.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_5.0_9A334.bundle/iBoot.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "45a4ca3315055474e507794ba2fb74adee11d73c211cb60f8332d7b2f404ae6a"
+size = 191
+purpose = "bsdiff patch 'iBoot.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 5.0 (9A334)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-9A334-iBSS.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_5.0_9A334.bundle/iBSS.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "c7a26a83aff0b849d7b6298a0a41c63ec2279ddea010f5b43781b3c9a9eb2048"
+size = 189
+purpose = "bsdiff patch 'iBSS.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 5.0 (9A334)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-9A334-kernelcache.release"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_5.0_9A334.bundle/kernelcache.release.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "06cc3d56a590c3ee067574a8cc3225f3062c0866adc89290d50200d0cabc1265"
+size = 185
+purpose = "bsdiff patch 'kernelcache.release' of the classic ipsw firmware bundle for iPhone2,1 5.0 (9A334)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-9A334-LLB.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_5.0_9A334.bundle/LLB.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "2f68c830b11e819307fe74e7adba905737954f3b33b3eb431f7904d965376b6c"
+size = 51211
+purpose = "bsdiff patch 'LLB.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 5.0 (9A334)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-9A405-asr"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_5.0.1_9A405.bundle/asr.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "c122d413f9a4330dc24376e8b40e8b6b5eb380ba47a0468cded35c67a4a1e27a"
+size = 215
+purpose = "bsdiff patch 'asr' of the classic ipsw firmware bundle for iPhone2,1 5.0.1 (9A405)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-9A405-iBEC.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_5.0.1_9A405.bundle/iBEC.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "d44e62014d9d281e997860212410808fa2ed457e6c3870ea037171c65aa20415"
+size = 267
+purpose = "bsdiff patch 'iBEC.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 5.0.1 (9A405)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-9A405-iBoot.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_5.0.1_9A405.bundle/iBoot.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "45a4ca3315055474e507794ba2fb74adee11d73c211cb60f8332d7b2f404ae6a"
+size = 191
+purpose = "bsdiff patch 'iBoot.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 5.0.1 (9A405)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-9A405-iBSS.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_5.0.1_9A405.bundle/iBSS.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "c7a26a83aff0b849d7b6298a0a41c63ec2279ddea010f5b43781b3c9a9eb2048"
+size = 189
+purpose = "bsdiff patch 'iBSS.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 5.0.1 (9A405)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-9A405-kernelcache.release"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_5.0.1_9A405.bundle/kernelcache.release.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "06cc3d56a590c3ee067574a8cc3225f3062c0866adc89290d50200d0cabc1265"
+size = 185
+purpose = "bsdiff patch 'kernelcache.release' of the classic ipsw firmware bundle for iPhone2,1 5.0.1 (9A405)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-9A405-LLB.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_5.0.1_9A405.bundle/LLB.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "3a45fe772c73bc80efaf1479eb037b3f34b5c8400f949f3f9dcaa412de66c4a1"
+size = 51199
+purpose = "bsdiff patch 'LLB.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 5.0.1 (9A405)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-9B176-asr"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_5.1_9B176.bundle/asr.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "c122d413f9a4330dc24376e8b40e8b6b5eb380ba47a0468cded35c67a4a1e27a"
+size = 215
+purpose = "bsdiff patch 'asr' of the classic ipsw firmware bundle for iPhone2,1 5.1 (9B176)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-9B176-iBEC.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_5.1_9B176.bundle/iBEC.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "e052e3a67aa35878343cd97a9f8bab3f5b6c170277e7f9dc3ce15c3a18559447"
+size = 267
+purpose = "bsdiff patch 'iBEC.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 5.1 (9B176)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-9B176-iBoot.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_5.1_9B176.bundle/iBoot.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "3afa60600b0e4a55ed652d38bfc311772f6068bb5a5ef6bbdb3cbed08c19eea8"
+size = 192
+purpose = "bsdiff patch 'iBoot.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 5.1 (9B176)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-9B176-iBSS.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_5.1_9B176.bundle/iBSS.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "3b3decd039d75736737a2fa4c2c890360871f35d0504db1d32a4129a8b9f9b85"
+size = 185
+purpose = "bsdiff patch 'iBSS.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 5.1 (9B176)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-9B176-kernelcache.release"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_5.1_9B176.bundle/kernelcache.release.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "ab6de1f401bed4b64c896863b325cdb101b9f9a9b6c41e09ab112e70cba2cd26"
+size = 186
+purpose = "bsdiff patch 'kernelcache.release' of the classic ipsw firmware bundle for iPhone2,1 5.1 (9B176)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-9B176-LLB.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_5.1_9B176.bundle/LLB.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "c229a9e0a01e172a670109c7578500ccba6a1f8161a0f7154e4661282fc6d9ab"
+size = 51094
+purpose = "bsdiff patch 'LLB.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 5.1 (9B176)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-9B206-asr"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_5.1.1_9B206.bundle/asr.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "c122d413f9a4330dc24376e8b40e8b6b5eb380ba47a0468cded35c67a4a1e27a"
+size = 215
+purpose = "bsdiff patch 'asr' of the classic ipsw firmware bundle for iPhone2,1 5.1.1 (9B206)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-9B206-iBEC.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_5.1.1_9B206.bundle/iBEC.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "8029f345afc8b415033d38b5766501e79ebdd5a60331b9ea04fde665f0bc59af"
+size = 267
+purpose = "bsdiff patch 'iBEC.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 5.1.1 (9B206)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-9B206-iBoot.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_5.1.1_9B206.bundle/iBoot.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "3afa60600b0e4a55ed652d38bfc311772f6068bb5a5ef6bbdb3cbed08c19eea8"
+size = 192
+purpose = "bsdiff patch 'iBoot.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 5.1.1 (9B206)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-9B206-iBSS.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_5.1.1_9B206.bundle/iBSS.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "3b3decd039d75736737a2fa4c2c890360871f35d0504db1d32a4129a8b9f9b85"
+size = 185
+purpose = "bsdiff patch 'iBSS.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 5.1.1 (9B206)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-9B206-kernelcache.release"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_5.1.1_9B206.bundle/kernelcache.release.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "fd6b9ae632720e573f29e8b2654198c60f4e02f44e3acd935df1951f3b7e3176"
+size = 184
+purpose = "bsdiff patch 'kernelcache.release' of the classic ipsw firmware bundle for iPhone2,1 5.1.1 (9B206)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-9B206-LLB.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_5.1.1_9B206.bundle/LLB.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "c229a9e0a01e172a670109c7578500ccba6a1f8161a0f7154e4661282fc6d9ab"
+size = 51094
+purpose = "bsdiff patch 'LLB.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 5.1.1 (9B206)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-10A403-asr"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_6.0_10A403.bundle/asr.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "ffddc7ae91870b4d970a992d3c04c6792ae580a705d8c2e984177c7bfcee4272"
+size = 367
+purpose = "bsdiff patch 'asr' of the classic ipsw firmware bundle for iPhone2,1 6.0 (10A403)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-10A403-iBEC.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_6.0_10A403.bundle/iBEC.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "6232c6741c410bf3157147d65dab6ff7fdea5d2fa4964f0c4ab77494bc2b4a7e"
+size = 286
+purpose = "bsdiff patch 'iBEC.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 6.0 (10A403)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-10A403-iBoot.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_6.0_10A403.bundle/iBoot.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "25132a82ce939010d8e083f4e283a8e510f434b605b148c34d601045133129f1"
+size = 263
+purpose = "bsdiff patch 'iBoot.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 6.0 (10A403)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-10A403-iBSS.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_6.0_10A403.bundle/iBSS.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "33c3cb2ac6063743b3b903b76765b7e0f9c08a9fe643e42c07ea453db1db59b3"
+size = 164
+purpose = "bsdiff patch 'iBSS.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 6.0 (10A403)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-10A403-kernelcache.release"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_6.0_10A403.bundle/kernelcache.release.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "819715afda3bbb6ee6f43636fecaade3d97d646db25cab04c4180eca0b25466c"
+size = 187
+purpose = "bsdiff patch 'kernelcache.release' of the classic ipsw firmware bundle for iPhone2,1 6.0 (10A403)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-10A403-LLB.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_6.0_10A403.bundle/LLB.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "d6bf64cafc1cd15bef2c013429bf33e730e6f997399608f49171170fbe856ed7"
+size = 56525
+purpose = "bsdiff patch 'LLB.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 6.0 (10A403)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-10A403-restoredexternal"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_6.0_10A403.bundle/restoredexternal.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "da4d29ce90d8b65934577525651af97d94ffca423e02ffe907da1e6f75489714"
+size = 181
+purpose = "bsdiff patch 'restoredexternal' of the classic ipsw firmware bundle for iPhone2,1 6.0 (10A403)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-10A523-asr"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_6.0.1_10A523.bundle/asr.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "ffddc7ae91870b4d970a992d3c04c6792ae580a705d8c2e984177c7bfcee4272"
+size = 367
+purpose = "bsdiff patch 'asr' of the classic ipsw firmware bundle for iPhone2,1 6.0.1 (10A523)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-10A523-iBEC.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_6.0.1_10A523.bundle/iBEC.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "6232c6741c410bf3157147d65dab6ff7fdea5d2fa4964f0c4ab77494bc2b4a7e"
+size = 286
+purpose = "bsdiff patch 'iBEC.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 6.0.1 (10A523)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-10A523-iBoot.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_6.0.1_10A523.bundle/iBoot.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "25132a82ce939010d8e083f4e283a8e510f434b605b148c34d601045133129f1"
+size = 263
+purpose = "bsdiff patch 'iBoot.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 6.0.1 (10A523)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-10A523-iBSS.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_6.0.1_10A523.bundle/iBSS.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "33c3cb2ac6063743b3b903b76765b7e0f9c08a9fe643e42c07ea453db1db59b3"
+size = 164
+purpose = "bsdiff patch 'iBSS.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 6.0.1 (10A523)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-10A523-kernelcache.release"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_6.0.1_10A523.bundle/kernelcache.release.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "819715afda3bbb6ee6f43636fecaade3d97d646db25cab04c4180eca0b25466c"
+size = 187
+purpose = "bsdiff patch 'kernelcache.release' of the classic ipsw firmware bundle for iPhone2,1 6.0.1 (10A523)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-10A523-LLB.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_6.0.1_10A523.bundle/LLB.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "39bb3f4f3a6077eed737feade24fd2b3e677ff02d8beb57b9f85dc259767da7a"
+size = 56475
+purpose = "bsdiff patch 'LLB.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 6.0.1 (10A523)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-10A523-restoredexternal"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_6.0.1_10A523.bundle/restoredexternal.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "6c84d2069df4c56b79c553d2071bc89d3cfc7c1ace40537d7ccdc0d6d8e9e659"
+size = 179
+purpose = "bsdiff patch 'restoredexternal' of the classic ipsw firmware bundle for iPhone2,1 6.0.1 (10A523)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-10B141-asr"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_6.1_10B141.bundle/asr.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "787eff551f45de56a800435b8772e6a8f62130582a2876548993b9992691628f"
+size = 369
+purpose = "bsdiff patch 'asr' of the classic ipsw firmware bundle for iPhone2,1 6.1 (10B141)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-10B141-iBEC.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_6.1_10B141.bundle/iBEC.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "69f61f7386752d4f2799263ce9de33c1f3cde139fc5e1ed04d8f16907a976c18"
+size = 287
+purpose = "bsdiff patch 'iBEC.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 6.1 (10B141)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-10B141-iBoot.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_6.1_10B141.bundle/iBoot.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "0d7f1fe6379310b0c7b6414e5f09552de4e9b06748c48def9d6a68d09a202559"
+size = 254
+purpose = "bsdiff patch 'iBoot.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 6.1 (10B141)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-10B141-iBSS.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_6.1_10B141.bundle/iBSS.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "33c3cb2ac6063743b3b903b76765b7e0f9c08a9fe643e42c07ea453db1db59b3"
+size = 164
+purpose = "bsdiff patch 'iBSS.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 6.1 (10B141)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-10B141-kernelcache.release"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_6.1_10B141.bundle/kernelcache.release.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "a4d2af3a26ee80f18423bfdd7c3064a638c601d7ace8f2efa6d3e35272a6043f"
+size = 189
+purpose = "bsdiff patch 'kernelcache.release' of the classic ipsw firmware bundle for iPhone2,1 6.1 (10B141)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-10B141-LLB.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_6.1_10B141.bundle/LLB.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "36ef052209bee0df039b0a45c776f27cf2fb76a752ecad9a90e1936357ef82e5"
+size = 56508
+purpose = "bsdiff patch 'LLB.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 6.1 (10B141)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-10B141-restoredexternal"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_6.1_10B141.bundle/restoredexternal.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "379cf43516aad7a9b99cc2d72beb7a2a988cef58a0b740be11cb2ff3b4a7ebf7"
+size = 178
+purpose = "bsdiff patch 'restoredexternal' of the classic ipsw firmware bundle for iPhone2,1 6.1 (10B141)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-10B146-asr"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_6.1.2_10B146.bundle/asr.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "787eff551f45de56a800435b8772e6a8f62130582a2876548993b9992691628f"
+size = 369
+purpose = "bsdiff patch 'asr' of the classic ipsw firmware bundle for iPhone2,1 6.1.2 (10B146)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-10B146-iBEC.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_6.1.2_10B146.bundle/iBEC.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "69f61f7386752d4f2799263ce9de33c1f3cde139fc5e1ed04d8f16907a976c18"
+size = 287
+purpose = "bsdiff patch 'iBEC.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 6.1.2 (10B146)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-10B146-iBoot.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_6.1.2_10B146.bundle/iBoot.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "0d7f1fe6379310b0c7b6414e5f09552de4e9b06748c48def9d6a68d09a202559"
+size = 254
+purpose = "bsdiff patch 'iBoot.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 6.1.2 (10B146)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-10B146-iBSS.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_6.1.2_10B146.bundle/iBSS.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "33c3cb2ac6063743b3b903b76765b7e0f9c08a9fe643e42c07ea453db1db59b3"
+size = 164
+purpose = "bsdiff patch 'iBSS.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 6.1.2 (10B146)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-10B146-kernelcache.release"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_6.1.2_10B146.bundle/kernelcache.release.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "a4d2af3a26ee80f18423bfdd7c3064a638c601d7ace8f2efa6d3e35272a6043f"
+size = 189
+purpose = "bsdiff patch 'kernelcache.release' of the classic ipsw firmware bundle for iPhone2,1 6.1.2 (10B146)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-10B146-LLB.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_6.1.2_10B146.bundle/LLB.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "558372902e6793a4a3b97abd8658143d2d1433a55f3d616e5333c1672f161d39"
+size = 56605
+purpose = "bsdiff patch 'LLB.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 6.1.2 (10B146)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-10B146-restoredexternal"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_6.1.2_10B146.bundle/restoredexternal.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "379cf43516aad7a9b99cc2d72beb7a2a988cef58a0b740be11cb2ff3b4a7ebf7"
+size = 178
+purpose = "bsdiff patch 'restoredexternal' of the classic ipsw firmware bundle for iPhone2,1 6.1.2 (10B146)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-10B329-asr"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_6.1.3_10B329.bundle/asr.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "787eff551f45de56a800435b8772e6a8f62130582a2876548993b9992691628f"
+size = 369
+purpose = "bsdiff patch 'asr' of the classic ipsw firmware bundle for iPhone2,1 6.1.3 (10B329)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-10B329-iBEC.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_6.1.3_10B329.bundle/iBEC.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "69f61f7386752d4f2799263ce9de33c1f3cde139fc5e1ed04d8f16907a976c18"
+size = 287
+purpose = "bsdiff patch 'iBEC.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 6.1.3 (10B329)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-10B329-iBoot.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_6.1.3_10B329.bundle/iBoot.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "421c6f5870446f36883105f72d6696220950691ef6e4628bcb9ed31e7cc76e36"
+size = 410
+purpose = "bsdiff patch 'iBoot.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 6.1.3 (10B329)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-10B329-iBSS.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_6.1.3_10B329.bundle/iBSS.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "33c3cb2ac6063743b3b903b76765b7e0f9c08a9fe643e42c07ea453db1db59b3"
+size = 164
+purpose = "bsdiff patch 'iBSS.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 6.1.3 (10B329)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-10B329-kernelcache.release"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_6.1.3_10B329.bundle/kernelcache.release.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "3566a6381eabec909bb79d2802cb6995fa4ae2dbd7fc5ffd02b600c47d0f9351"
+size = 227
+purpose = "bsdiff patch 'kernelcache.release' of the classic ipsw firmware bundle for iPhone2,1 6.1.3 (10B329)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-10B329-LLB.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_6.1.3_10B329.bundle/LLB.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "8b51fbf32fbc3ac870824a98bc799664f20bdc8114ced65f0f00494600c86e2b"
+size = 56491
+purpose = "bsdiff patch 'LLB.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 6.1.3 (10B329)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-10B329-restoredexternal"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_6.1.3_10B329.bundle/restoredexternal.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "379cf43516aad7a9b99cc2d72beb7a2a988cef58a0b740be11cb2ff3b4a7ebf7"
+size = 178
+purpose = "bsdiff patch 'restoredexternal' of the classic ipsw firmware bundle for iPhone2,1 6.1.3 (10B329)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-10B500-asr"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_6.1.6_10B500.bundle/asr.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "079fbbc0de24078b37573b4f1ba3fcb0ce32416d587784fccfb4ddced3c0c5af"
+size = 205
+purpose = "bsdiff patch 'asr' of the classic ipsw firmware bundle for iPhone2,1 6.1.6 (10B500)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-10B500-iBEC.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_6.1.6_10B500.bundle/iBEC.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "ae69990a19f2835ebd06302fa7eaa9ba95c6faa565bc9f8777011f33fe539308"
+size = 425
+purpose = "bsdiff patch 'iBEC.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 6.1.6 (10B500)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone2-1-10B500-iBSS.n88ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone2,1_6.1.6_10B500.bundle/iBSS.n88ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "33c3cb2ac6063743b3b903b76765b7e0f9c08a9fe643e42c07ea453db1db59b3"
+size = 164
+purpose = "bsdiff patch 'iBSS.n88ap.RELEASE' of the classic ipsw firmware bundle for iPhone2,1 6.1.6 (10B500)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone3-1-8A293-asr"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone3,1_4.0_8A293.bundle/asr.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "537779836acba8af77ee08839e74e426a0c1d80712fa1e7dfb8be63695068f7d"
+size = 378
+purpose = "bsdiff patch 'asr' of the classic ipsw firmware bundle for iPhone3,1 4.0 (8A293)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone3-1-8A293-iBSS.n90ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone3,1_4.0_8A293.bundle/iBSS.n90ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "a7016441fd913340e4930a6f1511436191917e83f70dcb23775b5a970aed311f"
+size = 207
+purpose = "bsdiff patch 'iBSS.n90ap.RELEASE' of the classic ipsw firmware bundle for iPhone3,1 4.0 (8A293)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone3-1-8A293-restoredexternal"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone3,1_4.0_8A293.bundle/restoredexternal.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "5a846fce93640bb4cd18455a568ab28090afa41ab27bf17d894182d7900b67ab"
+size = 211
+purpose = "bsdiff patch 'restoredexternal' of the classic ipsw firmware bundle for iPhone3,1 4.0 (8A293)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone3-1-8A306-asr"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone3,1_4.0.1_8A306.bundle/asr.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "537779836acba8af77ee08839e74e426a0c1d80712fa1e7dfb8be63695068f7d"
+size = 378
+purpose = "bsdiff patch 'asr' of the classic ipsw firmware bundle for iPhone3,1 4.0.1 (8A306)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone3-1-8A306-iBSS.n90ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone3,1_4.0.1_8A306.bundle/iBSS.n90ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "a7016441fd913340e4930a6f1511436191917e83f70dcb23775b5a970aed311f"
+size = 207
+purpose = "bsdiff patch 'iBSS.n90ap.RELEASE' of the classic ipsw firmware bundle for iPhone3,1 4.0.1 (8A306)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone3-1-8A306-restoredexternal"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone3,1_4.0.1_8A306.bundle/restoredexternal.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "5a846fce93640bb4cd18455a568ab28090afa41ab27bf17d894182d7900b67ab"
+size = 211
+purpose = "bsdiff patch 'restoredexternal' of the classic ipsw firmware bundle for iPhone3,1 4.0.1 (8A306)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone3-1-8A400-asr"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone3,1_4.0.2_8A400.bundle/asr.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "537779836acba8af77ee08839e74e426a0c1d80712fa1e7dfb8be63695068f7d"
+size = 378
+purpose = "bsdiff patch 'asr' of the classic ipsw firmware bundle for iPhone3,1 4.0.2 (8A400)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone3-1-8A400-iBSS.n90ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone3,1_4.0.2_8A400.bundle/iBSS.n90ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "a7016441fd913340e4930a6f1511436191917e83f70dcb23775b5a970aed311f"
+size = 207
+purpose = "bsdiff patch 'iBSS.n90ap.RELEASE' of the classic ipsw firmware bundle for iPhone3,1 4.0.2 (8A400)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone3-1-8A400-restoredexternal"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone3,1_4.0.2_8A400.bundle/restoredexternal.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "5a846fce93640bb4cd18455a568ab28090afa41ab27bf17d894182d7900b67ab"
+size = 211
+purpose = "bsdiff patch 'restoredexternal' of the classic ipsw firmware bundle for iPhone3,1 4.0.2 (8A400)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone3-1-8B117-asr"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone3,1_4.1_8B117.bundle/asr.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "6a24ccfbaf3c868729da9f028b50d1787793478c63e41afb3d41443c412e4c1d"
+size = 214
+purpose = "bsdiff patch 'asr' of the classic ipsw firmware bundle for iPhone3,1 4.1 (8B117)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone3-1-8B117-iBSS.n90ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone3,1_4.1_8B117.bundle/iBSS.n90ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "f5e95105fc05da6a29015e144d1edc7c76166f7b1c6759116a0dede5633c4f6f"
+size = 242
+purpose = "bsdiff patch 'iBSS.n90ap.RELEASE' of the classic ipsw firmware bundle for iPhone3,1 4.1 (8B117)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPhone3-1-8B117-restoredexternal"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPhone3,1_4.1_8B117.bundle/restoredexternal.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "390d55d12e9a0951f9a2300ad955ee31b441d7faf5a902ed3a34e6cbd0817296"
+size = 202
+purpose = "bsdiff patch 'restoredexternal' of the classic ipsw firmware bundle for iPhone3,1 4.1 (8B117)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPod1-1-7E18-018-6494-014"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPod1,1_3.1.3_7E18.bundle/018-6494-014.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "c4ed1beb122fb09f0789928df8a50052b43539f0120ccc0fdc72356a4a71cfb6"
+size = 80053
+purpose = "bsdiff patch '018-6494-014' of the classic ipsw firmware bundle for iPod1,1 3.1.3 (7E18)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPod1-1-7E18-asr"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPod1,1_3.1.3_7E18.bundle/asr.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "8f12ec7531f96e115b90172fd7a0a2d2d5ee1b48d3a52eeb1476fd87ca6e27fe"
+size = 240
+purpose = "bsdiff patch 'asr' of the classic ipsw firmware bundle for iPod1,1 3.1.3 (7E18)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPod1-1-7E18-iBoot.n45ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPod1,1_3.1.3_7E18.bundle/iBoot.n45ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "8144d2499c5bbb724af9aabf2e525448ca18514b96186f1e82b034487d287b91"
+size = 58972
+purpose = "bsdiff patch 'iBoot.n45ap.RELEASE' of the classic ipsw firmware bundle for iPod1,1 3.1.3 (7E18)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPod1-1-7E18-iBSS.n45ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPod1,1_3.1.3_7E18.bundle/iBSS.n45ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "43a75459d070a568734fbe7017920ec221bf296a7a3e57090b794fba50b6dab4"
+size = 151
+purpose = "bsdiff patch 'iBSS.n45ap.RELEASE' of the classic ipsw firmware bundle for iPod1,1 3.1.3 (7E18)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPod1-1-7E18-kernelcache.release"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPod1,1_3.1.3_7E18.bundle/kernelcache.release.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "63c0ced58dac89790839dbeb83a33eaf240fff78cba2547030d481d2981ca139"
+size = 169
+purpose = "bsdiff patch 'kernelcache.release' of the classic ipsw firmware bundle for iPod1,1 3.1.3 (7E18)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPod1-1-7E18-LLB.n45ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPod1,1_3.1.3_7E18.bundle/LLB.n45ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "44554e6336ad8d4e52d376c0156db4d7bfbffaba1730d7b400ca088d9f8880d2"
+size = 158
+purpose = "bsdiff patch 'LLB.n45ap.RELEASE' of the classic ipsw firmware bundle for iPod1,1 3.1.3 (7E18)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPod1-1-7E18-WTF.s5l8900xall.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPod1,1_3.1.3_7E18.bundle/WTF.s5l8900xall.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "861fbf8936eaf9164d0bc186bf8098971af5fe50da59f57f1a73e5dfebc2f4b4"
+size = 155
+purpose = "bsdiff patch 'WTF.s5l8900xall.RELEASE' of the classic ipsw firmware bundle for iPod1,1 3.1.3 (7E18)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPod2-1-7C145-asr"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPod2,1_3.1.1_7C145.bundle/asr.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "8f12ec7531f96e115b90172fd7a0a2d2d5ee1b48d3a52eeb1476fd87ca6e27fe"
+size = 240
+purpose = "bsdiff patch 'asr' of the classic ipsw firmware bundle for iPod2,1 3.1.1 (7C145)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPod2-1-7C145-iBoot.n72ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPod2,1_3.1.1_7C145.bundle/iBoot.n72ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "58a547d799999c77aef3811b54f6a211cd8bc8d6fb1a911cb8dcd63701c948cc"
+size = 182
+purpose = "bsdiff patch 'iBoot.n72ap.RELEASE' of the classic ipsw firmware bundle for iPod2,1 3.1.1 (7C145)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPod2-1-7C145-iBSS.n72ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPod2,1_3.1.1_7C145.bundle/iBSS.n72ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "32a4edecb9ef7aebdf3422ba81aa4f536e9550d973afc23eb0aba18302e4ebed"
+size = 4441
+purpose = "bsdiff patch 'iBSS.n72ap.RELEASE' of the classic ipsw firmware bundle for iPod2,1 3.1.1 (7C145)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPod2-1-7C145-kernelcache.release"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPod2,1_3.1.1_7C145.bundle/kernelcache.release.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "3da71e019d9efdf82f1dd945ed3fc6e5e73ebf30dcdbbead238f9d72fd25bfab"
+size = 54763
+purpose = "bsdiff patch 'kernelcache.release' of the classic ipsw firmware bundle for iPod2,1 3.1.1 (7C145)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPod2-1-7C145-LLB.n72ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPod2,1_3.1.1_7C145.bundle/LLB.n72ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "69187c78417a3a395968273649bc123574d6d8cacea06bff8d11123b7b6604dc"
+size = 44218
+purpose = "bsdiff patch 'LLB.n72ap.RELEASE' of the classic ipsw firmware bundle for iPod2,1 3.1.1 (7C145)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPod2-1-7D11-asr"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPod2,1_3.1.2_7D11.bundle/asr.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "8f12ec7531f96e115b90172fd7a0a2d2d5ee1b48d3a52eeb1476fd87ca6e27fe"
+size = 240
+purpose = "bsdiff patch 'asr' of the classic ipsw firmware bundle for iPod2,1 3.1.2 (7D11)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPod2-1-7D11-iBoot.n72ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPod2,1_3.1.2_7D11.bundle/iBoot.n72ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "58a547d799999c77aef3811b54f6a211cd8bc8d6fb1a911cb8dcd63701c948cc"
+size = 182
+purpose = "bsdiff patch 'iBoot.n72ap.RELEASE' of the classic ipsw firmware bundle for iPod2,1 3.1.2 (7D11)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPod2-1-7D11-iBSS.n72ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPod2,1_3.1.2_7D11.bundle/iBSS.n72ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "32a4edecb9ef7aebdf3422ba81aa4f536e9550d973afc23eb0aba18302e4ebed"
+size = 4441
+purpose = "bsdiff patch 'iBSS.n72ap.RELEASE' of the classic ipsw firmware bundle for iPod2,1 3.1.2 (7D11)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPod2-1-7D11-kernelcache.release"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPod2,1_3.1.2_7D11.bundle/kernelcache.release.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "0dd3ee013c1445780f4c6d6b07f7f7c2bcc9e626589cfdf2a2cf6cc7f43f47ee"
+size = 54157
+purpose = "bsdiff patch 'kernelcache.release' of the classic ipsw firmware bundle for iPod2,1 3.1.2 (7D11)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPod2-1-7D11-LLB.n72ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPod2,1_3.1.2_7D11.bundle/LLB.n72ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "b0c3ad4c6fbde44c86c00920b2dba902bffcc8d89c62e28cdb5b426bca7b6ac5"
+size = 67029
+purpose = "bsdiff patch 'LLB.n72ap.RELEASE' of the classic ipsw firmware bundle for iPod2,1 3.1.2 (7D11)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPod2-1-7E18-asr"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPod2,1_3.1.3_7E18.bundle/asr.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "8f12ec7531f96e115b90172fd7a0a2d2d5ee1b48d3a52eeb1476fd87ca6e27fe"
+size = 240
+purpose = "bsdiff patch 'asr' of the classic ipsw firmware bundle for iPod2,1 3.1.3 (7E18)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPod2-1-7E18-iBoot.n72ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPod2,1_3.1.3_7E18.bundle/iBoot.n72ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "6c1af6c0e5146b48d5101b43680d62bf7769bbfe53ae1b248e11176bc67c3209"
+size = 184
+purpose = "bsdiff patch 'iBoot.n72ap.RELEASE' of the classic ipsw firmware bundle for iPod2,1 3.1.3 (7E18)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPod2-1-7E18-iBSS.n72ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPod2,1_3.1.3_7E18.bundle/iBSS.n72ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "420ee6e98a534a61327af2e84afc72917599c75177943e90865159a51f5e80c8"
+size = 266
+purpose = "bsdiff patch 'iBSS.n72ap.RELEASE' of the classic ipsw firmware bundle for iPod2,1 3.1.3 (7E18)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPod2-1-7E18-kernelcache.release"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPod2,1_3.1.3_7E18.bundle/kernelcache.release.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "f016a74da47df2645aa26125ec4da9e13a476b858885faf2a55fb08fafd38437"
+size = 237
+purpose = "bsdiff patch 'kernelcache.release' of the classic ipsw firmware bundle for iPod2,1 3.1.3 (7E18)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPod2-1-7E18-LLB.n72ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPod2,1_3.1.3_7E18.bundle/LLB.n72ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "1b6929d69ed5de34ad3943da1803d22adbb47413f60413d789554a29ac073c73"
+size = 44196
+purpose = "bsdiff patch 'LLB.n72ap.RELEASE' of the classic ipsw firmware bundle for iPod2,1 3.1.3 (7E18)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPod2-1-8A293-asr"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPod2,1_4.0_8A293.bundle/asr.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "bcd895f626260bc10e458b2a1c6aeb50138c4da0d3bd08b987d0980d254c2bc8"
+size = 236
+purpose = "bsdiff patch 'asr' of the classic ipsw firmware bundle for iPod2,1 4.0 (8A293)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPod2-1-8A293-iBoot.n72ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPod2,1_4.0_8A293.bundle/iBoot.n72ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "157c906cf376e5dc7506690bbb24f3fb8101641a017f2aa37453b10f08e4b85a"
+size = 207
+purpose = "bsdiff patch 'iBoot.n72ap.RELEASE' of the classic ipsw firmware bundle for iPod2,1 4.0 (8A293)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPod2-1-8A293-iBSS.n72ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPod2,1_4.0_8A293.bundle/iBSS.n72ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "9327d364ef6809926bf2a6b4084d684637b02bd0069486762c0a68860da596ae"
+size = 200
+purpose = "bsdiff patch 'iBSS.n72ap.RELEASE' of the classic ipsw firmware bundle for iPod2,1 4.0 (8A293)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPod2-1-8A293-kernelcache.release"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPod2,1_4.0_8A293.bundle/kernelcache.release.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "4f50f2d0d918fee0bf67def87b6564fead8bfb66a953b9587be25040f0308271"
+size = 224
+purpose = "bsdiff patch 'kernelcache.release' of the classic ipsw firmware bundle for iPod2,1 4.0 (8A293)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPod2-1-8A293-LLB.n72ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPod2,1_4.0_8A293.bundle/LLB.n72ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "d1b3b4c8a1298bb6da74445f01874eb15bb67de10d8f1c14297723444f00cd68"
+size = 40404
+purpose = "bsdiff patch 'LLB.n72ap.RELEASE' of the classic ipsw firmware bundle for iPod2,1 4.0 (8A293)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPod2-1-8A293-restoredexternal"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPod2,1_4.0_8A293.bundle/restoredexternal.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "2406be182aacc7f84041aa27a8f7e22281b523613a8e4bcf494d64282e4eb93e"
+size = 211
+purpose = "bsdiff patch 'restoredexternal' of the classic ipsw firmware bundle for iPod2,1 4.0 (8A293)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPod2-1-8A400-asr"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPod2,1_4.0.2_8A400.bundle/asr.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "bcd895f626260bc10e458b2a1c6aeb50138c4da0d3bd08b987d0980d254c2bc8"
+size = 236
+purpose = "bsdiff patch 'asr' of the classic ipsw firmware bundle for iPod2,1 4.0.2 (8A400)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPod2-1-8A400-iBoot.n72ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPod2,1_4.0.2_8A400.bundle/iBoot.n72ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "157c906cf376e5dc7506690bbb24f3fb8101641a017f2aa37453b10f08e4b85a"
+size = 207
+purpose = "bsdiff patch 'iBoot.n72ap.RELEASE' of the classic ipsw firmware bundle for iPod2,1 4.0.2 (8A400)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPod2-1-8A400-iBSS.n72ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPod2,1_4.0.2_8A400.bundle/iBSS.n72ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "9327d364ef6809926bf2a6b4084d684637b02bd0069486762c0a68860da596ae"
+size = 200
+purpose = "bsdiff patch 'iBSS.n72ap.RELEASE' of the classic ipsw firmware bundle for iPod2,1 4.0.2 (8A400)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPod2-1-8A400-kernelcache.release"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPod2,1_4.0.2_8A400.bundle/kernelcache.release.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "f6b073ec526b258a0693a56944b13dc0466e9de3684ef7c5cc606cd3aa992bfc"
+size = 84826
+purpose = "bsdiff patch 'kernelcache.release' of the classic ipsw firmware bundle for iPod2,1 4.0.2 (8A400)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPod2-1-8A400-LLB.n72ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPod2,1_4.0.2_8A400.bundle/LLB.n72ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "d1b3b4c8a1298bb6da74445f01874eb15bb67de10d8f1c14297723444f00cd68"
+size = 40404
+purpose = "bsdiff patch 'LLB.n72ap.RELEASE' of the classic ipsw firmware bundle for iPod2,1 4.0.2 (8A400)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPod2-1-8A400-restoredexternal"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPod2,1_4.0.2_8A400.bundle/restoredexternal.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "2406be182aacc7f84041aa27a8f7e22281b523613a8e4bcf494d64282e4eb93e"
+size = 211
+purpose = "bsdiff patch 'restoredexternal' of the classic ipsw firmware bundle for iPod2,1 4.0.2 (8A400)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPod2-1-8B117-asr"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPod2,1_4.1_8B117.bundle/asr.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "7472156b102d2d80338305f44e5b0367881c26dc141f94f8eb281d9884d891e0"
+size = 381
+purpose = "bsdiff patch 'asr' of the classic ipsw firmware bundle for iPod2,1 4.1 (8B117)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPod2-1-8B117-iBSS.n72ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPod2,1_4.1_8B117.bundle/iBSS.n72ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "6dc76b799f9eb3645a811b4bd389023f2c079f77596caf4dc9d746f501a4e7ef"
+size = 315
+purpose = "bsdiff patch 'iBSS.n72ap.RELEASE' of the classic ipsw firmware bundle for iPod2,1 4.1 (8B117)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPod2-1-8B117-restoredexternal"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPod2,1_4.1_8B117.bundle/restoredexternal.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "a78b7a322722b3520acfebd131b344b2cfecb4137d4c463214d938f33ab689f1"
+size = 207
+purpose = "bsdiff patch 'restoredexternal' of the classic ipsw firmware bundle for iPod2,1 4.1 (8B117)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPod2-1-8C148-asr"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPod2,1_4.2.1_8C148.bundle/asr.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "cb23286af626f98e17179d3ed37005ea248ba5e67bcbd4d712161241c0791a23"
+size = 205
+purpose = "bsdiff patch 'asr' of the classic ipsw firmware bundle for iPod2,1 4.2.1 (8C148)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPod2-1-8C148-iBSS.n72ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPod2,1_4.2.1_8C148.bundle/iBSS.n72ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "8a14ec956924d86cfdda3d3cb293325b51907bda303608637cf9c6a927f93f34"
+size = 311
+purpose = "bsdiff patch 'iBSS.n72ap.RELEASE' of the classic ipsw firmware bundle for iPod2,1 4.2.1 (8C148)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPod2-1-8C148-kernelcache.release"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPod2,1_4.2.1_8C148.bundle/kernelcache.release.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "13baf6fafecfc6085ed969d8eb36efa5b3098faa1fb5e6bd26811ffa7cbe0b2c"
+size = 241
+purpose = "bsdiff patch 'kernelcache.release' of the classic ipsw firmware bundle for iPod2,1 4.2.1 (8C148)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPod3-1-7C145-asr"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPod3,1_3.1.1_7C145.bundle/asr.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "f63f712aac4658306d5b1ade97a60302b5cd538be62cf01cadc43e2807e59783"
+size = 249
+purpose = "bsdiff patch 'asr' of the classic ipsw firmware bundle for iPod3,1 3.1.1 (7C145)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPod3-1-7C145-iBSS.n18ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPod3,1_3.1.1_7C145.bundle/iBSS.n18ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "6fe43acb4f79d1b47d7ea6019b7e704c49dca7adc6a0a093bc15719d1fc4360e"
+size = 4998
+purpose = "bsdiff patch 'iBSS.n18ap.RELEASE' of the classic ipsw firmware bundle for iPod3,1 3.1.1 (7C145)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPod3-1-7C145-restoredexternal"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPod3,1_3.1.1_7C145.bundle/restoredexternal.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "825859af9c6de3e625618c78be28cc22281d1ed63575b50bcbfe94c89d64424b"
+size = 16105
+purpose = "bsdiff patch 'restoredexternal' of the classic ipsw firmware bundle for iPod3,1 3.1.1 (7C145)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPod3-1-7C146-asr"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPod3,1_3.1.1_7C146.bundle/asr.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "f63f712aac4658306d5b1ade97a60302b5cd538be62cf01cadc43e2807e59783"
+size = 249
+purpose = "bsdiff patch 'asr' of the classic ipsw firmware bundle for iPod3,1 3.1.1 (7C146)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPod3-1-7C146-iBSS.n18ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPod3,1_3.1.1_7C146.bundle/iBSS.n18ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "6fe43acb4f79d1b47d7ea6019b7e704c49dca7adc6a0a093bc15719d1fc4360e"
+size = 4998
+purpose = "bsdiff patch 'iBSS.n18ap.RELEASE' of the classic ipsw firmware bundle for iPod3,1 3.1.1 (7C146)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPod3-1-7C146-restoredexternal"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPod3,1_3.1.1_7C146.bundle/restoredexternal.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "825859af9c6de3e625618c78be28cc22281d1ed63575b50bcbfe94c89d64424b"
+size = 16105
+purpose = "bsdiff patch 'restoredexternal' of the classic ipsw firmware bundle for iPod3,1 3.1.1 (7C146)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPod3-1-7D11-asr"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPod3,1_3.1.2_7D11.bundle/asr.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "02353674ebf36d12e01cbcff35b36777b55bd011a80ce43a0078ba62fd1ee956"
+size = 248
+purpose = "bsdiff patch 'asr' of the classic ipsw firmware bundle for iPod3,1 3.1.2 (7D11)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPod3-1-7D11-iBSS.n18ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPod3,1_3.1.2_7D11.bundle/iBSS.n18ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "6fe43acb4f79d1b47d7ea6019b7e704c49dca7adc6a0a093bc15719d1fc4360e"
+size = 4998
+purpose = "bsdiff patch 'iBSS.n18ap.RELEASE' of the classic ipsw firmware bundle for iPod3,1 3.1.2 (7D11)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPod3-1-7D11-restoredexternal"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPod3,1_3.1.2_7D11.bundle/restoredexternal.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "5a6bbb58b78760add2143259fa10534762817ae3c2246817ff6d3722e7f37f28"
+size = 16093
+purpose = "bsdiff patch 'restoredexternal' of the classic ipsw firmware bundle for iPod3,1 3.1.2 (7D11)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPod3-1-7E18-asr"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPod3,1_3.1.3_7E18.bundle/asr.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "5b68f94e81cc6a014439ef1d70ec01d84dfea94ab7c44ab812f4e38df455665c"
+size = 201
+purpose = "bsdiff patch 'asr' of the classic ipsw firmware bundle for iPod3,1 3.1.3 (7E18)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPod3-1-7E18-iBSS.n18ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPod3,1_3.1.3_7E18.bundle/iBSS.n18ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "dc9ed63ff3795a0035f07468e3a82a8f8fde3edf1521c6efc5e111aab32994b8"
+size = 270
+purpose = "bsdiff patch 'iBSS.n18ap.RELEASE' of the classic ipsw firmware bundle for iPod3,1 3.1.3 (7E18)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPod3-1-7E18-restoredexternal"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPod3,1_3.1.3_7E18.bundle/restoredexternal.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "2c76810a0a8ab9d9972ad532da5c05d9b4532e46fa24bc5e10f896300a608a85"
+size = 200
+purpose = "bsdiff patch 'restoredexternal' of the classic ipsw firmware bundle for iPod3,1 3.1.3 (7E18)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPod3-1-8A293-asr"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPod3,1_4.0_8A293.bundle/asr.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "6a24ccfbaf3c868729da9f028b50d1787793478c63e41afb3d41443c412e4c1d"
+size = 214
+purpose = "bsdiff patch 'asr' of the classic ipsw firmware bundle for iPod3,1 4.0 (8A293)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPod3-1-8A293-iBSS.n18ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPod3,1_4.0_8A293.bundle/iBSS.n18ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "8d33150dd38b37c7d457cd76f229e808ae545e316eefce05a22ab09f90125b44"
+size = 210
+purpose = "bsdiff patch 'iBSS.n18ap.RELEASE' of the classic ipsw firmware bundle for iPod3,1 4.0 (8A293)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPod3-1-8A293-restoredexternal"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPod3,1_4.0_8A293.bundle/restoredexternal.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "5a846fce93640bb4cd18455a568ab28090afa41ab27bf17d894182d7900b67ab"
+size = 211
+purpose = "bsdiff patch 'restoredexternal' of the classic ipsw firmware bundle for iPod3,1 4.0 (8A293)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPod3-1-8A400-asr"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPod3,1_4.0.2_8A400.bundle/asr.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "6a24ccfbaf3c868729da9f028b50d1787793478c63e41afb3d41443c412e4c1d"
+size = 214
+purpose = "bsdiff patch 'asr' of the classic ipsw firmware bundle for iPod3,1 4.0.2 (8A400)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPod3-1-8A400-iBSS.n18ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPod3,1_4.0.2_8A400.bundle/iBSS.n18ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "8d33150dd38b37c7d457cd76f229e808ae545e316eefce05a22ab09f90125b44"
+size = 210
+purpose = "bsdiff patch 'iBSS.n18ap.RELEASE' of the classic ipsw firmware bundle for iPod3,1 4.0.2 (8A400)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPod3-1-8A400-restoredexternal"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPod3,1_4.0.2_8A400.bundle/restoredexternal.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "5a846fce93640bb4cd18455a568ab28090afa41ab27bf17d894182d7900b67ab"
+size = 211
+purpose = "bsdiff patch 'restoredexternal' of the classic ipsw firmware bundle for iPod3,1 4.0.2 (8A400)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPod3-1-8B117-asr"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPod3,1_4.1_8B117.bundle/asr.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "6a24ccfbaf3c868729da9f028b50d1787793478c63e41afb3d41443c412e4c1d"
+size = 214
+purpose = "bsdiff patch 'asr' of the classic ipsw firmware bundle for iPod3,1 4.1 (8B117)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPod3-1-8B117-iBSS.n18ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPod3,1_4.1_8B117.bundle/iBSS.n18ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "91dcc8e56a97c8045b82e0000e0899a621c8187ec7b466f60fa3fb25000be2ca"
+size = 233
+purpose = "bsdiff patch 'iBSS.n18ap.RELEASE' of the classic ipsw firmware bundle for iPod3,1 4.1 (8B117)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPod3-1-8B117-restoredexternal"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPod3,1_4.1_8B117.bundle/restoredexternal.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "390d55d12e9a0951f9a2300ad955ee31b441d7faf5a902ed3a34e6cbd0817296"
+size = 202
+purpose = "bsdiff patch 'restoredexternal' of the classic ipsw firmware bundle for iPod3,1 4.1 (8B117)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPod4-1-8B117-asr"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPod4,1_4.1_8B117.bundle/asr.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "6a24ccfbaf3c868729da9f028b50d1787793478c63e41afb3d41443c412e4c1d"
+size = 214
+purpose = "bsdiff patch 'asr' of the classic ipsw firmware bundle for iPod4,1 4.1 (8B117)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPod4-1-8B117-iBSS.n81ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPod4,1_4.1_8B117.bundle/iBSS.n81ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "1ff938151e4d5bd7a87d58656934098f7cd343f591242dbb0cfbb5e27948d5c9"
+size = 240
+purpose = "bsdiff patch 'iBSS.n81ap.RELEASE' of the classic ipsw firmware bundle for iPod4,1 4.1 (8B117)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPod4-1-8B118-asr"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPod4,1_4.1_8B118.bundle/asr.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "6a24ccfbaf3c868729da9f028b50d1787793478c63e41afb3d41443c412e4c1d"
+size = 214
+purpose = "bsdiff patch 'asr' of the classic ipsw firmware bundle for iPod4,1 4.1 (8B118)"
+redistribution = "download-only"
+
+[[resources]]
+id = "classic-patch-iPod4-1-8B118-iBSS.n81ap.RELEASE"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/FirmwareBundles/Down_iPod4,1_4.1_8B118.bundle/iBSS.n81ap.RELEASE.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "1ff938151e4d5bd7a87d58656934098f7cd343f591242dbb0cfbb5e27948d5c9"
+size = 240
+purpose = "bsdiff patch 'iBSS.n81ap.RELEASE' of the classic ipsw firmware bundle for iPod4,1 4.1 (8B118)"
+redistribution = "download-only"
+

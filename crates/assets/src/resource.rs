@@ -162,7 +162,7 @@ mod tests {
     #[test]
     fn bundled_resources_have_fixed_provenance() {
         let catalog = ResourceCatalog::bundled();
-        assert_eq!(catalog.iter().count(), 225);
+        assert_eq!(catalog.iter().count(), 485);
         let resource = catalog.get(&ResourceId::new("ios4-scab-template")).unwrap();
         assert_eq!(resource.sha256().len(), 64);
         assert_eq!(resource.redistribution(), Redistribution::DownloadOnly);
@@ -206,6 +206,30 @@ mod tests {
                 let resource = catalog.get(&ResourceId::new(&id)).unwrap();
                 assert_eq!(resource.redistribution(), Redistribution::DownloadOnly);
             }
+        }
+    }
+
+    #[test]
+    fn classic_ipsw_patches_are_cataloged() {
+        let catalog = ResourceCatalog::bundled();
+        // Every non-lockdownd .patch of the 54 Down_* bundles (lockdownd
+        // patches use the lockdownd-patch-* ids).
+        let classic = catalog
+            .iter()
+            .filter(|record| record.id().as_str().starts_with("classic-patch-"))
+            .count();
+        assert_eq!(classic, 260);
+        for id in [
+            "classic-patch-iPad1-1-7B367-asr",
+            "classic-patch-iPhone1-2-8C148-WTF.s5l8900xall.RELEASE",
+            "classic-patch-iPhone1-2-8C148-038-0029-002",
+            "classic-patch-iPhone2-1-8B117-restoredexternal",
+            "classic-patch-iPhone2-1-9B206-iBEC.n88ap.RELEASE",
+            "classic-patch-iPod2-1-7E18-LLB.n72ap.RELEASE",
+        ] {
+            let resource = catalog.get(&ResourceId::new(id)).unwrap();
+            assert_eq!(resource.redistribution(), Redistribution::DownloadOnly);
+            assert!(resource.source_url().contains("/FirmwareBundles/Down_"));
         }
     }
 
