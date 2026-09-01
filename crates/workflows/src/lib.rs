@@ -4,6 +4,7 @@
 
 mod baseband;
 mod boot;
+mod cryptex;
 mod execution;
 mod personalization;
 mod ramdisk;
@@ -13,6 +14,10 @@ mod runner;
 
 pub use baseband::{BasebandError, BasebandFirmware, BasebandRequestError, BasebandResolver};
 pub use boot::{RestoreBootError, RestoreBootOutcome, boot_restore};
+pub use cryptex::{
+    CryptexRequestError, CryptexResolver, is_cryptex_component, is_cryptex_updater,
+    rewrite_build_identity,
+};
 pub use execution::{PreparedBootComponent, RestorePreparation, RestorePreparationError};
 pub use personalization::{ComponentPersonalizer, PersonalizationError};
 pub use ramdisk::{
@@ -25,9 +30,9 @@ pub use ramdisk_boot::{
     RamdiskPreparationError, boot_ramdisk,
 };
 pub use restore::{
-    BasebandPolicy, DestructiveConsent, ExploitPolicy, NoncePolicy, PlanId, RestoreComponent,
-    RestorePlan, RestorePlanError, RestoreRequest, RestoreStep, RestoreStepKind, RsepPolicy,
-    SepPolicy, TicketPolicy,
+    BasebandPolicy, CryptexPolicy, CryptexSource, DestructiveConsent, ExploitPolicy, NoncePolicy,
+    PlanId, RestoreComponent, RestorePlan, RestorePlanError, RestoreRequest, RestoreStep,
+    RestoreStepKind, RsepPolicy, SepPolicy, TicketPolicy,
 };
 pub use runner::{
     RestoreExecutionError, RestoreExecutionOutcome, RestoreExecutionProgress, run_restore,

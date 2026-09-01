@@ -2,7 +2,7 @@ use std::fmt;
 
 use legacy_ios_firmware::{FirmwareArchive, FirmwareError, SigningTicket, TicketError};
 use legacy_ios_restore::PreparedRestoreData;
-use plist::Value;
+use plist::{Dictionary, Value};
 use thiserror::Error;
 
 use crate::{
@@ -28,6 +28,7 @@ pub struct RestorePreparation {
     boot_nonce: Option<String>,
     build_major: u32,
     send_rsep: bool,
+    ticket_dictionary: Dictionary,
     exploit_policy: crate::ExploitPolicy,
 }
 
@@ -122,7 +123,11 @@ impl RestorePreparation {
                     return Err(RestorePreparationError::MissingProvidedSep);
                 }
                 Some((
-                    ComponentPersonalizer::new(archive, identity.clone(), ticket_dictionary),
+                    ComponentPersonalizer::new(
+                        archive,
+                        identity.clone(),
+                        ticket_dictionary.clone(),
+                    ),
                     identity,
                 ))
             }
@@ -164,6 +169,17 @@ impl RestorePreparation {
             }
             restored_data = restored_data.with_nor(nor);
         }
+        // Answer BuildIdentityDict requests with the target identity, rewritten
+        // against the provided cryptex source when the plan calls for it
+        // (idevicerestore restore_send_buildidentity, restore.c:5129-5207).
+        let mut build_identity = identity.raw().clone();
+        if let Some(crate::CryptexSource::Provided(path)) = plan.cryptex_source() {
+            let source_archive = FirmwareArchive::open(path)?;
+            let source_manifest = source_archive.build_manifest()?;
+            let source_identity = source_manifest.select_identity(board, plan.behavior())?;
+            build_identity = crate::rewrite_build_identity(&build_identity, source_identity.raw());
+        }
+        restored_data = restored_data.with_build_identity(build_identity);
         Ok(Self {
             plan_id: plan.id().clone(),
             boot_components,
@@ -173,6 +189,7 @@ impl RestorePreparation {
             boot_nonce,
             build_major,
             send_rsep: plan.rsep_policy() == crate::RsepPolicy::Send,
+            ticket_dictionary,
             exploit_policy: plan.exploit_policy(),
         })
     }
@@ -209,6 +226,12 @@ impl RestorePreparation {
     /// (the resolved [`crate::RsepPolicy`]).
     pub const fn send_rsep(&self) -> bool {
         self.send_rsep
+    }
+
+    /// Signing ticket dictionary used for component path lookups and
+    /// boot-object personalization.
+    pub fn ticket_dictionary(&self) -> &Dictionary {
+        &self.ticket_dictionary
     }
 
     pub const fn exploit_policy(&self) -> crate::ExploitPolicy {
@@ -308,6 +331,8 @@ mod tests {
             baseband: BasebandPolicy::None,
             sep: SepPolicy::Auto,
             rsep: crate::RsepPolicy::Auto,
+            cryptex: crate::CryptexPolicy::Auto,
+            cryptex_source: crate::CryptexSource::Target,
             exploit: ExploitPolicy::None,
             nonce: crate::NoncePolicy::Manual,
         })
@@ -363,6 +388,8 @@ mod tests {
             baseband: BasebandPolicy::None,
             sep: SepPolicy::Auto,
             rsep: crate::RsepPolicy::Auto,
+            cryptex: crate::CryptexPolicy::Auto,
+            cryptex_source: crate::CryptexSource::Target,
             exploit: ExploitPolicy::AlreadyPwned,
             nonce: crate::NoncePolicy::Manual,
         })
@@ -393,6 +420,8 @@ mod tests {
             baseband: BasebandPolicy::None,
             sep,
             rsep: crate::RsepPolicy::Auto,
+            cryptex: crate::CryptexPolicy::Auto,
+            cryptex_source: crate::CryptexSource::Target,
             exploit: ExploitPolicy::AlreadyPwned,
             nonce: crate::NoncePolicy::Manual,
         };

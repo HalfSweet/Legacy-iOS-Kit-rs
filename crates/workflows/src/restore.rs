@@ -18,6 +18,8 @@ pub struct RestoreRequest {
     pub baseband: BasebandPolicy,
     pub sep: SepPolicy,
     pub rsep: RsepPolicy,
+    pub cryptex: CryptexPolicy,
+    pub cryptex_source: CryptexSource,
     pub exploit: ExploitPolicy,
     pub nonce: NoncePolicy,
 }
@@ -64,6 +66,31 @@ pub enum RsepPolicy {
     Skip,
 }
 
+/// Whether the restore answers Cryptex1 boot-object and firmware-updater
+/// requests (futurerestore dev branch, iOS 16+).
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum CryptexPolicy {
+    /// Enable Cryptex1 handling for iOS 16+ targets whose build identity
+    /// manifest carries `Cryptex1,SystemOS`.
+    #[default]
+    Auto,
+    None,
+}
+
+/// Source of the six `Cryptex1,*` payloads and, for a separate source, the
+/// build-identity rewrite / TSS retry identity.
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case", tag = "policy", content = "value")]
+pub enum CryptexSource {
+    /// The target IPSW itself (upstream's `IDR_DISABLE_LATEST_CRYPTEX` path).
+    #[default]
+    Target,
+    /// A user-provided latest-version IPSW (the explicit-file equivalent of
+    /// upstream's `downloadLatestCryptex1`).
+    Provided(PathBuf),
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum ExploitPolicy {
@@ -107,6 +134,8 @@ pub struct RestorePlan {
     baseband: BasebandPolicy,
     sep: SepPolicy,
     rsep: RsepPolicy,
+    /// Resolved Cryptex1 handling: the payload source when enabled.
+    cryptex: Option<CryptexSource>,
     exploit: ExploitPolicy,
     nonce: NoncePolicy,
     components: Vec<RestoreComponent>,
@@ -163,6 +192,11 @@ impl RestorePlan {
         {
             return Err(RestorePlanError::SepNotFound(path.clone()));
         }
+        if let CryptexSource::Provided(path) = &request.cryptex_source
+            && !path.is_file()
+        {
+            return Err(RestorePlanError::CryptexSourceNotFound(path.clone()));
+        }
 
         let archive = FirmwareArchive::open(&request.firmware)?;
         let manifest = archive.build_manifest()?;
@@ -180,6 +214,15 @@ impl RestorePlan {
             },
             policy => policy,
         };
+        let cryptex = match request.cryptex {
+            CryptexPolicy::None => None,
+            CryptexPolicy::Auto => {
+                let gated = major_version(manifest.product_version().as_str())
+                    .is_some_and(|major| major >= 16)
+                    && identity.manifest().contains_key("Cryptex1,SystemOS");
+                gated.then(|| request.cryptex_source.clone())
+            }
+        };
         let components = identity
             .component_paths()
             .map(|(name, path)| RestoreComponent {
@@ -193,6 +236,7 @@ impl RestorePlan {
             manifest.product_version().as_str(),
             manifest.build_id().as_str(),
             rsep,
+            cryptex.as_ref(),
         );
 
         Ok(Self {
@@ -207,6 +251,7 @@ impl RestorePlan {
             baseband: request.baseband,
             sep: request.sep,
             rsep,
+            cryptex,
             exploit: request.exploit,
             nonce: request.nonce,
             components,
@@ -261,6 +306,12 @@ impl RestorePlan {
     /// Resolved RestoreSEP send decision; never [`RsepPolicy::Auto`].
     pub const fn rsep_policy(&self) -> RsepPolicy {
         self.rsep
+    }
+
+    /// Resolved Cryptex1 payload source, or `None` when Cryptex1 handling is
+    /// disabled for this target.
+    pub fn cryptex_source(&self) -> Option<&CryptexSource> {
+        self.cryptex.as_ref()
     }
 
     pub const fn exploit_policy(&self) -> ExploitPolicy {
@@ -390,9 +441,10 @@ fn plan_id(
     product_version: &str,
     build_id: &str,
     rsep: RsepPolicy,
+    cryptex: Option<&CryptexSource>,
 ) -> PlanId {
     let material = format!(
-        "{}|{}|{}|{}|{}|{:?}|{:?}|{:?}|{:?}|{:?}|{:?}|{:?}",
+        "{}|{}|{}|{}|{}|{:?}|{:?}|{:?}|{:?}|{:?}|{:?}|{:?}|{:?}",
         request.device.product_type(),
         request
             .device
@@ -406,6 +458,7 @@ fn plan_id(
         request.baseband,
         request.sep,
         rsep,
+        cryptex,
         request.exploit,
         request.nonce,
     );
@@ -439,6 +492,8 @@ pub enum RestorePlanError {
     BasebandNotFound(PathBuf),
     #[error("provided SEP firmware does not exist: {}", .0.display())]
     SepNotFound(PathBuf),
+    #[error("provided cryptex source IPSW does not exist: {}", .0.display())]
+    CryptexSourceNotFound(PathBuf),
     #[error("skipping the signing ticket requires a pwned boot chain")]
     SkipTicketRequiresExploit,
     #[error(transparent)]
@@ -468,6 +523,8 @@ mod tests {
             baseband: BasebandPolicy::Auto,
             sep: SepPolicy::Auto,
             rsep: RsepPolicy::Auto,
+            cryptex: CryptexPolicy::Auto,
+            cryptex_source: CryptexSource::Target,
             exploit: ExploitPolicy::Auto,
             nonce: NoncePolicy::Manual,
         };
@@ -494,6 +551,8 @@ mod tests {
             baseband: BasebandPolicy::Auto,
             sep: SepPolicy::Auto,
             rsep,
+            cryptex: CryptexPolicy::Auto,
+            cryptex_source: CryptexSource::Target,
             exploit: ExploitPolicy::Auto,
             nonce: NoncePolicy::Manual,
         };
@@ -510,6 +569,70 @@ mod tests {
     }
 
     #[test]
+    fn cryptex_auto_gates_on_version_and_manifest() {
+        const CRYPTEX_MANIFEST: &str = concat!(
+            "<key>RestoreRamDisk</key><dict><key>Info</key><dict><key>Path</key>",
+            "<string>ramdisk.dmg</string></dict></dict>",
+            "<key>Cryptex1,SystemOS</key><dict><key>Info</key><dict><key>Path</key>",
+            "<string>cryptex.dmg</string></dict></dict>",
+        );
+        let modern = firmware_fixture_with_components("16.7.10", CRYPTEX_MANIFEST);
+        let modern_without = firmware_fixture_with_version("16.7.10");
+        let legacy = firmware_fixture_with_components("15.8.3", CRYPTEX_MANIFEST);
+        let request = |firmware: &NamedTempFile, cryptex| RestoreRequest {
+            device: DeviceIdentity::new(ProductType::from("iPhone3,1"), Soc::A4)
+                .with_board_config(BoardConfig::from("n90"))
+                .with_ecid(Ecid::new(42)),
+            firmware: firmware.path().to_owned(),
+            behavior: RestoreBehavior::Erase,
+            ticket: TicketPolicy::Signed,
+            baseband: BasebandPolicy::Auto,
+            sep: SepPolicy::Auto,
+            rsep: RsepPolicy::Auto,
+            cryptex,
+            cryptex_source: CryptexSource::Target,
+            exploit: ExploitPolicy::Auto,
+            nonce: NoncePolicy::Manual,
+        };
+
+        // iOS 16+ with a Cryptex1,SystemOS manifest entry enables handling.
+        let plan = RestorePlan::resolve(request(&modern, CryptexPolicy::Auto)).unwrap();
+        assert_eq!(plan.cryptex_source(), Some(&CryptexSource::Target));
+        // iOS 15.x and identities without Cryptex1,SystemOS stay disabled.
+        let plan = RestorePlan::resolve(request(&modern_without, CryptexPolicy::Auto)).unwrap();
+        assert_eq!(plan.cryptex_source(), None);
+        let plan = RestorePlan::resolve(request(&legacy, CryptexPolicy::Auto)).unwrap();
+        assert_eq!(plan.cryptex_source(), None);
+        let plan = RestorePlan::resolve(request(&modern, CryptexPolicy::None)).unwrap();
+        assert_eq!(plan.cryptex_source(), None);
+    }
+
+    #[test]
+    fn cryptex_provided_source_must_exist() {
+        let firmware = firmware_fixture_with_version("16.7.10");
+        let request = RestoreRequest {
+            device: DeviceIdentity::new(ProductType::from("iPhone3,1"), Soc::A4)
+                .with_board_config(BoardConfig::from("n90"))
+                .with_ecid(Ecid::new(42)),
+            firmware: firmware.path().to_owned(),
+            behavior: RestoreBehavior::Erase,
+            ticket: TicketPolicy::Signed,
+            baseband: BasebandPolicy::Auto,
+            sep: SepPolicy::Auto,
+            rsep: RsepPolicy::Auto,
+            cryptex: CryptexPolicy::Auto,
+            cryptex_source: CryptexSource::Provided(PathBuf::from("/nonexistent.ipsw")),
+            exploit: ExploitPolicy::Auto,
+            nonce: NoncePolicy::Manual,
+        };
+
+        assert!(matches!(
+            RestorePlan::resolve(request),
+            Err(RestorePlanError::CryptexSourceNotFound(_))
+        ));
+    }
+
+    #[test]
     fn skip_ticket_requires_pwned_boot_chain() {
         let file = firmware_fixture();
         let request = |exploit| RestoreRequest {
@@ -522,6 +645,8 @@ mod tests {
             baseband: BasebandPolicy::Auto,
             sep: SepPolicy::Auto,
             rsep: RsepPolicy::Auto,
+            cryptex: CryptexPolicy::Auto,
+            cryptex_source: CryptexSource::Target,
             exploit,
             nonce: NoncePolicy::Manual,
         };
@@ -536,6 +661,13 @@ mod tests {
     }
 
     fn firmware_fixture_with_version(version: &str) -> NamedTempFile {
+        firmware_fixture_with_components(
+            version,
+            "<key>RestoreRamDisk</key><dict><key>Info</key><dict><key>Path</key><string>ramdisk.dmg</string></dict></dict>",
+        )
+    }
+
+    fn firmware_fixture_with_components(version: &str, manifest: &str) -> NamedTempFile {
         let file = NamedTempFile::new().unwrap();
         let mut writer = ZipWriter::new(file.reopen().unwrap());
         writer
@@ -551,7 +683,7 @@ mod tests {
 <key>SupportedProductTypes</key><array><string>iPhone3,1</string></array>
 <key>BuildIdentities</key><array><dict>
 <key>Info</key><dict><key>DeviceClass</key><string>n90ap</string><key>RestoreBehavior</key><string>Erase</string></dict>
-<key>Manifest</key><dict><key>RestoreRamDisk</key><dict><key>Info</key><dict><key>Path</key><string>ramdisk.dmg</string></dict></dict></dict>
+<key>Manifest</key><dict>{manifest}</dict>
 </dict></array>
 </dict></plist>"#
                 )

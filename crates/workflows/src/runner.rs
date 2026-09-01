@@ -14,8 +14,8 @@ use thiserror::Error;
 use tracing::warn;
 
 use crate::{
-    BasebandPolicy, BasebandRequestError, BasebandResolver, RestoreBootError, RestorePlan,
-    RestorePreparation, boot_restore,
+    BasebandPolicy, BasebandRequestError, BasebandResolver, CryptexRequestError, CryptexResolver,
+    RestoreBootError, RestorePlan, RestorePreparation, boot_restore, is_cryptex_updater,
 };
 
 pub async fn run_restore<P>(
@@ -41,6 +41,11 @@ where
             tss.clone(),
         )?)),
     };
+    let cryptex = plan
+        .cryptex_source()
+        .map(|_| CryptexResolver::new(plan, preparation.ticket_dictionary().clone(), tss.clone()))
+        .transpose()?
+        .map(Arc::new);
     let ecid = plan
         .device()
         .ecid()
@@ -80,19 +85,41 @@ where
         options,
         move |request: DataRequest| {
             let baseband = baseband.clone();
+            let cryptex = cryptex.clone();
             let prepared_data = prepared_data.clone();
             async move {
-                if matches!(request.data_type(), DataType::Baseband) {
-                    let resolver = baseband.ok_or_else(|| {
-                        RestoreRunError::data_provider(BasebandRequestError::Disabled)
-                    })?;
-                    let response = resolver
-                        .resolve(&request)
-                        .await
-                        .map_err(RestoreRunError::data_provider)?;
-                    Ok(DispatchAction::Send(response))
-                } else {
-                    Ok(prepared_data.dispatch(&request)?)
+                match request.data_type() {
+                    DataType::Baseband => {
+                        let resolver = baseband.ok_or_else(|| {
+                            RestoreRunError::data_provider(BasebandRequestError::Disabled)
+                        })?;
+                        let response = resolver
+                            .resolve(&request)
+                            .await
+                            .map_err(RestoreRunError::data_provider)?;
+                        Ok(DispatchAction::Send(response))
+                    }
+                    DataType::SourceBootObjectV4 | DataType::PersonalizedBootObjectV3 => {
+                        let resolver = cryptex.ok_or_else(|| {
+                            RestoreRunError::data_provider(CryptexRequestError::Disabled)
+                        })?;
+                        let data = resolver
+                            .boot_object(&request)
+                            .await
+                            .map_err(RestoreRunError::data_provider)?;
+                        Ok(DispatchAction::FileData(data))
+                    }
+                    DataType::FirmwareUpdater if is_cryptex_updater(&request) => {
+                        let resolver = cryptex.ok_or_else(|| {
+                            RestoreRunError::data_provider(CryptexRequestError::Disabled)
+                        })?;
+                        let response = resolver
+                            .firmware_updater(&request)
+                            .await
+                            .map_err(RestoreRunError::data_provider)?;
+                        Ok(DispatchAction::Send(response))
+                    }
+                    _ => Ok(prepared_data.dispatch(&request)?),
                 }
             }
         },
@@ -157,6 +184,8 @@ pub enum RestoreExecutionError {
     Firmware(#[from] FirmwareError),
     #[error(transparent)]
     Baseband(#[from] BasebandRequestError),
+    #[error(transparent)]
+    Cryptex(#[from] CryptexRequestError),
     #[error(transparent)]
     Boot(#[from] RestoreBootError),
     #[error(transparent)]

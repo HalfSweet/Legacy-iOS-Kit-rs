@@ -136,6 +136,75 @@ impl TssRequest {
         }
         Ok(request)
     }
+
+    /// Build a Cryptex1 / Cryptex1LocalPolicy TSS request from the merged
+    /// request parameters (tsschecker `tss_request_add_cryptex_tags`,
+    /// tss.c:1420-1453). The `Ap,LocalPolicy` parameter selects the
+    /// local-policy branch.
+    pub fn for_cryptex(parameters: &Dictionary) -> Result<Self, TssError> {
+        let mut request = Self::new();
+        // tss_request_add_common_tags (tss.c:347-361).
+        for key in [
+            "ApECID",
+            "UniqueBuildID",
+            "ApChipID",
+            "ApBoardID",
+            "ApSecurityDomain",
+        ] {
+            if let Some(value) = parameters.get(key) {
+                request.insert(key, value.clone());
+            }
+        }
+        if parameters.contains_key("Ap,LocalPolicy") {
+            // Cryptex1LocalPolicy: tss_request_add_local_policy_tags
+            // (tss.c:86-128) plus Ap,NextStageCryptex1IM4MHash.
+            request.insert("@ApImg4Ticket", true);
+            for key in ["Ap,LocalBoot", "Ap,LocalPolicy", "Ap,NextStageIM4MHash"] {
+                let value = parameters
+                    .get(key)
+                    .ok_or(TssError::MissingCryptexParameter(key))?;
+                request.insert(key, value.clone());
+            }
+            for key in [
+                "Ap,RecoveryOSPolicyNonceHash",
+                "Ap,VolumeUUID",
+                "ApECID",
+                "ApChipID",
+                "ApBoardID",
+                "ApSecurityDomain",
+                "ApNonce",
+            ] {
+                if let Some(value) = parameters.get(key) {
+                    request.insert(key, value.clone());
+                }
+            }
+            for key in ["ApSecurityMode", "ApProductionMode"] {
+                if !request.dictionary.contains_key(key) {
+                    let value = parameters
+                        .get(key)
+                        .ok_or(TssError::MissingCryptexParameter(key))?;
+                    request.insert(key, value.clone());
+                }
+            }
+            if let Some(value) = parameters.get("Ap,NextStageCryptex1IM4MHash") {
+                request.insert("Ap,NextStageCryptex1IM4MHash", value.clone());
+            }
+        } else {
+            // Cryptex1 ticket request.
+            request.insert("@Cryptex1,Ticket", true);
+            for key in ["ApSecurityMode", "ApProductionMode"] {
+                if let Some(value) = parameters.get(key) {
+                    request.insert(key, value.clone());
+                }
+            }
+            for (key, value) in parameters {
+                if key.starts_with("Cryptex1") {
+                    request.insert(key.clone(), value.clone());
+                }
+            }
+        }
+        Ok(request)
+    }
 }
 
 impl Default for TssRequest {
@@ -372,6 +441,8 @@ pub enum TssError {
     InvalidEndpoint(String),
     #[error("BuildIdentity has no BasebandFirmware manifest")]
     MissingBasebandManifest,
+    #[error("cryptex TSS parameters are missing {0}")]
+    MissingCryptexParameter(&'static str),
 }
 
 #[cfg(test)]
@@ -380,6 +451,97 @@ mod tests {
 
     use super::*;
     use crate::{BuildManifest, RestoreBehavior};
+
+    #[test]
+    fn builds_cryptex1_ticket_request() {
+        let mut parameters = Dictionary::new();
+        parameters.insert("ApECID".into(), 42_u64.into());
+        parameters.insert("ApChipID".into(), 0x8020_u64.into());
+        parameters.insert("ApBoardID".into(), 0x0c_u64.into());
+        parameters.insert("ApSecurityMode".into(), true.into());
+        parameters.insert("ApProductionMode".into(), true.into());
+        parameters.insert("Cryptex1,ChipID".into(), 0x8020_u64.into());
+        parameters.insert("Cryptex1,Nonce".into(), Value::Data(vec![1, 2]));
+        parameters.insert("Unrelated".into(), "ignored".into());
+
+        let request = TssRequest::for_cryptex(&parameters).unwrap();
+        let dictionary = request.dictionary();
+
+        assert_eq!(
+            dictionary
+                .get("@Cryptex1,Ticket")
+                .and_then(Value::as_boolean),
+            Some(true)
+        );
+        assert!(!dictionary.contains_key("@ApImg4Ticket"));
+        assert_eq!(
+            dictionary
+                .get("ApECID")
+                .and_then(Value::as_unsigned_integer),
+            Some(42)
+        );
+        assert_eq!(
+            dictionary
+                .get("Cryptex1,ChipID")
+                .and_then(Value::as_unsigned_integer),
+            Some(0x8020)
+        );
+        assert_eq!(
+            dictionary.get("Cryptex1,Nonce").and_then(Value::as_data),
+            Some([1, 2].as_slice())
+        );
+        // Only Cryptex1-prefixed parameters are copied beyond the common tags.
+        assert!(!dictionary.contains_key("Unrelated"));
+    }
+
+    #[test]
+    fn builds_cryptex1_local_policy_request() {
+        let mut parameters = Dictionary::new();
+        parameters.insert("ApECID".into(), 42_u64.into());
+        parameters.insert("Ap,LocalBoot".into(), false.into());
+        parameters.insert("Ap,LocalPolicy".into(), Value::Data(vec![3, 4]));
+        parameters.insert("Ap,NextStageIM4MHash".into(), Value::Data(vec![5, 6]));
+        parameters.insert(
+            "Ap,NextStageCryptex1IM4MHash".into(),
+            Value::Data(vec![7, 8]),
+        );
+        parameters.insert("ApSecurityMode".into(), true.into());
+        parameters.insert("ApProductionMode".into(), true.into());
+
+        let request = TssRequest::for_cryptex(&parameters).unwrap();
+        let dictionary = request.dictionary();
+
+        assert_eq!(
+            dictionary.get("@ApImg4Ticket").and_then(Value::as_boolean),
+            Some(true)
+        );
+        assert!(!dictionary.contains_key("@Cryptex1,Ticket"));
+        assert_eq!(
+            dictionary.get("Ap,LocalPolicy").and_then(Value::as_data),
+            Some([3, 4].as_slice())
+        );
+        assert_eq!(
+            dictionary
+                .get("Ap,NextStageCryptex1IM4MHash")
+                .and_then(Value::as_data),
+            Some([7, 8].as_slice())
+        );
+        assert_eq!(
+            dictionary.get("ApSecurityMode").and_then(Value::as_boolean),
+            Some(true)
+        );
+    }
+
+    #[test]
+    fn cryptex_local_policy_requires_local_boot() {
+        let mut parameters = Dictionary::new();
+        parameters.insert("Ap,LocalPolicy".into(), Value::Data(vec![3, 4]));
+
+        assert!(matches!(
+            TssRequest::for_cryptex(&parameters),
+            Err(TssError::MissingCryptexParameter("Ap,LocalBoot"))
+        ));
+    }
 
     #[test]
     fn parses_success_response() {

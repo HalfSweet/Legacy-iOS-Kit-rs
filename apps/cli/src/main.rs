@@ -12,9 +12,9 @@ use clap::{ArgAction, Parser, Subcommand, ValueEnum};
 use legacy_ios_kit::{
     ActivationState, AfcPath, AppFilter, AppSignRequest, BackupOptions, BackupOutcome,
     BackupPassword, BackupRestoreOptions, BasebandPolicy, BoardConfig, BootMode, BootNonce,
-    BootPartition, ClassicPrepareRequest, ClassicRestoreRequest, CustomRootfsRequest,
-    DeviceDiagnostics, DeviceFileInfo, DeviceInventory, DeviceStorageInfo, DeviceSummary,
-    DmgFirmwareKey, Ecid, ExploitPolicy, FirmwareSummary, FourThreeComponentSource,
+    BootPartition, ClassicPrepareRequest, ClassicRestoreRequest, CryptexPolicy, CryptexSource,
+    CustomRootfsRequest, DeviceDiagnostics, DeviceFileInfo, DeviceInventory, DeviceStorageInfo,
+    DeviceSummary, DmgFirmwareKey, Ecid, ExploitPolicy, FirmwareSummary, FourThreeComponentSource,
     FourThreePrepareRequest, HfsEntrySummary, HfsMutation, HfsStatSummary, HostKeyPolicy,
     Iboot32PatchOptions, ImageCipher, InstalledApp, IosVersion, LegacyIosKit, MountOptions,
     MultipartPrepareRequest, MultipartRestoreRequest, NoncePolicy, NorSource, OperationEvent,
@@ -1283,6 +1283,14 @@ enum RestoreCommand {
         /// `--no-rsep`).
         #[arg(long)]
         no_rsep: bool,
+        /// Do not answer Cryptex1 boot-object / firmware-updater requests
+        /// (iOS 16+ targets).
+        #[arg(long, conflicts_with = "cryptex_ipsw")]
+        no_cryptex: bool,
+        /// Latest-version IPSW used as the Cryptex1 payload source instead of
+        /// the target IPSW.
+        #[arg(long)]
+        cryptex_ipsw: Option<PathBuf>,
         #[arg(long, value_enum, default_value_t = ExploitArg::Auto)]
         exploit: ExploitArg,
         /// Write the ticket generator to the device boot nonce NVRAM variable.
@@ -1329,6 +1337,14 @@ enum RestoreCommand {
         /// `--no-rsep`).
         #[arg(long)]
         no_rsep: bool,
+        /// Do not answer Cryptex1 boot-object / firmware-updater requests
+        /// (iOS 16+ targets).
+        #[arg(long, conflicts_with = "cryptex_ipsw")]
+        no_cryptex: bool,
+        /// Latest-version IPSW used as the Cryptex1 payload source instead of
+        /// the target IPSW.
+        #[arg(long)]
+        cryptex_ipsw: Option<PathBuf>,
         #[arg(long)]
         flash_version_1: bool,
         /// Write the ticket generator to the device boot nonce NVRAM variable.
@@ -3303,6 +3319,8 @@ async fn main() -> Result<()> {
                     no_sep,
                     rsep,
                     no_rsep,
+                    no_cryptex,
+                    cryptex_ipsw,
                     exploit,
                     set_nonce,
                 },
@@ -3338,6 +3356,9 @@ async fn main() -> Result<()> {
                     baseband,
                     sep,
                     rsep: rsep_policy(rsep, no_rsep),
+                    cryptex: cryptex_policy(no_cryptex),
+                    cryptex_source: cryptex_ipsw
+                        .map_or(CryptexSource::Target, CryptexSource::Provided),
                     exploit: exploit.into(),
                     nonce: nonce_policy(set_nonce),
                 })
@@ -3363,6 +3384,8 @@ async fn main() -> Result<()> {
                     no_sep,
                     rsep,
                     no_rsep,
+                    no_cryptex,
+                    cryptex_ipsw,
                     flash_version_1,
                     set_nonce,
                     yes,
@@ -3393,6 +3416,8 @@ async fn main() -> Result<()> {
                     sep.map_or(SepPolicy::Auto, SepPolicy::Provided)
                 },
                 rsep: rsep_policy(rsep, no_rsep),
+                cryptex: cryptex_policy(no_cryptex),
+                cryptex_source: cryptex_ipsw.map_or(CryptexSource::Target, CryptexSource::Provided),
                 exploit: exploit.into(),
                 nonce: nonce_policy(set_nonce),
             })?;
@@ -3458,6 +3483,8 @@ async fn main() -> Result<()> {
                     baseband: BasebandPolicy::None,
                     sep: SepPolicy::Auto,
                     rsep: RsepPolicy::Auto,
+                    cryptex: CryptexPolicy::Auto,
+                    cryptex_source: CryptexSource::Target,
                     exploit: exploit.into(),
                     nonce: NoncePolicy::Manual,
                 })
@@ -3483,6 +3510,8 @@ async fn main() -> Result<()> {
                     },
                     sep: SepPolicy::Auto,
                     rsep: RsepPolicy::Auto,
+                    cryptex: CryptexPolicy::Auto,
+                    cryptex_source: CryptexSource::Target,
                     exploit: exploit.into(),
                     nonce: NoncePolicy::Manual,
                 })
@@ -4262,6 +4291,14 @@ const fn rsep_policy(rsep: bool, no_rsep: bool) -> RsepPolicy {
         RsepPolicy::Send
     } else {
         RsepPolicy::Auto
+    }
+}
+
+const fn cryptex_policy(no_cryptex: bool) -> CryptexPolicy {
+    if no_cryptex {
+        CryptexPolicy::None
+    } else {
+        CryptexPolicy::Auto
     }
 }
 
