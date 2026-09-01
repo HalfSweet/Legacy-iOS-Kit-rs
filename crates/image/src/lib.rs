@@ -38,7 +38,7 @@ pub use lzss::{
     is_lzss_compressed,
 };
 pub use mbn::{MbnError, MbnFile, MbnFormat};
-pub use onboard::{OnboardTicket, OnboardTicketError};
+pub use onboard::{OnboardTicket, OnboardTicketError, rewrite_ibob_magic};
 pub use patch::{PatchError, apply_bsdiff};
 pub use payload::{
     ImagePayloadError, decrypt_img3_payload, extract_image_payload, repair_truncated_img3,

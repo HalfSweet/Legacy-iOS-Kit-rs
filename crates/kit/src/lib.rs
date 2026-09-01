@@ -276,6 +276,14 @@ impl LegacyIosKit {
     }
 
     pub fn convert_onboard_dump(&self, dump: &[u8]) -> Result<SigningTicket, KitError> {
+        // Raw dumps from powdersn0w/DRA downgraded devices carry the mangled
+        // `ibob` LLB magic; rewrite it to `blli` like upstream's
+        // shsh_convert_onboard before looking for the ticket.
+        let fixed = legacy_ios_image::rewrite_ibob_magic(dump);
+        let dump = fixed.as_deref().unwrap_or(dump);
+        if fixed.is_some() {
+            tracing::info!("rewrote the ibob ticket magic of the onboard dump");
+        }
         let ticket = legacy_ios_image::OnboardTicket::parse(dump)?;
         Ok(SigningTicket::from_img4_ticket(
             ticket.im4m().to_vec(),

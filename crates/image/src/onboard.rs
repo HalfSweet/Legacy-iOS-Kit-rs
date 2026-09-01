@@ -6,6 +6,21 @@ const SEQUENCE: u64 = 16;
 const OCTET_STRING: u64 = 4;
 const IA5_STRING: u64 = 22;
 
+/// Rewrite the first `bobi` magic of a raw onboard dump to `blli`, returning
+/// the fixed dump, or `None` when the marker is absent.
+///
+/// Mirrors restore.sh `shsh_convert_onboard` (upstream commit 1ff4be0): raw
+/// dumps dumped on powdersn0w/DRA downgraded devices carry the mangled `ibob`
+/// LLB tag, which later tools reject with "unknown magic 69626f62". Upstream
+/// gates the fix on pre-A7 devices; the byte-level rewrite is a no-op for
+/// dumps without the marker, so it is applied unconditionally here.
+pub fn rewrite_ibob_magic(dump: &[u8]) -> Option<Vec<u8>> {
+    let position = dump.windows(4).position(|window| window == b"bobi")?;
+    let mut fixed = dump.to_vec();
+    fixed[position..position + 4].copy_from_slice(b"blli");
+    Some(fixed)
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct OnboardTicket {
     im4m: Vec<u8>,
@@ -206,6 +221,14 @@ mod tests {
         let mut data = vec![tag, content.len() as u8];
         data.extend_from_slice(content);
         data
+    }
+
+    #[test]
+    fn rewrites_the_first_ibob_magic() {
+        let dump = b"....bobi....bobi..";
+        let fixed = rewrite_ibob_magic(dump).unwrap();
+        assert_eq!(fixed, b"....blli....bobi..");
+        assert_eq!(rewrite_ibob_magic(b"....blli...."), None);
     }
 
     #[test]
