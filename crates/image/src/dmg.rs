@@ -259,6 +259,15 @@ impl DmgFirmwareKey {
             *byte = u8::from_str_radix(&value[index * 2..index * 2 + 2], 16)
                 .map_err(|_| DmgError::InvalidFirmwareKey)?;
         }
+        Self::from_bytes(&bytes)
+    }
+
+    /// The raw 36-byte vfdecrypt key material: a 16-byte AES key followed by
+    /// the 20-byte HMAC-SHA1 key.
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, DmgError> {
+        if bytes.len() != 36 {
+            return Err(DmgError::InvalidFirmwareKey);
+        }
         let mut aes = [0; 16];
         aes.copy_from_slice(&bytes[..16]);
         let mut hmac = [0; 20];

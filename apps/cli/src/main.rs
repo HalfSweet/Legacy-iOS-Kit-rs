@@ -14,14 +14,15 @@ use legacy_ios_kit::{
     BackupPassword, BackupRestoreOptions, BasebandPolicy, BoardConfig, BootMode, BootNonce,
     BootPartition, CustomRootfsRequest, DeviceDiagnostics, DeviceFileInfo, DeviceInventory,
     DeviceStorageInfo, DeviceSummary, DmgFirmwareKey, Ecid, ExploitPolicy, FirmwareSummary,
-    HfsEntrySummary, HfsMutation, HfsStatSummary, HostKeyPolicy, Iboot32PatchOptions, ImageCipher,
-    InstalledApp, LegacyIosKit, MountOptions, MultipartPrepareRequest, MultipartRestoreRequest,
-    NoncePolicy, NorSource, OperationEvent, OperationHandle, OperationOutcome, ProductType,
-    RamdiskBootExecutionRequest, RamdiskBootRequest, RamdiskBuildRequest, RamdiskBuildSummary,
-    RamdiskSsh, RecoveryDeviceInfo, RecoveryUploadResult, RemoteFirmwareSummary, ResourceId,
-    RestoreBehavior, RestoreExecutionRequest, RestorePlan, RestoreRequest, ScpPath, SepPolicy,
-    ShshRequest, ShshSummary, SigningTicket, SshCommandOutput, SshPassword, SshTarget,
-    TicketPolicy, Udid, UsbHostDiagnostics,
+    FourThreeComponentSource, FourThreePrepareRequest, HfsEntrySummary, HfsMutation,
+    HfsStatSummary, HostKeyPolicy, Iboot32PatchOptions, ImageCipher, InstalledApp, LegacyIosKit,
+    MountOptions, MultipartPrepareRequest, MultipartRestoreRequest, NoncePolicy, NorSource,
+    OperationEvent, OperationHandle, OperationOutcome, ProductType, RamdiskBootExecutionRequest,
+    RamdiskBootRequest, RamdiskBuildRequest, RamdiskBuildSummary, RamdiskSsh, RecoveryDeviceInfo,
+    RecoveryUploadResult, RemoteFirmwareSummary, ResourceId, RestoreBehavior,
+    RestoreExecutionRequest, RestorePlan, RestoreRequest, ScpPath, SepPolicy, ShshRequest,
+    ShshSummary, SigningTicket, SshCommandOutput, SshPassword, SshTarget, TicketPolicy, Udid,
+    UsbHostDiagnostics,
 };
 use tracing::level_filters::LevelFilter;
 use tracing::{debug, info, warn};
@@ -638,7 +639,7 @@ enum DeviceCommand {
         #[arg(long)]
         host_key: Option<String>,
     },
-    /// FourThree step 2: partition a jailbroken iOS 8.4.1 iPad 2 over SSH.
+    /// FourThree step 2: partition a jailbroken iOS 6.1.3 iPad 2 over SSH.
     #[command(name = "fourthree-step2")]
     FourThreeStep2 {
         /// GB to leave for the iOS 6.1.3 data partition (the rest goes to 4.3.x).
@@ -667,14 +668,18 @@ enum DeviceCommand {
         #[arg(long)]
         base_build: String,
         /// Rebuilt 4.3.x RootFS.dmg.
-        #[arg(long)]
-        rootfs: PathBuf,
+        #[arg(long, required_unless_present = "components_dir")]
+        rootfs: Option<PathBuf>,
         /// Patched decrypted 4.3.x kernelcache.
-        #[arg(long)]
-        kernelcache: PathBuf,
+        #[arg(long, required_unless_present = "components_dir")]
+        kernelcache: Option<PathBuf>,
         /// Patched 4.3.x LLB payload.
-        #[arg(long)]
-        llb: PathBuf,
+        #[arg(long, required_unless_present = "components_dir")]
+        llb: Option<PathBuf>,
+        /// Directory holding the RootFS.dmg, Kernelcache, and LLB produced by
+        /// `firmware fourthree-prepare`.
+        #[arg(long, conflicts_with_all = ["rootfs", "kernelcache", "llb"])]
+        components_dir: Option<PathBuf>,
         /// Also install OpenSSH into the 4.3.x system.
         #[arg(long)]
         openssh: bool,
@@ -685,7 +690,7 @@ enum DeviceCommand {
         #[arg(long)]
         yes: bool,
     },
-    /// Install the FourThree companion app on the 8.4.1 system.
+    /// Install the FourThree companion app on the 6.1.3 system.
     #[command(name = "fourthree-app")]
     FourThreeApp {
         #[arg(long, default_value = "root")]
@@ -868,6 +873,39 @@ enum FirmwareCommand {
         /// Add UpdateBaseband=false to the part 2 ramdisk options.plist.
         #[arg(long)]
         disable_bbupdate: bool,
+    },
+    /// Build the FourThree custom 6.1.3 IPSW and the patched 4.3.x dualboot
+    /// components (kernelcache, LLB, RootFS) of a FourThree install.
+    #[command(name = "fourthree-prepare")]
+    FourThreePrepare {
+        /// Device product type: iPad2,1, iPad2,2, or iPad2,3.
+        #[arg(long)]
+        device: ProductType,
+        /// Stock iOS 6.1.3 IPSW (the FourThree target system).
+        #[arg(long)]
+        target_ipsw: PathBuf,
+        /// Stock IPSW of the base (dualbooted) iOS version, 4.3-4.3.5.
+        #[arg(long)]
+        base_ipsw: PathBuf,
+        /// Local iOS 4.3.5 (8L1) IPSW supplying the bootchain components.
+        #[arg(
+            long,
+            conflicts_with = "bootchain_url",
+            required_unless_present = "bootchain_url"
+        )]
+        bootchain_ipsw: Option<PathBuf>,
+        /// URL of the iOS 4.3.5 (8L1) IPSW, read through HTTP range requests.
+        #[arg(long)]
+        bootchain_url: Option<String>,
+        /// Output path of the custom 6.1.3 IPSW.
+        #[arg(long)]
+        output_ipsw: PathBuf,
+        /// Directory the patched Kernelcache, LLB, and RootFS.dmg are written to.
+        #[arg(long)]
+        components_dir: PathBuf,
+        /// Artifact cache for firmware keys and catalog resources.
+        #[arg(long)]
+        cache_dir: Option<PathBuf>,
     },
 }
 
@@ -1912,6 +1950,7 @@ async fn main() -> Result<()> {
                     rootfs,
                     kernelcache,
                     llb,
+                    components_dir,
                     openssh,
                     username,
                     host_key,
@@ -1924,6 +1963,19 @@ async fn main() -> Result<()> {
                     "FourThree supports iPad2,1/iPad2,2/iPad2,3, found {product_type}"
                 ));
             }
+            let (rootfs, kernelcache, llb) = match (components_dir, rootfs, kernelcache, llb) {
+                (Some(dir), None, None, None) => (
+                    dir.join("RootFS.dmg"),
+                    dir.join("Kernelcache"),
+                    dir.join("LLB"),
+                ),
+                (None, Some(rootfs), Some(kernelcache), Some(llb)) => (rootfs, kernelcache, llb),
+                _ => {
+                    return Err(anyhow!(
+                        "provide either --components-dir or all of --rootfs, --kernelcache, and --llb"
+                    ));
+                }
+            };
             confirm(
                 "install the FourThree 4.3.x dualboot system on the device",
                 yes,
@@ -2575,6 +2627,53 @@ async fn main() -> Result<()> {
             write_firmware(output, summary.part1())?;
             info!(part2 = %summary.part2().path().display(), "part 2 (multipatch) IPSW built");
             write_firmware(output, summary.part2())?;
+        }
+        Command::Firmware {
+            command:
+                FirmwareCommand::FourThreePrepare {
+                    device,
+                    target_ipsw,
+                    base_ipsw,
+                    bootchain_ipsw,
+                    bootchain_url,
+                    output_ipsw,
+                    components_dir,
+                    cache_dir,
+                },
+        } => {
+            let bootchain_source = match (bootchain_ipsw, bootchain_url) {
+                (Some(path), None) => FourThreeComponentSource::Local(path),
+                (None, Some(url)) => FourThreeComponentSource::Remote(url),
+                _ => {
+                    return Err(anyhow!(
+                        "exactly one of --bootchain-ipsw or --bootchain-url is required"
+                    ));
+                }
+            };
+            let cache_root = match cache_dir {
+                Some(path) => path,
+                None => config.artifact_cache_dir()?,
+            };
+            let outcome = kit
+                .prepare_fourthree_ipsw(FourThreePrepareRequest::new(
+                    device,
+                    target_ipsw,
+                    base_ipsw,
+                    bootchain_source,
+                    output_ipsw,
+                    components_dir,
+                    cache_root,
+                ))
+                .await
+                .context("failed to build the FourThree custom IPSW and components")?;
+            info!(ipsw = %outcome.ipsw().path().display(), "FourThree custom IPSW built");
+            write_firmware(output, outcome.ipsw())?;
+            info!(
+                kernelcache = %outcome.kernelcache().display(),
+                llb = %outcome.llb().display(),
+                rootfs = %outcome.rootfs_dmg().display(),
+                "FourThree dualboot components built"
+            );
         }
         Command::Restore {
             command:

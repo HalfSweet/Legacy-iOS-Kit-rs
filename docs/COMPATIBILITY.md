@@ -44,7 +44,7 @@ Legend: ✅ implemented · 🟡 partial / bounded · ❌ not implemented ·
 | powdersn0w (iOS 4.3.x powder) | ❌ | missing exploit/ASR patch resources |
 | RSEP / Cryptex policies | ❌ | |
 | iPhone X restored_external | ❌ | |
-| FourThree dualboot (iPad2) | 🟡 | steps 2/3/app/boot ✅; step 1 custom IPSW ❌ pending byte-level validation |
+| FourThree dualboot (iPad2) | 🟡 | step 1 custom IPSW + dualboot components ✅ (`lik firmware fourthree-prepare`, unit-tested only — no end-to-end fixture test with real IPSWs yet); steps 2/3/app/boot ✅ |
 
 ## Jailbreak / activation
 

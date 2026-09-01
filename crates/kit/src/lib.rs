@@ -39,9 +39,11 @@ pub use firmware::{
     CustomRootfsRequest, FirmwareIdentitySummary, FirmwareSummary, RemoteFirmwareSummary,
 };
 pub use fourthree::{
-    FOURTHREE_BASE_VERSIONS, FOURTHREE_TARGET_VERSION, FourThreeOpenSsh, FourThreePatch,
-    FourThreeStep, FourThreeStep3Packages, TwistedMind2Output, fourthree_board_config,
-    fourthree_data_partition_bytes, fourthree_lockdownd_patch_id, fourthree_patch_id,
+    FOURTHREE_BASE_VERSIONS, FOURTHREE_BOOTCHAIN_BUILD, FOURTHREE_BOOTCHAIN_VERSION,
+    FOURTHREE_TARGET_VERSION, FourThreeComponentSource, FourThreeOpenSsh, FourThreePatch,
+    FourThreePrepareOutcome, FourThreePrepareRequest, FourThreeStep, FourThreeStep3Packages,
+    TwistedMind2Output, fourthree_board_config, fourthree_data_partition_bytes,
+    fourthree_lockdownd_patch_id, fourthree_patch_id, point_restore_device_tree_at_downgrade,
 };
 pub use hacktivate::{HacktivateMethod, hacktivate_method};
 pub use hfs::{HfsEntrySummary, HfsKind, HfsMutation, HfsStatSummary};
@@ -367,6 +369,15 @@ impl LegacyIosKit {
         fourthree::check(ssh).await
     }
 
+    /// FourThree step 1: build the custom 6.1.3 IPSW and the patched 4.3.x
+    /// dualboot components (kernelcache, LLB, RootFS) from the stock IPSWs.
+    pub async fn prepare_fourthree_ipsw(
+        &self,
+        request: FourThreePrepareRequest,
+    ) -> Result<FourThreePrepareOutcome, KitError> {
+        fourthree::prepare(request).await
+    }
+
     /// FourThree step 2: install the dualboot packages and partition the
     /// device with TwistedMind2. Returns the generated /TwistedMind2* files.
     pub async fn fourthree_step2(
@@ -389,7 +400,7 @@ impl LegacyIosKit {
         fourthree::step3(ssh, product_type, packages).await
     }
 
-    /// Install the FourThree companion app on the 8.4.1 system.
+    /// Install the FourThree companion app on the 6.1.3 system.
     pub async fn fourthree_install_app(
         &self,
         ssh: &RamdiskSsh,

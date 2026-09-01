@@ -30,4 +30,7 @@ pub use img4::{Img4Error, extract_im4p_payload, personalize_img4, replace_im4p_p
 pub use mbn::{MbnError, MbnFile, MbnFormat};
 pub use onboard::{OnboardTicket, OnboardTicketError};
 pub use patch::{PatchError, apply_bsdiff};
-pub use payload::{ImagePayloadError, extract_image_payload, replace_image_payload};
+pub use payload::{
+    ImagePayloadError, decrypt_img3_payload, extract_image_payload, repair_truncated_img3,
+    replace_image_payload,
+};

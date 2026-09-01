@@ -1,24 +1,43 @@
-//! FourThree dualboot (iOS 8.4.1 + 4.3.x) for the iPad 2, mirroring upstream's
-//! `device_fourthree_*` flows.
+//! FourThree dualboot (iOS 6.1.3 + 4.3.x) for the iPad 2, mirroring upstream's
+//! `ipsw_prepare_fourthree*` and `device_fourthree_*` flows.
 //!
-//! Step 1 (building the custom 8.4.1 IPSW and the patched 4.3.x kernelcache,
-//! LLB, and RootFS, upstream `ipsw_prepare_fourthree*`) is not implemented
-//! yet; the patched components are produced externally and passed to step 3.
+//! Step 1 builds the custom 6.1.3 IPSW (part 1) and the patched 4.3.x
+//! kernelcache, LLB, and RootFS (part 2) from the stock IPSWs, mirroring
+//! upstream `ipsw_prepare_fourthree` and `ipsw_prepare_fourthree_part2`.
 //! Steps 2 and 3 run over SSH against a jailbroken normal-mode device.
 
+use std::io::Cursor;
+use std::path::PathBuf;
+
 use legacy_ios_assets::ResourceId;
-use legacy_ios_image::apply_bsdiff;
+use legacy_ios_core::{BuildId, ProductType};
+use legacy_ios_firmware::{
+    CustomIpswBuilder, FirmwareArchive, FirmwareKey, FirmwareKeyProvider, FirmwareKeySet,
+    RemoteFirmwareArchive,
+};
+use legacy_ios_image::{
+    DmgFirmwareKey, DmgImage, DmgPartitionInput, Img3Tag, apply_bsdiff, decrypt_firmware_image,
+    decrypt_img3_payload, extract_image_payload, repair_truncated_img3, replace_image_payload,
+};
 use legacy_ios_services::{RamdiskSsh, ScpPath, SshError};
+use plist::Value;
 use tracing::info;
 
-use crate::KitError;
+use crate::{FirmwareSummary, KitError};
 
 /// Base (dualbooted) iOS versions supported by FourThree.
 pub const FOURTHREE_BASE_VERSIONS: [&str; 6] = ["4.3", "4.3.1", "4.3.2", "4.3.3", "4.3.4", "4.3.5"];
 /// iOS version of the target (primary) system the base system boots from.
 pub const FOURTHREE_TARGET_VERSION: &str = "6.1.3";
+/// iOS version and build supplying the dualboot bootchain components
+/// (AppleLogo/DeviceTree/iBoot/RecoveryMode), hardcoded like upstream's
+/// `saved/$device_type/8L1` path and `device_fw_key_check temp 8L1`.
+pub const FOURTHREE_BOOTCHAIN_VERSION: &str = "4.3.5";
+pub const FOURTHREE_BOOTCHAIN_BUILD: &str = "8L1";
 /// Fixed size in bytes of the 4.3.x system partition created by TwistedMind2.
 const TWISTED_MIND2_SYSTEM_SIZE: u64 = 879_124_480;
+/// Partition name used by upstream's `dmg build` for the rebuilt RootFS.
+const ROOTFS_PARTITION_NAME: &str = "Mac_OS_X (Apple_HFSX : 1)";
 const KERNELCACHEB: &str = "/System/Library/Caches/com.apple.kernelcaches/kernelcachb";
 const LOCKDOWND: &str = "/mnt1/usr/libexec/lockdownd";
 
@@ -26,7 +45,7 @@ const LOCKDOWND: &str = "/mnt1/usr/libexec/lockdownd";
 /// `device_fourthree_check`.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum FourThreeStep {
-    /// Step 1: the device is restored to iOS 8.4.1 (/dev/disk0s2s1 exists).
+    /// Step 1: the device is restored to iOS 6.1.3 (/dev/disk0s2s1 exists).
     Restore,
     /// Step 2: TwistedMind2 created the 4.3.x partitions (/dev/disk0s3).
     Partition,
@@ -117,6 +136,443 @@ pub fn fourthree_data_partition_bytes(size_gb: u32) -> Option<u64> {
     } else {
         None
     }
+}
+
+/// Where the iOS 4.3.5 (8L1) bootchain components are read from.
+#[derive(Clone, Debug)]
+pub enum FourThreeComponentSource {
+    /// A local iOS 4.3.5 IPSW.
+    Local(PathBuf),
+    /// An iOS 4.3.5 IPSW URL read through HTTP range requests.
+    Remote(String),
+}
+
+enum ComponentSource {
+    Local(FirmwareArchive),
+    Remote(RemoteFirmwareArchive),
+}
+
+impl ComponentSource {
+    async fn open(source: &FourThreeComponentSource) -> Result<Self, KitError> {
+        match source {
+            FourThreeComponentSource::Local(path) => Ok(Self::Local(FirmwareArchive::open(path)?)),
+            FourThreeComponentSource::Remote(url) => {
+                Ok(Self::Remote(RemoteFirmwareArchive::open(url).await?))
+            }
+        }
+    }
+
+    async fn read(&self, name: &str) -> Result<Vec<u8>, KitError> {
+        match self {
+            Self::Local(archive) => Ok(archive.read_entry(name)?),
+            Self::Remote(archive) => Ok(archive.read_entry(name).await?),
+        }
+    }
+
+    fn entry_names(&self) -> Result<Vec<String>, KitError> {
+        match self {
+            Self::Local(archive) => Ok(archive.entry_names()?),
+            Self::Remote(archive) => Ok(archive.entry_names().map(str::to_owned).collect()),
+        }
+    }
+}
+
+/// Request for building the FourThree custom IPSW and dualboot components.
+#[derive(Clone, Debug)]
+pub struct FourThreePrepareRequest {
+    product_type: ProductType,
+    target_ipsw: PathBuf,
+    base_ipsw: PathBuf,
+    bootchain_source: FourThreeComponentSource,
+    ipsw_output: PathBuf,
+    component_output: PathBuf,
+    cache_root: PathBuf,
+}
+
+impl FourThreePrepareRequest {
+    /// `target_ipsw` is a stock iOS 6.1.3 IPSW, `base_ipsw` a stock IPSW of
+    /// the dualbooted 4.3.x version, and `component_output` the directory the
+    /// patched `Kernelcache`, `LLB`, and `RootFS.dmg` are written to.
+    pub fn new(
+        product_type: ProductType,
+        target_ipsw: impl Into<PathBuf>,
+        base_ipsw: impl Into<PathBuf>,
+        bootchain_source: FourThreeComponentSource,
+        ipsw_output: impl Into<PathBuf>,
+        component_output: impl Into<PathBuf>,
+        cache_root: impl Into<PathBuf>,
+    ) -> Self {
+        Self {
+            product_type,
+            target_ipsw: target_ipsw.into(),
+            base_ipsw: base_ipsw.into(),
+            bootchain_source,
+            ipsw_output: ipsw_output.into(),
+            component_output: component_output.into(),
+            cache_root: cache_root.into(),
+        }
+    }
+}
+
+/// Artifacts produced by FourThree step 1.
+pub struct FourThreePrepareOutcome {
+    ipsw: FirmwareSummary,
+    kernelcache: PathBuf,
+    llb: PathBuf,
+    rootfs_dmg: PathBuf,
+}
+
+impl FourThreePrepareOutcome {
+    /// The custom 6.1.3 IPSW restored in step 1.
+    pub const fn ipsw(&self) -> &FirmwareSummary {
+        &self.ipsw
+    }
+
+    /// Patched decrypted 4.3.x kernelcache, installed as kernelcachb.
+    pub fn kernelcache(&self) -> &std::path::Path {
+        &self.kernelcache
+    }
+
+    /// Patched 4.3.x LLB payload, installed at /LLB.
+    pub fn llb(&self) -> &std::path::Path {
+        &self.llb
+    }
+
+    /// Rebuilt 4.3.x RootFS.dmg restored onto /dev/disk0s3.
+    pub fn rootfs_dmg(&self) -> &std::path::Path {
+        &self.rootfs_dmg
+    }
+}
+
+/// Build the FourThree custom 6.1.3 IPSW and the patched 4.3.x dualboot
+/// components, mirroring upstream `ipsw_prepare_fourthree` and
+/// `ipsw_prepare_fourthree_part2`.
+pub(crate) async fn prepare(
+    request: FourThreePrepareRequest,
+) -> Result<FourThreePrepareOutcome, KitError> {
+    let board = fourthree_board_config(request.product_type.as_str())
+        .ok_or_else(|| KitError::FourThreeUnsupportedDevice(request.product_type.to_string()))?;
+
+    let target = FirmwareArchive::open(&request.target_ipsw)?;
+    let target_manifest = target.build_manifest()?;
+    let target_version = target_manifest.product_version().to_string();
+    let target_build = target_manifest.build_id().clone();
+    if target_version != FOURTHREE_TARGET_VERSION {
+        return Err(KitError::FourThreeUnsupportedTarget(format!(
+            "{} {target_version}",
+            request.product_type
+        )));
+    }
+    let base = FirmwareArchive::open(&request.base_ipsw)?;
+    let base_manifest = base.build_manifest()?;
+    let base_version = base_manifest.product_version().to_string();
+    let base_build = base_manifest.build_id().clone();
+    if !FOURTHREE_BASE_VERSIONS.contains(&base_version.as_str()) {
+        return Err(KitError::FourThreeUnsupportedBase(format!(
+            "{} {base_version}",
+            request.product_type
+        )));
+    }
+
+    let keys = FirmwareKeyProvider::with_cache(&request.cache_root);
+    info!(
+        version = FOURTHREE_TARGET_VERSION,
+        "fetching target component keys"
+    );
+    let target_keys = keys.fetch(&request.product_type, &target_build).await?;
+    info!(
+        version = FOURTHREE_BOOTCHAIN_VERSION,
+        "fetching bootchain component keys"
+    );
+    let bootchain_keys = keys
+        .fetch(
+            &request.product_type,
+            &BuildId::new(FOURTHREE_BOOTCHAIN_BUILD),
+        )
+        .await?;
+    info!(version = %base_version, "fetching base component keys");
+    let base_keys = keys.fetch(&request.product_type, &base_build).await?;
+
+    // The device and both versions are validated against the catalog above,
+    // so every patch id resolves.
+    let patch_id = |version: &str, component: FourThreePatch| {
+        fourthree_patch_id(request.product_type.as_str(), version, component)
+            .expect("device and version are validated against the catalog")
+    };
+    let rdt_patch = read_resource(
+        &patch_id(FOURTHREE_TARGET_VERSION, FourThreePatch::RestoreDeviceTree),
+        &request.cache_root,
+    )
+    .await?;
+    let iboot_patch = read_resource(
+        &patch_id(FOURTHREE_TARGET_VERSION, FourThreePatch::IBoot),
+        &request.cache_root,
+    )
+    .await?;
+    let llb_patch = read_resource(
+        &patch_id(&base_version, FourThreePatch::Llb),
+        &request.cache_root,
+    )
+    .await?;
+    let kernelcache_patch = read_resource(
+        &patch_id(&base_version, FourThreePatch::Kernelcache),
+        &request.cache_root,
+    )
+    .await?;
+
+    let target_entries = target.entry_names()?;
+    let target_flash = all_flash_dir(&target_entries, board)?;
+    let device_tree = key_for(&target_keys, "DeviceTree")?.filename().to_owned();
+    let restore_device_tree = target.read_entry(&format!("{target_flash}/{device_tree}"))?;
+    let flash_manifest = target.read_entry(&format!("{target_flash}/manifest"))?;
+    let build_manifest = target.read_entry("BuildManifest.plist")?;
+
+    let bootchain = ComponentSource::open(&request.bootchain_source).await?;
+    let bootchain_entries = bootchain.entry_names()?;
+    let bootchain_flash = all_flash_dir(&bootchain_entries, board)?;
+    let mut boot_images = Vec::new();
+    for image in ["AppleLogo", "DeviceTree", "RecoveryMode", "iBoot"] {
+        let key = key_for(&bootchain_keys, image)?;
+        let data = bootchain
+            .read(&format!("{bootchain_flash}/{}", key.filename()))
+            .await?;
+        boot_images.push((image, data));
+    }
+
+    let base_entries = base.entry_names()?;
+    let base_flash = all_flash_dir(&base_entries, board)?;
+    let llb_container = base.read_entry(&format!(
+        "{base_flash}/{}",
+        key_for(&base_keys, "LLB")?.filename()
+    ))?;
+    let kernelcache_container = base.read_entry(key_for(&base_keys, "Kernelcache")?.filename())?;
+    let rootfs_dmg = base.read_entry(key_for(&base_keys, "RootFS")?.filename())?;
+
+    info!("building the FourThree custom IPSW and dualboot components");
+    let built = tokio::task::spawn_blocking(move || {
+        // Part 1: the patched RestoreDeviceTree under Downgrade/ and the
+        // mangled/patched 4.3.5 bootchain components as *B.img3, mirroring
+        // ipsw_prepare_fourthree.
+        let mut replacements: Vec<(String, Vec<u8>)> = Vec::new();
+        let (key, iv) = key_material(key_for(&target_keys, "DeviceTree")?, "DeviceTree")?;
+        let decrypted = decrypt_img3_payload(&restore_device_tree, &key, &iv)?;
+        let patched = apply_bsdiff(&decrypted, &rdt_patch)?;
+        replacements.push((
+            "Downgrade/RestoreDeviceTree".to_owned(),
+            repair_truncated_img3(&patched)?,
+        ));
+
+        let mut names = Vec::new();
+        for (image, container) in boot_images {
+            let (key, iv) = key_material(key_for(&bootchain_keys, image)?, image)?;
+            let decrypted = decrypt_img3_payload(&container, &key, &iv)?;
+            let (name, data) = match image {
+                "AppleLogo" => (
+                    "applelogoB.img3",
+                    mangle_bootchain_image(&decrypted, *b"bg", image)?,
+                ),
+                "DeviceTree" => (
+                    "DeviceTreeB.img3",
+                    mangle_bootchain_image(&decrypted, *b"br", image)?,
+                ),
+                "RecoveryMode" => (
+                    "recoverymodeB.img3",
+                    mangle_bootchain_image(&decrypted, *b"bc", image)?,
+                ),
+                "iBoot" => (
+                    "iBootB.img3",
+                    repair_truncated_img3(&apply_bsdiff(&decrypted, &iboot_patch)?)?,
+                ),
+                _ => unreachable!("fixed component list"),
+            };
+            replacements.push((format!("{target_flash}/{name}"), data));
+            names.push(name);
+        }
+        replacements.push((
+            format!("{target_flash}/manifest"),
+            append_to_flash_manifest(&flash_manifest, &names),
+        ));
+        // Upstream gets the Downgrade/RestoreDeviceTree manifest path from the
+        // powdersn0w IPSW builder; this flow starts from a stock IPSW, so the
+        // BuildManifest edit happens here.
+        replacements.push((
+            "BuildManifest.plist".to_owned(),
+            point_restore_device_tree_at_downgrade(&build_manifest)?,
+        ));
+
+        // Part 2: the patched 4.3.x kernelcache, LLB, and RootFS, mirroring
+        // ipsw_prepare_fourthree_part2.
+        let (key, iv) = key_material(key_for(&base_keys, "Kernelcache")?, "Kernelcache")?;
+        let raw = extract_image_payload(&kernelcache_container, Some((&key, &iv)))?;
+        let patched = apply_bsdiff(&raw, &kernelcache_patch)?;
+        // Upstream re-wraps the patched payload using the original container
+        // as the template, encrypting and then decrypting with the same key:
+        // the identity. Wrap the patched payload directly instead.
+        let kernelcache = replace_image_payload(&kernelcache_container, &patched, None)?;
+
+        let (key, iv) = key_material(key_for(&base_keys, "LLB")?, "LLB")?;
+        let raw = extract_image_payload(&llb_container, Some((&key, &iv)))?;
+        let llb = apply_bsdiff(&raw, &llb_patch)?;
+
+        let rootfs_key = key_for(&base_keys, "RootFS")?
+            .key()
+            .ok_or(KitError::FourThreeMissingKey("RootFS"))?;
+        let rootfs = DmgImage::build(vec![DmgPartitionInput::new(
+            ROOTFS_PARTITION_NAME,
+            decrypt_firmware_image(&rootfs_dmg, &DmgFirmwareKey::from_bytes(rootfs_key)?)?,
+        )])?
+        .into_bytes();
+        Ok::<_, KitError>((replacements, kernelcache, llb, rootfs))
+    })
+    .await
+    .map_err(|error| KitError::Task(error.to_string()))??;
+    let (replacements, kernelcache, llb, rootfs) = built;
+
+    let mut builder = CustomIpswBuilder::new(FirmwareArchive::open(&request.target_ipsw)?);
+    for (name, data) in replacements {
+        builder = builder.replace(name, data)?;
+    }
+    builder.build(&request.ipsw_output).await?;
+
+    tokio::fs::create_dir_all(&request.component_output).await?;
+    let kernelcache_path = request.component_output.join("Kernelcache");
+    tokio::fs::write(&kernelcache_path, &kernelcache).await?;
+    let llb_path = request.component_output.join("LLB");
+    tokio::fs::write(&llb_path, &llb).await?;
+    let rootfs_path = request.component_output.join("RootFS.dmg");
+    tokio::fs::write(&rootfs_path, &rootfs).await?;
+    info!(
+        ipsw = %request.ipsw_output.display(),
+        components = %request.component_output.display(),
+        "FourThree step 1 artifacts built"
+    );
+
+    let ipsw = FirmwareSummary::inspect(request.ipsw_output)?;
+    Ok(FourThreePrepareOutcome {
+        ipsw,
+        kernelcache: kernelcache_path,
+        llb: llb_path,
+        rootfs_dmg: rootfs_path,
+    })
+}
+
+async fn read_resource(id: &ResourceId, cache_root: &std::path::Path) -> Result<Vec<u8>, KitError> {
+    let path = crate::firmware::fetch_resource(id, cache_root.to_owned()).await?;
+    Ok(tokio::fs::read(path).await?)
+}
+
+/// `Firmware/all_flash/all_flash.<board>ap[.production]` directory inside an
+/// IPSW, located via its `manifest` entry. Falls back to the only all_flash
+/// manifest when the directory name does not carry the board config.
+fn all_flash_dir(entries: &[String], board: &str) -> Result<String, KitError> {
+    let marker = format!("all_flash.{board}ap");
+    let mut fallback = None;
+    for name in entries {
+        let Some(dir) = name.strip_suffix("/manifest") else {
+            continue;
+        };
+        if !dir.starts_with("Firmware/all_flash/") {
+            continue;
+        }
+        if dir.contains(&marker) {
+            return Ok(dir.to_owned());
+        }
+        fallback.get_or_insert_with(|| dir.to_owned());
+    }
+    fallback.ok_or(KitError::FourThreeInvalidImage("all_flash manifest"))
+}
+
+fn key_for<'a>(keys: &'a FirmwareKeySet, image: &'static str) -> Result<&'a FirmwareKey, KitError> {
+    keys.key(image).ok_or(KitError::FourThreeMissingKey(image))
+}
+
+fn key_material(key: &FirmwareKey, image: &'static str) -> Result<(Vec<u8>, [u8; 16]), KitError> {
+    match (key.key(), key.iv()) {
+        (Some(key), Some(iv)) => Ok((key.to_vec(), *iv)),
+        _ => Err(KitError::FourThreeMissingKey(image)),
+    }
+}
+
+/// Apply the FourThree `*B.img3` type mangle to a decrypted IMG3 container,
+/// mirroring upstream's `echo "0000010: 62xx" | xxd -r` edits: the last
+/// character of the image type fourcc (image header and TYPE element) becomes
+/// 'b' so the dualboot components do not collide with the 6.1.3 copies in
+/// NOR.
+fn mangle_bootchain_image(
+    container: &[u8],
+    marker: [u8; 2],
+    image: &'static str,
+) -> Result<Vec<u8>, KitError> {
+    // A decrypted IMG3 with a leading TYPE element: image type at 0x10, TYPE
+    // element header at 0x14, TYPE data at 0x20.
+    if container.len() < 0x24
+        || !container.starts_with(b"3gmI")
+        || container[0x14..0x18] != Img3Tag::TYPE.get().to_le_bytes()
+    {
+        return Err(KitError::FourThreeInvalidImage(image));
+    }
+    let mut mangled = container.to_vec();
+    mangled[0x10..0x12].copy_from_slice(&marker);
+    mangled[0x20..0x22].copy_from_slice(&marker);
+    Ok(mangled)
+}
+
+/// Append the `*B.img3` names to the all_flash manifest, mirroring upstream's
+/// `echo "${getcomp}B.img3" >> $all_flash/manifest`.
+fn append_to_flash_manifest(manifest: &[u8], names: &[&str]) -> Vec<u8> {
+    let mut text = String::from_utf8_lossy(manifest).into_owned();
+    if !text.ends_with('\n') {
+        text.push('\n');
+    }
+    for name in names {
+        text.push_str(name);
+        text.push('\n');
+    }
+    text.into_bytes()
+}
+
+/// Point every build identity's RestoreDeviceTree component at the patched
+/// copy under `Downgrade/`, mirroring the BuildManifest edit the upstream
+/// flow gets from the powdersn0w IPSW builder. Manifests already referencing
+/// `Downgrade/` are returned unchanged, like upstream's idempotence check.
+pub fn point_restore_device_tree_at_downgrade(manifest: &[u8]) -> Result<Vec<u8>, KitError> {
+    if manifest
+        .windows(b"Downgrade/".len())
+        .any(|window| window == b"Downgrade/")
+    {
+        return Ok(manifest.to_vec());
+    }
+    let mut value = Value::from_reader(Cursor::new(manifest))?;
+    let root = value
+        .as_dictionary_mut()
+        .ok_or(KitError::FourThreeInvalidManifest)?;
+    let identities = root
+        .get_mut("BuildIdentities")
+        .and_then(Value::as_array_mut)
+        .ok_or(KitError::FourThreeInvalidManifest)?;
+    for identity in identities {
+        let Some(manifest) = identity
+            .as_dictionary_mut()
+            .and_then(|identity| identity.get_mut("Manifest"))
+            .and_then(Value::as_dictionary_mut)
+        else {
+            continue;
+        };
+        if let Some(info) = manifest
+            .get_mut("RestoreDeviceTree")
+            .and_then(Value::as_dictionary_mut)
+            .and_then(|component| component.get_mut("Info"))
+            .and_then(Value::as_dictionary_mut)
+        {
+            info.insert(
+                "Path".to_owned(),
+                Value::String("Downgrade/RestoreDeviceTree".to_owned()),
+            );
+        }
+    }
+    let mut output = Vec::new();
+    value.to_writer_xml(&mut output)?;
+    Ok(output)
 }
 
 /// A file produced by the on-device TwistedMind2 partitioner, pulled back to
@@ -414,7 +870,20 @@ fn scp_path(path: &str) -> Result<ScpPath, KitError> {
 
 #[cfg(test)]
 mod tests {
+    use legacy_ios_image::{Img3, Img3Element};
+
     use super::*;
+
+    fn sample_img3(image_type: u32) -> Vec<u8> {
+        Img3::new(
+            image_type,
+            vec![
+                Img3Element::new(Img3Tag::TYPE, image_type.to_le_bytes().to_vec()),
+                Img3Element::new(Img3Tag::DATA, b"payload".to_vec()),
+            ],
+        )
+        .to_bytes()
+    }
 
     #[test]
     fn maps_ipad2_boards() {
@@ -524,6 +993,98 @@ mod tests {
         assert!(matches!(
             ensure_step3_allowed(FourThreeStep::DualBoot),
             Err(KitError::FourThreeStepAlreadyDone("step 3"))
+        ));
+    }
+
+    #[test]
+    fn mangles_bootchain_image_types() {
+        let container = sample_img3(u32::from_be_bytes(*b"logo"));
+        let mangled = mangle_bootchain_image(&container, *b"bg", "AppleLogo").unwrap();
+        let parsed = Img3::parse(&mangled).unwrap();
+        let logb = u32::from_be_bytes(*b"logb");
+        assert_eq!(parsed.image_type(), logb);
+        let type_element = parsed
+            .elements()
+            .iter()
+            .find(|element| element.tag() == Img3Tag::TYPE)
+            .unwrap();
+        assert_eq!(type_element.data(), logb.to_le_bytes());
+        // The payload and the rest of the container are untouched.
+        assert_eq!(parsed.payload().unwrap(), b"payload");
+        assert_eq!(mangled.len(), container.len());
+    }
+
+    #[test]
+    fn mangle_requires_a_leading_type_element() {
+        let mut container = sample_img3(u32::from_be_bytes(*b"logo"));
+        container[0x14..0x18].copy_from_slice(b"ATAD");
+        assert!(matches!(
+            mangle_bootchain_image(&container, *b"bg", "AppleLogo"),
+            Err(KitError::FourThreeInvalidImage("AppleLogo"))
+        ));
+        assert!(matches!(
+            mangle_bootchain_image(b"not an image", *b"br", "DeviceTree"),
+            Err(KitError::FourThreeInvalidImage("DeviceTree"))
+        ));
+    }
+
+    #[test]
+    fn finds_all_flash_dir() {
+        let entries = vec![
+            "Firmware/all_flash/all_flash.k93ap.production/LLB.k93ap.RELEASE.img3".to_owned(),
+            "Firmware/all_flash/all_flash.k93ap.production/manifest".to_owned(),
+            "kernelcache.release.k93".to_owned(),
+        ];
+        assert_eq!(
+            all_flash_dir(&entries, "k93ap").unwrap(),
+            "Firmware/all_flash/all_flash.k93ap.production"
+        );
+        // Falls back to the only all_flash manifest for other boards.
+        assert!(all_flash_dir(&entries, "k94ap").is_ok());
+        assert!(matches!(
+            all_flash_dir(&[], "k93ap"),
+            Err(KitError::FourThreeInvalidImage("all_flash manifest"))
+        ));
+    }
+
+    #[test]
+    fn appends_bootchain_names_to_flash_manifest() {
+        let manifest = b"LLB.k93ap.RELEASE.img3\napplelogo.s5l8940x.img3";
+        let updated = append_to_flash_manifest(manifest, &["applelogoB.img3", "DeviceTreeB.img3"]);
+        assert_eq!(
+            updated,
+            b"LLB.k93ap.RELEASE.img3\napplelogo.s5l8940x.img3\napplelogoB.img3\nDeviceTreeB.img3\n"
+        );
+    }
+
+    #[test]
+    fn points_restore_device_tree_at_downgrade() {
+        let manifest = br#"<?xml version="1.0" encoding="UTF-8"?>
+<plist version="1.0"><dict>
+<key>BuildIdentities</key><array><dict>
+<key>Manifest</key><dict>
+<key>RestoreDeviceTree</key><dict><key>Info</key><dict><key>Path</key><string>Firmware/all_flash/all_flash.k93ap.production/DeviceTree.k93ap.img3</string></dict></dict>
+<key>RestoreKernelCache</key><dict><key>Info</key><dict><key>Path</key><string>kernelcache.release.k93</string></dict></dict>
+</dict>
+</dict></array></dict></plist>"#;
+        let rewritten = point_restore_device_tree_at_downgrade(manifest).unwrap();
+        let text = String::from_utf8(rewritten).unwrap();
+        assert!(text.contains("Downgrade/RestoreDeviceTree"));
+        // RestoreKernelCache is left untouched.
+        assert!(text.contains("kernelcache.release.k93"));
+
+        // Idempotent, like upstream's Downgrade grep check.
+        let again = point_restore_device_tree_at_downgrade(text.as_bytes()).unwrap();
+        assert_eq!(again, text.as_bytes());
+    }
+
+    #[test]
+    fn rejects_manifest_without_identities() {
+        let manifest = br#"<?xml version="1.0" encoding="UTF-8"?>
+<plist version="1.0"><dict></dict></plist>"#;
+        assert!(matches!(
+            point_restore_device_tree_at_downgrade(manifest),
+            Err(KitError::FourThreeInvalidManifest)
         ));
     }
 }

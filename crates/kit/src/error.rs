@@ -106,7 +106,7 @@ pub enum KitError {
     MissingHacktivationPatch,
     #[error("no original lockdownd on the device; provide one with a file")]
     MissingOriginalLockdownd,
-    #[error("FourThree step 1 (restore to iOS 8.4.1) is not complete on the device")]
+    #[error("FourThree step 1 (restore to iOS 6.1.3) is not complete on the device")]
     FourThreeRestoreIncomplete,
     #[error("FourThree step 2 (partitioning) is not complete on the device")]
     FourThreePartitionIncomplete,
@@ -122,6 +122,16 @@ pub enum KitError {
     FourThreePartitionerFailed,
     #[error("FourThree does not support {0}")]
     FourThreeUnsupportedDevice(String),
+    #[error("FourThree requires an iOS 6.1.3 target IPSW, found {0}")]
+    FourThreeUnsupportedTarget(String),
+    #[error("FourThree supports iOS 4.3-4.3.5 base IPSWs, found {0}")]
+    FourThreeUnsupportedBase(String),
+    #[error("no firmware key material for the FourThree {0} component")]
+    FourThreeMissingKey(&'static str),
+    #[error("the IPSW does not contain a valid {0}")]
+    FourThreeInvalidImage(&'static str),
+    #[error("the BuildManifest has no BuildIdentities array")]
+    FourThreeInvalidManifest,
     #[error("multipart restore supports iOS 3.x and 4.0-4.2 targets, found {0}")]
     MultipartUnsupportedTarget(String),
     #[error("the custom IPSW restore ramdisk is already multipatched")]
@@ -186,7 +196,12 @@ impl KitError {
             | Self::InvalidFourThreePartitionSize(_)
             | Self::MissingFourThreeLockdowndPatch
             | Self::FourThreePartitionerFailed
-            | Self::FourThreeUnsupportedDevice(_) => OperationPhase::Planning,
+            | Self::FourThreeUnsupportedDevice(_)
+            | Self::FourThreeUnsupportedTarget(_)
+            | Self::FourThreeUnsupportedBase(_)
+            | Self::FourThreeMissingKey(_)
+            | Self::FourThreeInvalidImage(_)
+            | Self::FourThreeInvalidManifest => OperationPhase::Planning,
             Self::MultipartUnsupportedTarget(_)
             | Self::MultipartAlreadyPatched
             | Self::MultipartInvalidOptionsPlist
@@ -299,7 +314,12 @@ impl KitError {
             | Self::InvalidFourThreePartitionSize(_)
             | Self::MissingFourThreeLockdowndPatch
             | Self::FourThreePartitionerFailed
-            | Self::FourThreeUnsupportedDevice(_) => Recoverability::NotRecoverable,
+            | Self::FourThreeUnsupportedDevice(_)
+            | Self::FourThreeUnsupportedTarget(_)
+            | Self::FourThreeUnsupportedBase(_)
+            | Self::FourThreeMissingKey(_)
+            | Self::FourThreeInvalidImage(_)
+            | Self::FourThreeInvalidManifest => Recoverability::NotRecoverable,
             Self::MultipartUnsupportedTarget(_)
             | Self::MultipartAlreadyPatched
             | Self::MultipartInvalidOptionsPlist
