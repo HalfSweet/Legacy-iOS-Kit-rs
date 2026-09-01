@@ -40,7 +40,7 @@ Legend: ✅ implemented · 🟡 partial / bounded · ❌ not implemented ·
 | skip-blob pwned restore | ✅ | `--skip-blob` requires pwned boot chain |
 | SEP from file / no SEP | ✅ | `--sep` / `--no-sep` |
 | set-nonce from ticket generator | ✅ | `--set-nonce` |
-| iOS 3.x/4.x multipart two-stage restore | 🟡 | part1 lacks some iBoot patches; part2 needs an externally prepared powder IPSW |
+| iOS 3.x/4.x multipart two-stage restore | 🟡 | part1 NOR IPSW complete (5.1.1 components, target iBoot/DeviceTree/AppleLogo, bundled ASR patch, APTicket scab); part2 needs an externally prepared powder IPSW |
 | powdersn0w (iOS 4.3.x powder) | ❌ | missing exploit/ASR patch resources |
 | RSEP / Cryptex policies | ❌ | |
 | iPhone X restored_external | ❌ | |

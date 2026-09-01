@@ -11,6 +11,7 @@ const KEYS_BASE_URL: &str = "https://raw.githubusercontent.com/LukeZGD/Legacy-iO
 
 /// A single image's firmware key material. Values are deliberately not
 /// logged or debug-printed.
+#[derive(Clone)]
 pub struct FirmwareKey {
     image: String,
     filename: String,
@@ -52,7 +53,7 @@ impl std::fmt::Debug for FirmwareKey {
 }
 
 /// Firmware keys for one product/build pair.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct FirmwareKeySet {
     keys: Vec<FirmwareKey>,
 }

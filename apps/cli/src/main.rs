@@ -862,8 +862,9 @@ enum FirmwareCommand {
         /// Artifact cache for firmware keys and catalog resources.
         #[arg(long)]
         cache_dir: Option<PathBuf>,
-        /// bsdiff patch applied to the ramdisk ASR binaries; without it the
-        /// ramdisks keep their existing ASR binaries.
+        /// bsdiff patch applied to the part 2 ramdisk ASR binary; without it
+        /// the ramdisk keeps the ASR binary of the custom IPSW. The part 1
+        /// ramdisk always uses the bundled iOS 5.1.1 ASR patch.
         #[arg(long)]
         asr_patch: Option<PathBuf>,
         /// powdersn0w exploit payload installed as /exploit in the part 2
@@ -873,6 +874,17 @@ enum FirmwareCommand {
         /// Add UpdateBaseband=false to the part 2 ramdisk options.plist.
         #[arg(long)]
         disable_bbupdate: bool,
+        /// Patch the target iBoot of the part 1 IPSW with verbose boot-args.
+        #[arg(long)]
+        ipsw_verbose: bool,
+        /// Extra boot-args appended to the target iBoot boot-args.
+        #[arg(long)]
+        bootargs: Option<String>,
+        /// Output path of the patched target iBoot sidecar required on
+        /// iPad1,1: the raw iBoot for iOS 3 targets, or a tar holding it as
+        /// iBEC for iOS 4 targets.
+        #[arg(long)]
+        iboot_output: Option<PathBuf>,
     },
     /// Build the FourThree custom 6.1.3 IPSW and the patched 4.3.x dualboot
     /// components (kernelcache, LLB, RootFS) of a FourThree install.
@@ -2585,6 +2597,9 @@ async fn main() -> Result<()> {
                     asr_patch,
                     exploit,
                     disable_bbupdate,
+                    ipsw_verbose,
+                    bootargs,
+                    iboot_output,
                 },
         } => {
             let nor_source = match (nor_ipsw, nor_url) {
@@ -2612,7 +2627,14 @@ async fn main() -> Result<()> {
                 part2,
                 cache_root,
             )
-            .with_disable_baseband_update(disable_bbupdate);
+            .with_disable_baseband_update(disable_bbupdate)
+            .with_verbose_boot_args(ipsw_verbose);
+            if let Some(args) = bootargs {
+                request = request.with_boot_args(args);
+            }
+            if let Some(path) = iboot_output {
+                request = request.with_iboot_output(path);
+            }
             if let Some(path) = asr_patch {
                 request = request.with_asr_patch(path);
             }

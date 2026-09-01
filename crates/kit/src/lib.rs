@@ -79,9 +79,10 @@ pub use legacy_ios_workflows::{
     RestoreStep, RestoreStepKind, SepPolicy, TicketPolicy,
 };
 pub use multipart::{
-    MULTIPART_NOR_BUILD, MULTIPART_NOR_VERSION, MultipartIpswSummary, MultipartPrepareRequest,
-    MultipartRestoreRequest, NorSource, RamdiskPayload, multipart_base_version, multipart_support,
-    ramdisk_payload, reboot4_resource,
+    MULTIPART_IBOOT_BOOT_ARGS, MULTIPART_IBOOT_BOOT_ARGS_VERBOSE, MULTIPART_NOR_BUILD,
+    MULTIPART_NOR_VERSION, MultipartIpswSummary, MultipartPrepareRequest, MultipartRestoreRequest,
+    NorSource, RamdiskPayload, TargetIbootDisposition, multipart_base_version, multipart_support,
+    ramdisk_payload, reboot4_resource, target_iboot_disposition, target_iboot_patch_options,
 };
 pub use operation::OperationHandle;
 pub use pairing::PairingStore;

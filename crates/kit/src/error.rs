@@ -142,6 +142,8 @@ pub enum KitError {
     MultipartInvalidManifest,
     #[error("no firmware key material for the {0} component")]
     MultipartMissingKey(&'static str),
+    #[error("iPad1,1 multipart builds require an output path for the patched target iBoot")]
+    MultipartMissingIbootOutput,
     #[error("timed out waiting for the device to re-enter DFU/recovery between multipart stages")]
     MultipartStageTimeout,
     #[error("restored device version mismatch: expected {expected}, got {actual}")]
@@ -206,7 +208,8 @@ impl KitError {
             | Self::MultipartAlreadyPatched
             | Self::MultipartInvalidOptionsPlist
             | Self::MultipartInvalidManifest
-            | Self::MultipartMissingKey(_) => OperationPhase::Planning,
+            | Self::MultipartMissingKey(_)
+            | Self::MultipartMissingIbootOutput => OperationPhase::Planning,
             Self::MultipartStageTimeout => OperationPhase::WaitingForDevice,
             Self::RamdiskPreparation(_) => OperationPhase::Preflight,
             Self::RamdiskBoot(_) => OperationPhase::Booting,
@@ -324,7 +327,8 @@ impl KitError {
             | Self::MultipartAlreadyPatched
             | Self::MultipartInvalidOptionsPlist
             | Self::MultipartInvalidManifest
-            | Self::MultipartMissingKey(_) => Recoverability::NotRecoverable,
+            | Self::MultipartMissingKey(_)
+            | Self::MultipartMissingIbootOutput => Recoverability::NotRecoverable,
             Self::MultipartStageTimeout => Recoverability::ReenterDfu,
         }
     }

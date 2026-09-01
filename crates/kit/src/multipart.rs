@@ -4,11 +4,16 @@
 //! `restore_prepare`.
 //!
 //! Stage 1 (part 1) is a NOR flash IPSW built from iOS 5.1.1 (9B206) restore
-//! components: RSA-patched iBSS/iBEC (the iBEC boots the restore ramdisk with
-//! `nand-enable-reformat=1`), decrypted DeviceTree/Kernelcache under
-//! `Downgrade/`, a ramdisk whose options.plist disables filesystem creation,
-//! baseband update, and system image restore, plus the device APTicket
-//! resealed into the scab IMG3 template as `applelogoT.img3`.
+//! components: RSA-patched iBSS/iBEC (the iBEC skips the APTicket check and
+//! boots the restore ramdisk with `nand-enable-reformat=1`), decrypted
+//! DeviceTree/Kernelcache under `Downgrade/`, a ramdisk grown to 18 MB whose
+//! options.plist disables filesystem creation, baseband update, and system
+//! image restore and whose ASR binary is patched with the bundled bsdiff
+//! patch, an empty dummy RootFS, the base all_flash contents with the target
+//! version's DeviceTree swapped in, the target version's iBoot patched with
+//! the boot-partition/boot-ramdisk/logo4 patch set, the target AppleLogo
+//! mangled to its iOS 4 form, and the device APTicket resealed into the scab
+//! IMG3 template as `applelogoT.img3`.
 //!
 //! Stage 2 (part 2) is the target version's custom IPSW (built externally,
 //! e.g. by powdersn0w, like FourThree's externally-produced components) with
@@ -32,7 +37,10 @@ use legacy_ios_firmware::{
     BuildManifest, CustomIpswBuilder, FirmwareArchive, FirmwareKey, FirmwareKeyProvider,
     FirmwareKeySet, RemoteFirmwareArchive, SigningTicket, TssClient,
 };
-use legacy_ios_image::{HfsImage, apply_bsdiff, extract_image_payload, replace_image_payload};
+use legacy_ios_image::{
+    BootPartition, HfsImage, Iboot32PatchOptions, apply_bsdiff, extract_image_payload,
+    patch_iboot32_with_options, replace_image_payload,
+};
 use legacy_ios_transport::IbootClient;
 use plist::Value;
 use tracing::{info, warn};
@@ -55,6 +63,14 @@ pub const MULTIPART_IBEC_BOOT_ARGS: &str =
 /// Boot-args for the multipatch iBSS/iBEC, mirroring upstream
 /// `ipsw_prepare_multipatch`.
 pub const MULTIPATCH_BOOT_ARGS: &str = "rd=md0 -v nand-enable-reformat=1 amfi=0xff amfi_get_out_of_my_way=1 cs_enforcement_disable=1 pio-error=0";
+
+/// Default boot-args of the target iBoot patched into the part 1 IPSW,
+/// mirroring upstream `device_bootargs_default`.
+pub const MULTIPART_IBOOT_BOOT_ARGS: &str = "pio-error=0 debug=0x2014e serial=3";
+
+/// Verbose boot-args variant of the target iBoot, selected by upstream
+/// `--ipsw-verbose`.
+pub const MULTIPART_IBOOT_BOOT_ARGS_VERBOSE: &str = "pio-error=0 -v";
 
 const PART1_RAMDISK_SIZE: usize = 18_000_000;
 const PART2_RAMDISK_SIZE: usize = 30_000_000;
@@ -122,6 +138,152 @@ pub fn ramdisk_payload(product_type: &ProductType, target_version: &str) -> Opti
         bin_tar: ResourceId::new("ios4-restore-bin-tar"),
         reboot: reboot4_resource(product_type),
     })
+}
+
+/// Where the patched target iBoot of a part 1 build goes, mirroring the
+/// device branches of upstream `ipsw_prepare_ios4multipart`.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum TargetIbootDisposition {
+    /// Added to all_flash as `iBoot2.img3` with a manifest entry.
+    AllFlash,
+    /// Written raw to the sidecar output; iPad1,1 iOS 3 targets keep it as
+    /// `iBoot3_<ecid>` for the restore-time SSH upload.
+    SidecarRaw,
+    /// Written to the sidecar output as a tar archive holding the iBoot under
+    /// the name `iBEC`; iPad1,1 iOS 4 targets feed it to the externally run
+    /// powdersn0w base preparation.
+    SidecarTar,
+}
+
+pub fn target_iboot_disposition(
+    product_type: &ProductType,
+    target_version: &str,
+) -> TargetIbootDisposition {
+    if product_type.as_str() == "iPad1,1" {
+        if target_version.starts_with("3.") {
+            TargetIbootDisposition::SidecarRaw
+        } else {
+            TargetIbootDisposition::SidecarTar
+        }
+    } else {
+        TargetIbootDisposition::AllFlash
+    }
+}
+
+/// iBoot32Patcher option set for the target iBoot of the part 1 IPSW,
+/// mirroring the `ExtraArr` of upstream `ipsw_prepare_ios4multipart`:
+/// `--boot-partition --boot-ramdisk --logo4`, `--433` unless the target is
+/// 4.2.9/4.2.10, and `-b` with the default boot-args (verbose variant under
+/// `--ipsw-verbose`) plus any user-supplied extras.
+pub fn target_iboot_patch_options(
+    target_version: &str,
+    verbose: bool,
+    extra_boot_args: Option<&str>,
+) -> Iboot32PatchOptions {
+    let mut boot_args = if verbose {
+        MULTIPART_IBOOT_BOOT_ARGS_VERBOSE
+    } else {
+        MULTIPART_IBOOT_BOOT_ARGS
+    }
+    .to_owned();
+    if let Some(extra) = extra_boot_args.filter(|extra| !extra.is_empty()) {
+        boot_args.push(' ');
+        boot_args.push_str(extra);
+    }
+    Iboot32PatchOptions {
+        boot_args: Some(boot_args),
+        boot_partition: Some(BootPartition::Standard),
+        boot_ramdisk: true,
+        logo4: true,
+        jump_iboot_433: !matches!(target_version, "4.2.9" | "4.2.10"),
+        ..Iboot32PatchOptions::default()
+    }
+}
+
+/// Two-byte image-tag mangle applied at offsets 0x10 and 0x20 of the target
+/// iBoot container, mirroring upstream `patch_iboot`: iPad1,1 turns the iBoot
+/// into an iBEC, every other multipart device into an iB0B.
+fn iboot_tag_mangle(product_type: &ProductType) -> [u8; 2] {
+    if product_type.as_str() == "iPad1,1" {
+        *b"ce"
+    } else {
+        *b"bo"
+    }
+}
+
+/// Whether the target AppleLogo is added as a separate `applelogo4.img3`
+/// (devices whose latest version is 5.x) rather than replacing the base
+/// all_flash applelogo manifest entry, mirroring upstream's
+/// `device_latest_vers == "5"*` branch.
+fn applelogo_separate_entry(product_type: &ProductType) -> bool {
+    multipart_base_version(product_type) == Some("5.1.1")
+}
+
+/// How the target AppleLogo appears in the part 1 all_flash manifest.
+enum AppleLogoEntry<'a> {
+    /// Appended as `applelogo4.img3` after `applelogoT.img3`.
+    Separate,
+    /// All `applelogo` lines of the base manifest (including the just-added
+    /// `applelogoT.img3`, like upstream's `sed '/applelogo/d'`) are dropped
+    /// and the target logo is appended under its original file name.
+    Replace(&'a str),
+}
+
+/// Rewrite the base all_flash `manifest` file of the part 1 IPSW, applying
+/// the iBoot2/AppleLogo edits of upstream `ipsw_prepare_ios4multipart` in
+/// upstream's order.
+fn edit_all_flash_manifest(text: &str, add_iboot2: bool, applelogo: &AppleLogoEntry) -> String {
+    let mut output = String::new();
+    let mut push_line = |line: &str| {
+        output.push_str(line);
+        output.push('\n');
+    };
+    let base_lines: Vec<&str> = match applelogo {
+        AppleLogoEntry::Replace(_) => text
+            .lines()
+            .filter(|line| !line.contains("applelogo"))
+            .collect(),
+        AppleLogoEntry::Separate => text.lines().collect(),
+    };
+    for line in base_lines {
+        push_line(line);
+    }
+    if add_iboot2 {
+        push_line("iBoot2.img3");
+    }
+    match applelogo {
+        AppleLogoEntry::Separate => {
+            push_line("applelogoT.img3");
+            push_line("applelogo4.img3");
+        }
+        AppleLogoEntry::Replace(name) => push_line(name),
+    }
+    output
+}
+
+/// Build a ustar archive holding a single file, mirroring upstream's
+/// `tar -cvf iBoot.tar iBEC` for iPad1,1 iOS 4 targets.
+fn tar_single_file(name: &str, data: &[u8]) -> Vec<u8> {
+    assert!(name.len() <= 100, "ustar file name too long");
+    let mut header = [0u8; 512];
+    header[..name.len()].copy_from_slice(name.as_bytes());
+    header[100..108].copy_from_slice(b"0000644\0");
+    header[108..116].copy_from_slice(b"0000000\0");
+    header[116..124].copy_from_slice(b"0000000\0");
+    header[124..136].copy_from_slice(format!("{:011o}\0", data.len()).as_bytes());
+    header[136..148].copy_from_slice(b"00000000000\0");
+    header[156] = b'0';
+    header[257..263].copy_from_slice(b"ustar\0");
+    header[263..265].copy_from_slice(b"00");
+    header[148..156].copy_from_slice(b"        ");
+    let checksum: u32 = header.iter().map(|byte| u32::from(*byte)).sum();
+    header[148..156].copy_from_slice(format!("{checksum:06o}\0 ").as_bytes());
+    let mut archive = Vec::new();
+    archive.extend_from_slice(&header);
+    archive.extend_from_slice(data);
+    archive.resize(archive.len().next_multiple_of(512), 0);
+    archive.resize(archive.len() + 1024, 0);
+    archive
 }
 
 /// options.plist file name inside the restore ramdisk, mirroring upstream:
@@ -232,12 +394,15 @@ fn all_flash_dir(board_config: &BoardConfig) -> String {
     format!("Firmware/all_flash/all_flash.{}ap", board_config.as_str())
 }
 
-fn decrypt_component(data: &[u8], key: &FirmwareKey) -> Result<Vec<u8>, KitError> {
-    let encryption = match (key.key(), key.iv()) {
+fn encryption_of(key: &FirmwareKey) -> Option<(&[u8], &[u8])> {
+    match (key.key(), key.iv()) {
         (Some(key), Some(iv)) => Some((key, iv.as_slice())),
         _ => None,
-    };
-    Ok(extract_image_payload(data, encryption)?)
+    }
+}
+
+fn decrypt_component(data: &[u8], key: &FirmwareKey) -> Result<Vec<u8>, KitError> {
+    Ok(extract_image_payload(data, encryption_of(key))?)
 }
 
 fn key_for<'a>(keys: &'a FirmwareKeySet, image: &'static str) -> Result<&'a FirmwareKey, KitError> {
@@ -302,6 +467,9 @@ pub struct MultipartPrepareRequest {
     asr_patch: Option<PathBuf>,
     exploit: Option<PathBuf>,
     disable_baseband_update: bool,
+    verbose_boot_args: bool,
+    boot_args: Option<String>,
+    iboot_output: Option<PathBuf>,
 }
 
 impl MultipartPrepareRequest {
@@ -332,11 +500,15 @@ impl MultipartPrepareRequest {
             asr_patch: None,
             exploit: None,
             disable_baseband_update: false,
+            verbose_boot_args: false,
+            boot_args: None,
+            iboot_output: None,
         }
     }
 
-    /// bsdiff patch applied to `usr/sbin/asr` of both restore ramdisks,
-    /// replacing the ASR binary copies used when no patch is given.
+    /// bsdiff patch applied to `usr/sbin/asr` of the part 2 ramdisk,
+    /// replacing the ASR binary copy used when no patch is given. The part 1
+    /// ramdisk always uses the bundled iOS 5.1.1 ASR patch, like upstream.
     pub fn with_asr_patch(mut self, path: impl Into<PathBuf>) -> Self {
         self.asr_patch = Some(path.into());
         self
@@ -354,6 +526,28 @@ impl MultipartPrepareRequest {
     /// options.plist.
     pub fn with_disable_baseband_update(mut self, enabled: bool) -> Self {
         self.disable_baseband_update = enabled;
+        self
+    }
+
+    /// Verbose boot-args variant of the target iBoot patched into the part 1
+    /// IPSW, mirroring upstream's `--ipsw-verbose`.
+    pub fn with_verbose_boot_args(mut self, enabled: bool) -> Self {
+        self.verbose_boot_args = enabled;
+        self
+    }
+
+    /// Extra boot-args appended to the target iBoot boot-args, mirroring
+    /// upstream's `--bootargs`.
+    pub fn with_boot_args(mut self, args: impl Into<String>) -> Self {
+        self.boot_args = Some(args.into());
+        self
+    }
+
+    /// Output path of the patched target iBoot sidecar required on iPad1,1:
+    /// the raw iBoot for iOS 3 targets (upstream's `iBoot3_<ecid>`), or a tar
+    /// holding it as `iBEC` for iOS 4 targets (upstream's `iBoot.tar`).
+    pub fn with_iboot_output(mut self, path: impl Into<PathBuf>) -> Self {
+        self.iboot_output = Some(path.into());
         self
     }
 }
@@ -405,6 +599,11 @@ pub(crate) async fn prepare(
     let apticket = extract_apticket_der(&ticket);
     let scab_template =
         read_resource(&ResourceId::new("ios4-scab-template"), &request.cache_root).await?;
+    // The part 1 ramdisk always takes the bundled iOS 5.1.1 ASR patch
+    // (upstream resources/patch/old); the request-level patch only feeds the
+    // part 2 ramdisk, like upstream's FirmwareBundle asr.patch.
+    let part1_asr_patch =
+        read_resource(&ResourceId::new("ios4-asr-patch"), &request.cache_root).await?;
     let asr_patch = match &request.asr_patch {
         Some(path) => Some(tokio::fs::read(path).await?),
         None => None,
@@ -417,10 +616,13 @@ pub(crate) async fn prepare(
     info!("building part 1 (NOR flash) IPSW");
     let part1 = build_part1(
         &request,
+        &target,
+        &target_version,
         nor_keys,
+        target_keys.clone(),
         apticket,
         scab_template,
-        asr_patch.clone(),
+        part1_asr_patch,
     )
     .await?;
     info!("building part 2 (multipatch) IPSW");
@@ -441,12 +643,16 @@ async fn read_resource(id: &ResourceId, cache_root: &std::path::Path) -> Result<
     Ok(tokio::fs::read(path).await?)
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn build_part1(
     request: &MultipartPrepareRequest,
+    target: &FirmwareArchive,
+    target_version: &str,
     keys: FirmwareKeySet,
+    target_keys: FirmwareKeySet,
     apticket: Vec<u8>,
     scab_template: Vec<u8>,
-    asr_patch: Option<Vec<u8>>,
+    asr_patch: Vec<u8>,
 ) -> Result<FirmwareSummary, KitError> {
     let nor = ComponentSource::open(&request.nor_source).await?;
     let all_flash = all_flash_dir(&request.board_config);
@@ -482,32 +688,55 @@ async fn build_part1(
         }
     }
     // The part 1 NOR contents carry the target version's DeviceTree.
-    let target = FirmwareArchive::open(&request.target_ipsw)?;
     flash_entries.push((
         format!("{all_flash}/{devicetree_name}"),
         target.read_entry(&format!("{all_flash}/{devicetree_name}"))?,
     ));
 
+    // Target version's iBoot and AppleLogo, patched/mangled into the all_flash
+    // contents like upstream's patch_iboot and AppleLogo branches.
+    let iboot_key = key_for(&target_keys, "iBoot")?;
+    let iboot_container = target.read_entry(&format!("{all_flash}/{}", iboot_key.filename()))?;
+    let logo_key = key_for(&target_keys, "AppleLogo")?;
+    let logo_name = logo_key.filename().to_owned();
+    let logo_container = target.read_entry(&format!("{all_flash}/{logo_name}"))?;
+
+    let disposition = target_iboot_disposition(&request.product_type, target_version);
+    if disposition != TargetIbootDisposition::AllFlash && request.iboot_output.is_none() {
+        return Err(KitError::MultipartMissingIbootOutput);
+    }
+    let iboot_options = target_iboot_patch_options(
+        target_version,
+        request.verbose_boot_args,
+        request.boot_args.as_deref(),
+    );
+    let mangle = iboot_tag_mangle(&request.product_type);
+    let applelogo_separate = applelogo_separate_entry(&request.product_type);
+
     let output = request.part1_output.clone();
     let board = request.board_config.clone();
-    let entries = tokio::task::spawn_blocking(move || {
+    let (entries, iboot_sidecar) = tokio::task::spawn_blocking(move || {
         let mut entries = Vec::new();
         for (image, _, data) in raw {
             let key = key_for(&keys, image)?;
             let decrypted = decrypt_component(&data, key)?;
             match image {
                 "iBSS" => {
-                    let patched = legacy_ios_image::patch_iboot32(&decrypted, None, None)?;
+                    let patched =
+                        patch_iboot32_with_options(&decrypted, &Iboot32PatchOptions::default())?;
                     entries.push((
                         iboot_dfu_path(key.filename()),
                         replace_image_payload(&data, &patched, None)?,
                     ));
                 }
                 "iBEC" => {
-                    let patched = legacy_ios_image::patch_iboot32(
+                    let patched = patch_iboot32_with_options(
                         &decrypted,
-                        Some(MULTIPART_IBEC_BOOT_ARGS),
-                        None,
+                        &Iboot32PatchOptions {
+                            boot_args: Some(MULTIPART_IBEC_BOOT_ARGS.to_owned()),
+                            ticket: true,
+                            ..Iboot32PatchOptions::default()
+                        },
                     )?;
                     entries.push((
                         iboot_dfu_path(key.filename()),
@@ -524,7 +753,8 @@ async fn build_part1(
                         "/usr/local/share/restore/options.{}ap.plist",
                         board.as_str()
                     );
-                    let mut mutations = vec![
+                    let asr = apply_bsdiff(&ramdisk.read("/usr/sbin/asr")?, &asr_patch)?;
+                    let mutations = vec![
                         HfsMutation::Grow {
                             size: PART1_RAMDISK_SIZE,
                         },
@@ -536,25 +766,19 @@ async fn build_part1(
                             path: options_path,
                             data: nor_options_plist(),
                         },
+                        HfsMutation::Remove {
+                            path: "/usr/sbin/asr".to_owned(),
+                            recursive: false,
+                        },
+                        HfsMutation::AddFile {
+                            path: "/usr/sbin/asr".to_owned(),
+                            data: asr,
+                        },
+                        HfsMutation::Chmod {
+                            path: "/usr/sbin/asr".to_owned(),
+                            mode: 0o755,
+                        },
                     ];
-                    if let Some(patch) = &asr_patch {
-                        let asr = ramdisk.read("/usr/sbin/asr")?;
-                        let patched = apply_bsdiff(&asr, patch)?;
-                        mutations.extend([
-                            HfsMutation::Remove {
-                                path: "/usr/sbin/asr".to_owned(),
-                                recursive: false,
-                            },
-                            HfsMutation::AddFile {
-                                path: "/usr/sbin/asr".to_owned(),
-                                data: patched,
-                            },
-                            HfsMutation::Chmod {
-                                path: "/usr/sbin/asr".to_owned(),
-                                mode: 0o755,
-                            },
-                        ]);
-                    }
                     apply_mutations(&mut ramdisk, mutations)?;
                     entries.push((
                         key.filename().to_owned(),
@@ -572,26 +796,83 @@ async fn build_part1(
             "BuildManifest.plist".to_owned(),
             rewrite_downgrade_paths(&manifest)?,
         ));
+
+        // Target iBoot: decrypt, patch, mangle the image tag, and re-encrypt
+        // into the mangled container with the target keys.
+        let iboot_key = key_for(&target_keys, "iBoot")?;
+        let decrypted = decrypt_component(&iboot_container, iboot_key)?;
+        let patched = patch_iboot32_with_options(&decrypted, &iboot_options)?;
+        let mut template = iboot_container;
+        template[0x10..0x12].copy_from_slice(&mangle);
+        template[0x20..0x22].copy_from_slice(&mangle);
+        let iboot = replace_image_payload(&template, &patched, encryption_of(iboot_key))?;
+
+        // Target AppleLogo mangled to its iOS 4 form.
+        let mut logo = logo_container;
+        logo[0x10..0x12].copy_from_slice(b"4g");
+        logo[0x20..0x22].copy_from_slice(b"4g");
+        let applelogo = if applelogo_separate {
+            AppleLogoEntry::Separate
+        } else {
+            AppleLogoEntry::Replace(logo_name.as_str())
+        };
+
         // The APTicket resealed into the scab template boots the restored
         // chain from NOR.
-        let applelogo = replace_image_payload(&scab_template, &apticket, None)?;
-        let mut flash_entries = flash_entries;
-        for (name, data) in &mut flash_entries {
-            if name.ends_with("/manifest") {
-                let mut text = String::from_utf8_lossy(data).into_owned();
-                if !text.ends_with('\n') {
-                    text.push('\n');
+        let apticket_img3 = replace_image_payload(&scab_template, &apticket, None)?;
+
+        let iboot_sidecar = match disposition {
+            TargetIbootDisposition::AllFlash => {
+                flash_entries.push((format!("{all_flash}/iBoot2.img3"), iboot));
+                None
+            }
+            TargetIbootDisposition::SidecarRaw | TargetIbootDisposition::SidecarTar => Some(iboot),
+        };
+        flash_entries.push((format!("{all_flash}/applelogoT.img3"), apticket_img3));
+        match &applelogo {
+            AppleLogoEntry::Separate => {
+                flash_entries.push((format!("{all_flash}/applelogo4.img3"), logo));
+            }
+            AppleLogoEntry::Replace(name) => {
+                let path = format!("{all_flash}/{name}");
+                match flash_entries.iter_mut().find(|entry| entry.0 == path) {
+                    Some(entry) => entry.1 = logo,
+                    None => flash_entries.push((path, logo)),
                 }
-                text.push_str("applelogoT.img3\n");
-                *data = text.into_bytes();
             }
         }
-        flash_entries.push((format!("{all_flash}/applelogoT.img3"), applelogo));
+        for (name, data) in &mut flash_entries {
+            if name.ends_with("/manifest") {
+                let text = String::from_utf8_lossy(data).into_owned();
+                *data = edit_all_flash_manifest(
+                    &text,
+                    disposition == TargetIbootDisposition::AllFlash,
+                    &applelogo,
+                )
+                .into_bytes();
+            }
+        }
         entries.extend(flash_entries);
-        Ok::<_, KitError>(entries)
+        Ok::<_, KitError>((entries, iboot_sidecar))
     })
     .await
     .map_err(|error| KitError::Task(error.to_string()))??;
+
+    if let Some(iboot) = iboot_sidecar {
+        let output = request
+            .iboot_output
+            .as_ref()
+            .ok_or(KitError::MultipartMissingIbootOutput)?;
+        let data = match disposition {
+            TargetIbootDisposition::SidecarRaw => iboot,
+            TargetIbootDisposition::SidecarTar => tar_single_file("iBEC", &iboot),
+            TargetIbootDisposition::AllFlash => unreachable!("no sidecar for all_flash iBoot"),
+        };
+        if let Some(parent) = output.parent().filter(|path| !path.as_os_str().is_empty()) {
+            tokio::fs::create_dir_all(parent).await?;
+        }
+        tokio::fs::write(output, data).await?;
+    }
 
     write_ipsw_from_scratch(entries, &output).await?;
     FirmwareSummary::inspect(output)
@@ -667,6 +948,21 @@ async fn build_part2(
         warn!("no powdersn0w exploit payload provided; the multistage reboot will lack /exploit");
     }
 
+    // iPod3,1 iOS 3.1 targets take the options.plist template bundled
+    // upstream instead of the custom ramdisk's own options.plist.
+    let options_override =
+        if request.product_type.as_str() == "iPod3,1" && target_version.starts_with("3.1") {
+            Some(
+                read_resource(
+                    &ResourceId::new("ios4-options-n18-plist"),
+                    &request.cache_root,
+                )
+                .await?,
+            )
+        } else {
+            None
+        };
+
     let custom_source = request.custom_ipsw.clone();
     let output = request.part2_output.clone();
     let options_name = options_plist_name(target_version, &request.board_config);
@@ -701,7 +997,10 @@ async fn build_part2(
                 }
                 "RestoreRamdisk" => {
                     let options_path = format!("/usr/local/share/restore/{options_name}");
-                    let options = custom_ramdisk.read(&options_path)?;
+                    let options = match &options_override {
+                        Some(override_plist) => override_plist.clone(),
+                        None => custom_ramdisk.read(&options_path)?,
+                    };
                     let options = edit_options_plist(&options, disable_baseband_update)?;
 
                     let mut ramdisk = HfsImage::parse(decrypted)?;
@@ -905,6 +1204,146 @@ async fn await_bootloader_device(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn target_iboot_options_match_upstream_extra_arr() {
+        for version in ["3.1.3", "4.0", "4.2.1", "4.3.3"] {
+            let options = target_iboot_patch_options(version, false, None);
+            assert_eq!(
+                options.boot_partition,
+                Some(BootPartition::Standard),
+                "{version}"
+            );
+            assert!(options.boot_ramdisk, "{version}");
+            assert!(options.logo4, "{version}");
+            assert!(options.jump_iboot_433, "{version}");
+            assert_eq!(
+                options.boot_args.as_deref(),
+                Some(MULTIPART_IBOOT_BOOT_ARGS),
+                "{version}"
+            );
+        }
+        // 4.2.9/4.2.10 ship an iBoot new enough to skip the --433 jump.
+        for version in ["4.2.9", "4.2.10"] {
+            assert!(
+                !target_iboot_patch_options(version, false, None).jump_iboot_433,
+                "{version}"
+            );
+        }
+    }
+
+    #[test]
+    fn target_iboot_options_boot_args_variants() {
+        let verbose = target_iboot_patch_options("4.2.1", true, None);
+        assert_eq!(
+            verbose.boot_args.as_deref(),
+            Some(MULTIPART_IBOOT_BOOT_ARGS_VERBOSE)
+        );
+        let extra = target_iboot_patch_options("4.2.1", false, Some("serial=1"));
+        assert_eq!(
+            extra.boot_args.as_deref(),
+            Some("pio-error=0 debug=0x2014e serial=3 serial=1")
+        );
+        // Empty extras are ignored, like upstream's `-n` check.
+        let empty = target_iboot_patch_options("4.2.1", false, Some(""));
+        assert_eq!(empty.boot_args.as_deref(), Some(MULTIPART_IBOOT_BOOT_ARGS));
+    }
+
+    #[test]
+    fn maps_target_iboot_disposition() {
+        assert_eq!(
+            target_iboot_disposition(&ProductType::from("iPad1,1"), "3.1.3"),
+            TargetIbootDisposition::SidecarRaw
+        );
+        assert_eq!(
+            target_iboot_disposition(&ProductType::from("iPad1,1"), "4.2.1"),
+            TargetIbootDisposition::SidecarTar
+        );
+        for device in ["iPhone3,1", "iPhone3,3", "iPod3,1", "iPod4,1"] {
+            assert_eq!(
+                target_iboot_disposition(&ProductType::from(device), "4.2.1"),
+                TargetIbootDisposition::AllFlash,
+                "{device}"
+            );
+        }
+    }
+
+    #[test]
+    fn maps_iboot_tag_mangle() {
+        assert_eq!(iboot_tag_mangle(&ProductType::from("iPad1,1")), *b"ce");
+        assert_eq!(iboot_tag_mangle(&ProductType::from("iPhone3,1")), *b"bo");
+        assert_eq!(iboot_tag_mangle(&ProductType::from("iPod4,1")), *b"bo");
+    }
+
+    #[test]
+    fn maps_applelogo_branch() {
+        for device in ["iPhone3,3", "iPad1,1", "iPod3,1"] {
+            assert!(
+                applelogo_separate_entry(&ProductType::from(device)),
+                "{device}"
+            );
+        }
+        for device in ["iPhone3,1", "iPhone3,2", "iPod4,1"] {
+            assert!(
+                !applelogo_separate_entry(&ProductType::from(device)),
+                "{device}"
+            );
+        }
+    }
+
+    #[test]
+    fn edits_all_flash_manifest_separate_branch() {
+        let base = "applelogo.img3\niBoot.img3\nmanifest\n";
+        let edited = edit_all_flash_manifest(base, true, &AppleLogoEntry::Separate);
+        assert_eq!(
+            edited,
+            "applelogo.img3\niBoot.img3\nmanifest\niBoot2.img3\napplelogoT.img3\napplelogo4.img3\n"
+        );
+        // iPad1,1 adds no iBoot2 entry.
+        let edited = edit_all_flash_manifest(base, false, &AppleLogoEntry::Separate);
+        assert_eq!(
+            edited,
+            "applelogo.img3\niBoot.img3\nmanifest\napplelogoT.img3\napplelogo4.img3\n"
+        );
+    }
+
+    #[test]
+    fn edits_all_flash_manifest_replace_branch() {
+        // Upstream's sed drops every line containing "applelogo", including
+        // the applelogoT.img3 line added moments earlier.
+        let base = "applelogo@2x.img3\niBoot.img3\nbatterylow0.img3\n";
+        let edited = edit_all_flash_manifest(
+            base,
+            true,
+            &AppleLogoEntry::Replace("applelogo.s5l8930x.img3"),
+        );
+        assert_eq!(
+            edited,
+            "iBoot.img3\nbatterylow0.img3\niBoot2.img3\napplelogo.s5l8930x.img3\n"
+        );
+    }
+
+    #[test]
+    fn builds_single_file_tar() {
+        let data = b"iboot-bytes";
+        let archive = tar_single_file("iBEC", data);
+        assert_eq!(&archive[0..4], b"iBEC");
+        assert_eq!(&archive[257..263], b"ustar\0");
+        // Size field holds the payload length in octal.
+        let size =
+            u64::from_str_radix(std::str::from_utf8(&archive[124..135]).unwrap(), 8).unwrap();
+        assert_eq!(size, data.len() as u64);
+        // Checksum covers the header with the checksum field blanked.
+        let mut header = archive[0..512].to_vec();
+        header[148..156].copy_from_slice(b"        ");
+        let checksum: u64 = header.iter().map(|byte| u64::from(*byte)).sum();
+        let stored =
+            u64::from_str_radix(std::str::from_utf8(&archive[148..154]).unwrap(), 8).unwrap();
+        assert_eq!(stored, checksum);
+        assert_eq!(&archive[512..512 + data.len()], data);
+        assert!(archive.len().is_multiple_of(512));
+        assert!(archive.len() >= 512 + 512 + 1024);
+    }
 
     #[test]
     fn maps_supported_devices_and_versions() {
