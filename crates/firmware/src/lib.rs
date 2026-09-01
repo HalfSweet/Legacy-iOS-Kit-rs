@@ -4,6 +4,7 @@
 
 mod archive;
 mod artifact;
+mod classic_bundle;
 mod custom;
 mod keys;
 mod manifest;
@@ -15,6 +16,11 @@ mod ustar;
 
 pub use archive::FirmwareArchive;
 pub use artifact::{ArtifactError, ArtifactSpec, ArtifactStore, Digest};
+pub use classic_bundle::{
+    ClassicBundle, ClassicBundleError, ClassicBundleRequest, ClassicComponent,
+    ClassicFilesystemPatch, ClassicFirmwareEntry, ClassicPatch, ClassicProcessor,
+    ClassicRamdiskPatch,
+};
 pub use custom::{CustomIpswBuilder, CustomIpswError};
 pub use keys::{FirmwareKey, FirmwareKeyError, FirmwareKeyProvider, FirmwareKeySet};
 pub use manifest::{BuildIdentity, BuildManifest, FirmwareError, RestoreBehavior};

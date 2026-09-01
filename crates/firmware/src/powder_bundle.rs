@@ -488,7 +488,11 @@ impl PowderBundle {
             .ok_or_else(|| PowderBundleError::MissingKeyMaterial("RootFS".to_owned()))?
             .to_vec();
 
-        let ramdisk_options_path = ramdisk_options_path(request);
+        let ramdisk_options_path = ramdisk_options_path(
+            &request.product_type,
+            &request.board_config,
+            request.target_version.as_str(),
+        );
 
         let mut bundle = Self {
             role: request.role,
@@ -1252,7 +1256,7 @@ fn is_a5(product_type: &ProductType) -> bool {
     )
 }
 
-fn all_flash_dir(board_config: &BoardConfig) -> String {
+pub(crate) fn all_flash_dir(board_config: &BoardConfig) -> String {
     format!(
         "{ALL_FLASH_PREFIX}/all_flash.{}ap.production",
         board_config.as_str()
@@ -1271,14 +1275,17 @@ fn hwmodel(board_config: &BoardConfig) -> String {
 /// `RamdiskOptionsPath` rule of `ipsw_prepare_bundle`: per-board options
 /// plist unless the target is iOS 3.x/4.x (iPad1,1 4.x excepted). Upstream
 /// keys this on the target version even for base bundles.
-fn ramdisk_options_path(request: &PowderBundleRequest) -> String {
-    let target = request.target_version.as_str();
-    let per_board = (!target.starts_with('3') && !target.starts_with('4'))
-        || (request.product_type.as_str() == "iPad1,1" && target.starts_with('4'));
+pub(crate) fn ramdisk_options_path(
+    product_type: &ProductType,
+    board_config: &BoardConfig,
+    target_version: &str,
+) -> String {
+    let per_board = (!target_version.starts_with('3') && !target_version.starts_with('4'))
+        || (product_type.as_str() == "iPad1,1" && target_version.starts_with('4'));
     let mut path = "/usr/local/share/restore/options".to_owned();
     if per_board {
         path.push('.');
-        path.push_str(request.board_config.as_str());
+        path.push_str(board_config.as_str());
     }
     path.push_str(".plist");
     path
@@ -1317,7 +1324,7 @@ fn required_key<'a>(
 /// Component file name: the BuildManifest path basename when available,
 /// otherwise the firmware key set's filename, with anything after the first
 /// `.dmg` stripped, mirroring `ipsw_prepare_keys`/`ipsw_prepare_paths`.
-fn component_name(
+pub(crate) fn component_name(
     identity: Option<&BuildIdentity>,
     manifest_component: &str,
     key: &FirmwareKey,
