@@ -47,6 +47,24 @@ purpose = "Device-side binaries for the iOS 4 restore ramdisk"
 redistribution = "download-only"
 
 [[resources]]
+id = "ios4-asr-patch"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/patch/old/iPhone3,1/5.1.1/asr.patch"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "ff8e33deeea2e901a3999688593425a0508aec1228ea5a9129a27f9386d98e31"
+size = 214
+purpose = "bsdiff patch for the iOS 5.1.1 ramdisk ASR binary of the iOS 3.x/4.x multipart NOR IPSW; identical for iPad1,1, iPhone3,1, iPhone3,3, iPod3,1, and iPod4,1"
+redistribution = "download-only"
+
+[[resources]]
+id = "ios4-options-n18-plist"
+source_url = "https://raw.githubusercontent.com/LukeZGD/Legacy-iOS-Kit/1ff4be07ea2946ccaeff2db60c4426488b8f6e32/resources/firmware/src/options.n18.plist"
+source_commit = "1ff4be07ea2946ccaeff2db60c4426488b8f6e32"
+sha256 = "74604b4b4f621a67ac568b9a8a8f8a0a9530c2ee99604aff73b636676b1b58e2"
+size = 585
+purpose = "options.plist template for iPod3,1 iOS 3.1 targets in the multipart multipatch ramdisk"
+redistribution = "download-only"
+
+[[resources]]
 id = "gaster-checkm8-payload-a9"
 source_url = "https://raw.githubusercontent.com/0x7ff/gaster/7fffffff38a1bed1cdc1c5bae0df70f14395129b/payload_A9.bin"
 source_commit = "7fffffff38a1bed1cdc1c5bae0df70f14395129b"
