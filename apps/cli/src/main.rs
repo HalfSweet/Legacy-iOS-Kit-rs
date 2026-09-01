@@ -12,18 +12,18 @@ use clap::{ArgAction, Parser, Subcommand, ValueEnum};
 use legacy_ios_kit::{
     ActivationState, AfcPath, AppFilter, AppSignRequest, BackupOptions, BackupOutcome,
     BackupPassword, BackupRestoreOptions, BasebandPolicy, BoardConfig, BootMode, BootNonce,
-    BootPartition, CustomRootfsRequest, DeviceDiagnostics, DeviceFileInfo, DeviceInventory,
-    DeviceStorageInfo, DeviceSummary, DmgFirmwareKey, Ecid, ExploitPolicy, FirmwareSummary,
-    FourThreeComponentSource, FourThreePrepareRequest, HfsEntrySummary, HfsMutation,
-    HfsStatSummary, HostKeyPolicy, Iboot32PatchOptions, ImageCipher, InstalledApp, LegacyIosKit,
-    MountOptions, MultipartPrepareRequest, MultipartRestoreRequest, NoncePolicy, NorSource,
-    OperationEvent, OperationHandle, OperationOutcome, PowderPrepareRequest, PowderPwnMethod,
-    PowderRestoreRequest, PowderTicketSource, ProductType, RamdiskBootExecutionRequest,
-    RamdiskBootRequest, RamdiskBuildRequest, RamdiskBuildSummary, RamdiskSsh, RecoveryDeviceInfo,
-    RecoveryUploadResult, RemoteFirmwareSummary, ResourceId, RestoreBehavior,
-    RestoreExecutionRequest, RestorePlan, RestoreRequest, ScpPath, SepPolicy, ShshRequest,
-    ShshSummary, SigningTicket, Soc, SshCommandOutput, SshPassword, SshTarget, TicketPolicy, Udid,
-    UsbHostDiagnostics, extract_apticket_der,
+    BootPartition, ClassicPrepareRequest, CustomRootfsRequest, DeviceDiagnostics, DeviceFileInfo,
+    DeviceInventory, DeviceStorageInfo, DeviceSummary, DmgFirmwareKey, Ecid, ExploitPolicy,
+    FirmwareSummary, FourThreeComponentSource, FourThreePrepareRequest, HfsEntrySummary,
+    HfsMutation, HfsStatSummary, HostKeyPolicy, Iboot32PatchOptions, ImageCipher, InstalledApp,
+    IosVersion, LegacyIosKit, MountOptions, MultipartPrepareRequest, MultipartRestoreRequest,
+    NoncePolicy, NorSource, OperationEvent, OperationHandle, OperationOutcome,
+    PowderPrepareRequest, PowderPwnMethod, PowderRestoreRequest, PowderTicketSource, ProductType,
+    RamdiskBootExecutionRequest, RamdiskBootRequest, RamdiskBuildRequest, RamdiskBuildSummary,
+    RamdiskSsh, RecoveryDeviceInfo, RecoveryUploadResult, RemoteFirmwareSummary, ResourceId,
+    RestoreBehavior, RestoreExecutionRequest, RestorePlan, RestoreRequest, ScpPath, SepPolicy,
+    ShshRequest, ShshSummary, SigningTicket, Soc, SshCommandOutput, SshPassword, SshTarget,
+    TicketPolicy, Udid, UsbHostDiagnostics, extract_apticket_der,
 };
 use tracing::level_filters::LevelFilter;
 use tracing::{debug, info, warn};
@@ -975,6 +975,67 @@ enum FirmwareCommand {
         /// iPad1,1); required for ios4powder and ramdiskH two-bundle builds.
         #[arg(long)]
         iboot: Option<PathBuf>,
+        /// Output path of the custom IPSW.
+        #[arg(long, short = 'o')]
+        output_ipsw: PathBuf,
+        /// Artifact cache for firmware keys and catalog resources.
+        #[arg(long)]
+        cache_dir: Option<PathBuf>,
+    },
+    /// Build a classic (xpwn ipsw) custom IPSW for old devices: S5L8900
+    /// (iPhone 2G/3G, iPod touch 1G) and S5L8720/8920/8922/A4 targets that
+    /// upstream routes to the classic tool (iPhone2,1, iPod2,1, and pre-4.2
+    /// blob restores).
+    #[command(name = "classic-prepare")]
+    ClassicPrepare {
+        #[arg(long)]
+        device: ProductType,
+        #[arg(long)]
+        board: BoardConfig,
+        /// Original IPSW of the target iOS version.
+        #[arg(long)]
+        target_ipsw: PathBuf,
+        /// Resolve the jailbreak payload matrix.
+        #[arg(long)]
+        jailbreak: bool,
+        /// Include the OpenSSH payload tar set (upstream default).
+        #[arg(long, default_value_t = true, overrides_with = "no_openssh")]
+        openssh: bool,
+        /// Omit the OpenSSH payload tar set.
+        #[arg(long)]
+        no_openssh: bool,
+        /// Patch lockdownd in the root filesystem (hacktivation); requires
+        /// --jailbreak and an iPhone/iPad1,1 on iOS 3.1-6.x.
+        #[arg(long)]
+        hacktivate: bool,
+        /// Beta target: merge a generated systemversion.tar.
+        #[arg(long)]
+        beta: bool,
+        /// Old-bootrom iPod2,1 on a 3.1/4.0 target (24kpwn).
+        #[arg(long = "24kpwn-old-bootrom")]
+        old_bootrom_24kpwn: bool,
+        /// Skip the baseband update (device_disable_bbupdate).
+        #[arg(long)]
+        disable_bbupdate: bool,
+        /// Activation records tar merged into the root filesystem.
+        #[arg(long)]
+        activation_records: Option<PathBuf>,
+        /// Baseband tar merged into the root filesystem (device_deadbb).
+        #[arg(long)]
+        baseband: Option<PathBuf>,
+        /// Externally patched iBoot binary merged as iBoot.tar (named iBEC on
+        /// iPad1,1).
+        #[arg(long)]
+        iboot: Option<PathBuf>,
+        /// The device's latest iOS version, driving the old-mode derivation;
+        /// pass the target version to force the non-old iPhone2,1
+        /// blob-restore path. Defaults to the target version.
+        #[arg(long)]
+        latest_version: Option<String>,
+        /// Accepted for parity with upstream's --memory; the builder always
+        /// assembles payloads in memory.
+        #[arg(long)]
+        memory: bool,
         /// Output path of the custom IPSW.
         #[arg(long, short = 'o')]
         output_ipsw: PathBuf,
@@ -2997,6 +3058,101 @@ async fn main() -> Result<()> {
             let summary = kit
                 .inspect_firmware(output_ipsw)
                 .context("failed to inspect the built powder IPSW")?;
+            write_firmware(output, &summary)?;
+        }
+        Command::Firmware {
+            command:
+                FirmwareCommand::ClassicPrepare {
+                    device,
+                    board,
+                    target_ipsw,
+                    jailbreak,
+                    openssh,
+                    no_openssh,
+                    hacktivate,
+                    beta,
+                    old_bootrom_24kpwn,
+                    disable_bbupdate,
+                    activation_records,
+                    baseband,
+                    iboot,
+                    latest_version,
+                    memory,
+                    output_ipsw,
+                    cache_dir,
+                },
+        } => {
+            if memory {
+                debug!("--memory is inherent to the in-memory Rust builder");
+            }
+            let cache_root = match cache_dir {
+                Some(path) => path,
+                None => config.artifact_cache_dir()?,
+            };
+            let mut request = ClassicPrepareRequest::new(
+                device.clone(),
+                board,
+                target_ipsw,
+                output_ipsw.clone(),
+                cache_root,
+            )
+            .with_jailbreak(jailbreak)
+            .with_openssh(openssh && !no_openssh)
+            .with_hacktivate(hacktivate)
+            .with_beta(beta)
+            .with_24kpwn_old_bootrom(old_bootrom_24kpwn)
+            .with_disable_baseband_update(disable_bbupdate);
+            if let Some(version) = latest_version {
+                request = request.with_latest_version(IosVersion::from(version.as_str()));
+            }
+            // Upstream ExtraArgs order: the baseband tar, then the
+            // activation records tar.
+            let mut extra_tars = Vec::new();
+            for (path, fallback) in [
+                (baseband, "baseband.tar"),
+                (activation_records, "activation.tar"),
+            ] {
+                if let Some(path) = path {
+                    let name = path
+                        .file_name()
+                        .map(|name| name.to_string_lossy().into_owned())
+                        .unwrap_or_else(|| fallback.to_owned());
+                    let data = tokio::fs::read(&path)
+                        .await
+                        .with_context(|| format!("failed to read {}", path.display()))?;
+                    extra_tars.push((name, data));
+                }
+            }
+            if !extra_tars.is_empty() {
+                request = request.with_extra_tars(extra_tars);
+            }
+            if let Some(path) = iboot {
+                let data = tokio::fs::read(&path)
+                    .await
+                    .with_context(|| format!("failed to read {}", path.display()))?;
+                // Upstream merges the patched iBoot as iBEC on iPad1,1 and as
+                // iBoot elsewhere (restore.sh ipsw_prepare_iboot).
+                let name = if device.as_str() == "iPad1,1" {
+                    "iBEC"
+                } else {
+                    "iBoot"
+                };
+                request = request.with_iboot_sidecar(name, data);
+            }
+            let plan = kit
+                .plan_classic_ipsw(request)
+                .await
+                .context("failed to plan the classic custom IPSW")?;
+            info!(
+                version = %plan.version(),
+                build = %plan.build_id(),
+                old = plan.old(),
+                "classic build planned"
+            );
+            consume_operation(output, kit.execute_classic_prepare(plan)).await?;
+            let summary = kit
+                .inspect_firmware(output_ipsw)
+                .context("failed to inspect the built classic IPSW")?;
             write_firmware(output, &summary)?;
         }
         Command::Firmware {

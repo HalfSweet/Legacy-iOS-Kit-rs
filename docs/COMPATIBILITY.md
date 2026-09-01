@@ -42,6 +42,7 @@ Legend: ✅ implemented · 🟡 partial / bounded · ❌ not implemented ·
 | set-nonce from ticket generator | ✅ | `--set-nonce` |
 | iOS 3.x/4.x multipart two-stage restore | ✅ ⚠️ | part1 NOR IPSW (5.1.1 components, target iBoot/DeviceTree/AppleLogo, bundled ASR patch, APTicket scab); part2 built by `lik firmware powder-prepare`; `--skip-first` resume; optional `--part2-ticket` for upstream `-w` parity; hardware-unverified |
 | powdersn0w custom IPSW + restore | ✅ ⚠️ | builder (single/two-bundle/ios4powder) via `lik firmware powder-prepare`; single-stage powder restore via `lik restore powder` (A4 fetches the latest-version ticket from TSS, A5/A5X/A6/A6X take a base-version blob; kDFU/pwnDFU entry, external checkm8-a5/litera1n guidance); hardware-unverified |
+| classic xpwn custom IPSW (old devices) | ✅ ⚠️ | builder via `lik firmware classic-prepare` (S5L8900 and S5L8720/8920/8922/A4 classic targets: jailbreak payload matrix, hacktivation lockdownd patch, 24kpwn/alloc8-era old mode, greenpois0n/aquila tars, baseband/activation tar merge); restore side not yet wired; hardware-unverified |
 | RSEP / Cryptex policies | ❌ | |
 | iPhone X restored_external | ❌ | |
 | FourThree dualboot (iPad2) | 🟡 | step 1 custom IPSW + dualboot components ✅ (`lik firmware fourthree-prepare`, unit-tested only — no end-to-end fixture test with real IPSWs yet); steps 2/3/app/boot ✅ |
@@ -57,7 +58,7 @@ Legend: ✅ implemented · 🟡 partial / bounded · ❌ not implemented ·
 | TrollStore (iOS 14/15) | ✅ | Tips persistence helper |
 | TrollStore via TrollRestore (iOS 15.2–16.6.1, 16.7 RC, 17.0; A9+) | ✅ ⚠️ | sparserestore exploit (CVE-2024-44252) over mobilebackup2, `lik device trollrestore`; unit-tested only — not yet run against a live device |
 | hacktivate / revert | ✅ | data_ark fast path + lockdownd patches |
-| Hacktivation via IPSW (iPhone 2G/3G/3GS) | ❌ | |
+| Hacktivation via IPSW (iPhone 2G/3G/3GS) | ✅ ⚠️ | `--hacktivate` of `lik firmware classic-prepare` (lockdownd patch merged into the root filesystem, gated to jailbroken iPhone/iPad1,1 on iOS 3.1-6.x); hardware-unverified |
 
 ## Services / data
 

@@ -95,8 +95,9 @@ const FSTAB_DATA: &[u8] = b"/dev/disk0s1 / hfs rw 0 1\n/dev/disk0s2 /private/var
 /// `PREF_PATH` and `prefData` from xpwn's `include/pref.h`: the
 /// SBShowNonDefaultSystemApps SpringBoard preference written when the config
 /// carries `needPref` (jailbroken single-IPSW builds).
-const PREF_PATH: &str = "/private/var/mobile/Library/Preferences/com.apple.springboard.plist";
-const PREF_DATA: [u8; 76] = [
+pub(crate) const PREF_PATH: &str =
+    "/private/var/mobile/Library/Preferences/com.apple.springboard.plist";
+pub(crate) const PREF_DATA: [u8; 76] = [
     0x62, 0x70, 0x6c, 0x69, 0x73, 0x74, 0x30, 0x30, 0xd1, 0x01, 0x02, 0x5f, 0x10, 0x1a, 0x53, 0x42,
     0x53, 0x68, 0x6f, 0x77, 0x4e, 0x6f, 0x6e, 0x44, 0x65, 0x66, 0x61, 0x75, 0x6c, 0x74, 0x53, 0x79,
     0x73, 0x74, 0x65, 0x6d, 0x41, 0x70, 0x70, 0x73, 0x09, 0x08, 0x0b, 0x28, 0x00, 0x00, 0x00, 0x00,
@@ -1047,7 +1048,7 @@ fn dfu_image(keys: &FirmwareKeySet, image: &'static str) -> Result<Ios4DfuImage,
 
 /// Fetch a catalog resource and gunzip it when it is gzip-compressed, like
 /// the `gzip -d` calls of `ipsw_prepare_32bit` for the .tar.gz payloads.
-async fn read_tar_resource(
+pub(crate) async fn read_tar_resource(
     id: &ResourceId,
     cache_root: &std::path::Path,
 ) -> Result<Vec<u8>, KitError> {
@@ -1060,7 +1061,10 @@ async fn read_tar_resource(
 }
 
 /// Fetch a catalog resource verbatim.
-async fn read_resource(id: &ResourceId, cache_root: &std::path::Path) -> Result<Vec<u8>, KitError> {
+pub(crate) async fn read_resource(
+    id: &ResourceId,
+    cache_root: &std::path::Path,
+) -> Result<Vec<u8>, KitError> {
     let path = crate::firmware::fetch_resource(id, cache_root.to_owned()).await?;
     Ok(tokio::fs::read(path).await?)
 }
@@ -1968,7 +1972,7 @@ fn iboot_boot_args(config: &PowderConfig) -> String {
 /// other keys and gains `MinimumSystemPartition`; a missing or unparseable
 /// plist is replaced with a fresh three-key dictionary (the
 /// MinimumSystemPartition add happens only on the parse path upstream).
-fn restore_options_plist(
+pub(crate) fn restore_options_plist(
     original: Option<&[u8]>,
     size_mb: u64,
     update_baseband: bool,
@@ -2012,7 +2016,10 @@ fn restore_options_plist(
 /// Rewrite `Manifest/<component>/Info/Path` of every build identity, like
 /// main.c's manifestDirty pass. Missing keys are skipped, and manifests
 /// without a BuildIdentities array are returned unchanged, as upstream.
-fn rewrite_manifest_paths(manifest: &[u8], rewrites: &[(&str, &str)]) -> Result<Vec<u8>, KitError> {
+pub(crate) fn rewrite_manifest_paths(
+    manifest: &[u8],
+    rewrites: &[(&str, &str)],
+) -> Result<Vec<u8>, KitError> {
     let mut value = plist::Value::from_reader(Cursor::new(manifest))?;
     let Some(identities) = value
         .as_dictionary_mut()
@@ -2047,7 +2054,7 @@ fn rewrite_manifest_paths(manifest: &[u8], rewrites: &[(&str, &str)]) -> Result<
 
 /// doDecrypt: peel one layer (IMG3 decryption only, the payload stays
 /// LZSS-compressed) and rewrap into an unencrypted container.
-fn decrypt_rewrap(
+pub(crate) fn decrypt_rewrap(
     container: &[u8],
     encryption: Option<(&[u8], &[u8])>,
 ) -> Result<Vec<u8>, KitError> {
@@ -2081,7 +2088,7 @@ fn transform_payload(
 
 /// add_hfs semantics: overwrite the file in place when it exists, create it
 /// otherwise.
-fn upsert_file(image: &mut HfsImage, path: &str, data: &[u8]) -> Result<(), HfsError> {
+pub(crate) fn upsert_file(image: &mut HfsImage, path: &str, data: &[u8]) -> Result<(), HfsError> {
     if image.stat(path).is_ok() {
         image.write_file(path, data)
     } else {

@@ -5,6 +5,7 @@
 mod alloc8;
 mod baseband;
 mod bootstrap;
+mod classic;
 mod device;
 mod erase;
 mod error;
@@ -36,6 +37,7 @@ mod trollstore;
 pub use bootstrap::{
     BootstrapPackages, BootstrapSelection, bootstrap_selection, gunzip, select_untether7,
 };
+pub use classic::{ClassicPreparePlan, ClassicPrepareRequest, DEFAULT_CLASSIC_RAMDISK_GROW_BLOCKS};
 pub use device::{
     BackendFailure, DeviceDiagnostics, DeviceInventory, DeviceManager, DeviceSummary,
 };
@@ -365,6 +367,25 @@ impl LegacyIosKit {
     /// over the returned handle.
     pub fn execute_powder_prepare(&self, plan: PowderPreparePlan) -> OperationHandle {
         powder::spawn(plan)
+    }
+
+    /// Plan a classic custom build for old devices (S5L8900 and
+    /// S5L8720/8920/8922/A4), mirroring upstream's `ipsw_prepare_jailbreak`
+    /// with the classic xpwn `ipsw` tool: gate the device and the
+    /// hacktivation request, derive old mode, resolve the firmware bundle and
+    /// payload plan, and fetch the patch/payload resources.
+    pub async fn plan_classic_ipsw(
+        &self,
+        request: ClassicPrepareRequest,
+    ) -> Result<ClassicPreparePlan, KitError> {
+        classic::plan(request).await
+    }
+
+    /// Execute a classic plan: patch and decrypt the boot chain, personalize
+    /// the root filesystem and restore ramdisk, then write the custom IPSW,
+    /// reporting progress over the returned handle.
+    pub fn execute_classic_prepare(&self, plan: ClassicPreparePlan) -> OperationHandle {
+        classic::spawn(plan)
     }
 
     /// Execute a two-stage multipart restore: part 1 (NOR flash) without

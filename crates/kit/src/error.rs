@@ -82,6 +82,29 @@ pub enum KitError {
     PowderAsrPatch(#[from] legacy_ios_image::PowderAsrError),
     #[error("powdersn0w kernel patch failed: {0}")]
     PowderKernelPatch(#[from] legacy_ios_image::Kernel32Error),
+    #[error("classic bundle resolution failed: {0}")]
+    ClassicBundle(#[from] legacy_ios_firmware::ClassicBundleError),
+    #[error(
+        "the classic ipsw builder supports S5L8900/S5L8720/S5L8920/S5L8922/A4 devices, found {0}"
+    )]
+    ClassicUnsupportedDevice(String),
+    #[error(
+        "{product_type} on iOS {version} cannot be hacktivated with a custom IPSW (requires a jailbroken iPhone/iPad1,1 on iOS 3.1-6.x)"
+    )]
+    ClassicCannotHacktivate {
+        product_type: String,
+        version: String,
+    },
+    #[error("the payload plan expects an iBoot.tar sidecar but none was provided")]
+    ClassicMissingIbootSidecar,
+    #[error("the classic firmware bundle has no {0} entry")]
+    ClassicMissingComponent(&'static str),
+    #[error("the restore ramdisk has no options plist at the per-board or default path")]
+    ClassicMissingRamdiskOptions,
+    #[error("layered image patch failed: {0}")]
+    Layered(#[from] legacy_ios_image::LayeredError),
+    #[error("8900 image operation failed: {0}")]
+    Img1(#[from] legacy_ios_image::Img1Error),
     #[error("LZSS payload processing failed: {0}")]
     Lzss(#[from] legacy_ios_image::LzssError),
     #[error("signing ticket operation failed: {0}")]
@@ -324,6 +347,12 @@ impl KitError {
             | Self::PowderMissingComponent(_)
             | Self::PowderInvalidManifest
             | Self::PowderUnsupportedBasebandReplace(_) => OperationPhase::Planning,
+            Self::ClassicBundle(_)
+            | Self::ClassicUnsupportedDevice(_)
+            | Self::ClassicCannotHacktivate { .. }
+            | Self::ClassicMissingIbootSidecar
+            | Self::ClassicMissingComponent(_)
+            | Self::ClassicMissingRamdiskOptions => OperationPhase::Planning,
             Self::PowderRestoreUnsupportedDevice(_)
             | Self::PowderRestoreRequiresMultipart(_)
             | Self::PowderRestoreTicketFetchUnsupported(_) => OperationPhase::Planning,
@@ -343,6 +372,8 @@ impl KitError {
             | Self::PowderAsrPatch(_)
             | Self::PowderKernelPatch(_)
             | Self::PowderTruncatedNorImage(_)
+            | Self::Layered(_)
+            | Self::Img1(_)
             | Self::Lzss(_)
             | Self::Ticket(_)
             | Self::TicketPolicyMismatch
@@ -487,6 +518,14 @@ impl KitError {
             | Self::PowderInvalidManifest
             | Self::PowderUnsupportedBasebandReplace(_)
             | Self::PowderTruncatedNorImage(_) => Recoverability::NotRecoverable,
+            Self::ClassicBundle(_)
+            | Self::ClassicUnsupportedDevice(_)
+            | Self::ClassicCannotHacktivate { .. }
+            | Self::ClassicMissingIbootSidecar
+            | Self::ClassicMissingComponent(_)
+            | Self::ClassicMissingRamdiskOptions
+            | Self::Layered(_)
+            | Self::Img1(_) => Recoverability::NotRecoverable,
             Self::PowderRestoreUnsupportedDevice(_)
             | Self::PowderRestoreRequiresMultipart(_)
             | Self::PowderRestoreTicketFetchUnsupported(_) => Recoverability::NotRecoverable,
