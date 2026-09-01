@@ -178,6 +178,8 @@ pub enum KitError {
     MultipartMissingKey(&'static str),
     #[error("iPad1,1 multipart builds require an output path for the patched target iBoot")]
     MultipartMissingIbootOutput,
+    #[error("--skip-first keeps the existing part 2 IPSW, but {0} does not exist")]
+    MultipartMissingPart2(std::path::PathBuf),
     #[error("timed out waiting for the device to re-enter DFU/recovery between multipart stages")]
     MultipartStageTimeout,
     #[error("restored device version mismatch: expected {expected}, got {actual}")]
@@ -271,7 +273,8 @@ impl KitError {
             | Self::MultipartInvalidOptionsPlist
             | Self::MultipartInvalidManifest
             | Self::MultipartMissingKey(_)
-            | Self::MultipartMissingIbootOutput => OperationPhase::Planning,
+            | Self::MultipartMissingIbootOutput
+            | Self::MultipartMissingPart2(_) => OperationPhase::Planning,
             Self::PowderBundle(_)
             | Self::PowderUnsupportedDevice(_)
             | Self::PowderMissingIbootSidecar
@@ -420,7 +423,8 @@ impl KitError {
             | Self::MultipartInvalidOptionsPlist
             | Self::MultipartInvalidManifest
             | Self::MultipartMissingKey(_)
-            | Self::MultipartMissingIbootOutput => Recoverability::NotRecoverable,
+            | Self::MultipartMissingIbootOutput
+            | Self::MultipartMissingPart2(_) => Recoverability::NotRecoverable,
             Self::PowderBundle(_)
             | Self::PowderUnsupportedDevice(_)
             | Self::PowderMissingIbootSidecar

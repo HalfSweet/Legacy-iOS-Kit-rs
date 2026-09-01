@@ -910,6 +910,10 @@ enum FirmwareCommand {
         /// iBEC for iOS 4 targets.
         #[arg(long)]
         iboot_output: Option<PathBuf>,
+        /// Keep the existing part 2 IPSW and build only the part 1 NOR flash
+        /// IPSW, for powdersn0w 4.2.x and lower restores.
+        #[arg(long)]
+        skip_first: bool,
     },
     /// Build the FourThree custom 6.1.3 IPSW and the patched 4.3.x dualboot
     /// components (kernelcache, LLB, RootFS) of a FourThree install.
@@ -1212,6 +1216,10 @@ enum RestoreCommand {
         /// Do not send baseband firmware during the part 2 restore.
         #[arg(long)]
         no_baseband: bool,
+        /// Skip the first restore and flash the part 2 IPSW only, for
+        /// powdersn0w 4.2.x and lower restores.
+        #[arg(long)]
+        skip_first: bool,
         #[arg(long)]
         yes: bool,
     },
@@ -2689,6 +2697,7 @@ async fn main() -> Result<()> {
                     ipsw_verbose,
                     bootargs,
                     iboot_output,
+                    skip_first,
                 },
         } => {
             let nor_source = match (nor_ipsw, nor_url) {
@@ -2717,7 +2726,8 @@ async fn main() -> Result<()> {
                 cache_root,
             )
             .with_disable_baseband_update(disable_bbupdate)
-            .with_verbose_boot_args(ipsw_verbose);
+            .with_verbose_boot_args(ipsw_verbose)
+            .with_skip_first(skip_first);
             if let Some(args) = bootargs {
                 request = request.with_boot_args(args);
             }
@@ -2936,6 +2946,7 @@ async fn main() -> Result<()> {
                     exploit,
                     limera1n_payload,
                     no_baseband,
+                    skip_first,
                     yes,
                 },
         } => {
@@ -3002,10 +3013,10 @@ async fn main() -> Result<()> {
             }
             consume_operation(
                 output,
-                kit.execute_multipart_restore(MultipartRestoreRequest::new(
-                    part1_request,
-                    part2_request,
-                )),
+                kit.execute_multipart_restore(
+                    MultipartRestoreRequest::new(part1_request, part2_request)
+                        .with_skip_first(skip_first),
+                ),
             )
             .await?;
         }

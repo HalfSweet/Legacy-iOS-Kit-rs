@@ -453,6 +453,7 @@ pub struct MultipartPrepareRequest {
     verbose_boot_args: bool,
     boot_args: Option<String>,
     iboot_output: Option<PathBuf>,
+    skip_first: bool,
 }
 
 impl MultipartPrepareRequest {
@@ -486,6 +487,7 @@ impl MultipartPrepareRequest {
             verbose_boot_args: false,
             boot_args: None,
             iboot_output: None,
+            skip_first: false,
         }
     }
 
@@ -533,6 +535,14 @@ impl MultipartPrepareRequest {
         self.iboot_output = Some(path.into());
         self
     }
+
+    /// Mirror of upstream's `--skip-first`: keep the existing part 2 IPSW and
+    /// build only the part 1 NOR flash IPSW, for continuing a powdersn0w
+    /// 4.2.x or lower restore after the multipatched target already exists.
+    pub fn with_skip_first(mut self, enabled: bool) -> Self {
+        self.skip_first = enabled;
+        self
+    }
 }
 
 /// The two built IPSWs of a multipart restore.
@@ -556,6 +566,12 @@ impl MultipartIpswSummary {
 pub(crate) async fn prepare(
     request: MultipartPrepareRequest,
 ) -> Result<MultipartIpswSummary, KitError> {
+    if request.skip_first && !tokio::fs::try_exists(&request.part2_output).await? {
+        return Err(KitError::MultipartMissingPart2(
+            request.part2_output.clone(),
+        ));
+    }
+
     let target = FirmwareArchive::open(&request.target_ipsw)?;
     let target_manifest = target.build_manifest()?;
     let target_version = target_manifest.product_version().to_string();
@@ -608,16 +624,21 @@ pub(crate) async fn prepare(
         part1_asr_patch,
     )
     .await?;
-    info!("building part 2 (multipatch) IPSW");
-    let part2 = build_part2(
-        &request,
-        &target,
-        &target_version,
-        target_keys,
-        asr_patch,
-        exploit,
-    )
-    .await?;
+    let part2 = if request.skip_first {
+        info!("skip-first: keeping the existing part 2 IPSW");
+        FirmwareSummary::inspect(request.part2_output.clone())?
+    } else {
+        info!("building part 2 (multipatch) IPSW");
+        build_part2(
+            &request,
+            &target,
+            &target_version,
+            target_keys,
+            asr_patch,
+            exploit,
+        )
+        .await?
+    };
     Ok(MultipartIpswSummary { part1, part2 })
 }
 
@@ -1083,6 +1104,7 @@ async fn build_part2(
 pub struct MultipartRestoreRequest {
     part1: RestoreExecutionRequest,
     part2: RestoreExecutionRequest,
+    skip_first: bool,
 }
 
 impl MultipartRestoreRequest {
@@ -1091,7 +1113,16 @@ impl MultipartRestoreRequest {
             // The NOR flash stage does not boot a normal system.
             part1: part1.with_final_verification(false),
             part2,
+            skip_first: false,
         }
+    }
+
+    /// Mirror of upstream's `--skip-first`: skip the part 1 NOR flash restore
+    /// and proceed straight to the pwned part 2 restore, for powdersn0w 4.2.x
+    /// and lower devices whose NOR is already flashed.
+    pub fn with_skip_first(mut self, enabled: bool) -> Self {
+        self.skip_first = enabled;
+        self
     }
 }
 
@@ -1125,37 +1156,46 @@ async fn execute(
 ) -> Result<Option<legacy_ios_core::OperationOutcome>, KitError> {
     let ecid = request.part2.device().ecid();
 
-    info!("multipart stage 1: NOR flash restore");
-    if crate::restore_execution::execute(devices, leases, tss, emitter, request.part1)
-        .await?
-        .is_none()
-    {
-        return Ok(None);
-    }
-    if emitter.is_cancelled() {
-        return Ok(None);
-    }
+    if request.skip_first {
+        info!(
+            "skip-first: skipping the part 1 NOR flash restore; proceeding to the pwned part 2 restore"
+        );
+    } else {
+        info!("multipart stage 1: NOR flash restore");
+        if crate::restore_execution::execute(devices, leases, tss, emitter, request.part1)
+            .await?
+            .is_none()
+        {
+            return Ok(None);
+        }
+        if emitter.is_cancelled() {
+            return Ok(None);
+        }
 
-    info!("multipart stage 2: waiting for the device to re-enter DFU/recovery");
-    emitter
-        .emit(legacy_ios_core::OperationEvent::PhaseStarted {
-            phase: legacy_ios_core::OperationPhase::WaitingForDevice,
-            cancellation: legacy_ios_core::CancellationSafety::Immediate,
-        })
-        .await;
-    emitter
-        .emit(legacy_ios_core::OperationEvent::ActionRequired {
-            id: ActionId::new(1),
-            action: ActionKind::FollowDfuInstructions {
-                steps: vec![
-                    "The NOR flash stage is complete; do not disconnect the device.".to_owned(),
-                    "Put the device into DFU mode to continue with the target restore.".to_owned(),
-                ],
-            },
-        })
-        .await;
-    if !await_bootloader_device(ecid, emitter).await? {
-        return Ok(None);
+        info!("multipart stage 2: waiting for the device to re-enter DFU/recovery");
+        emitter
+            .emit(legacy_ios_core::OperationEvent::PhaseStarted {
+                phase: legacy_ios_core::OperationPhase::WaitingForDevice,
+                cancellation: legacy_ios_core::CancellationSafety::Immediate,
+            })
+            .await;
+        emitter
+            .emit(legacy_ios_core::OperationEvent::ActionRequired {
+                id: ActionId::new(1),
+                action: ActionKind::FollowDfuInstructions {
+                    steps: vec![
+                        "The NOR flash stage is complete; do not disconnect the device.".to_owned(),
+                        "Put the device into DFU mode to continue with the target restore."
+                            .to_owned(),
+                        "If pwning fails after this point, re-enter DFU and run again with --skip-first to continue."
+                            .to_owned(),
+                    ],
+                },
+            })
+            .await;
+        if !await_bootloader_device(ecid, emitter).await? {
+            return Ok(None);
+        }
     }
 
     info!("multipart stage 2: target restore");
@@ -1495,6 +1535,29 @@ mod tests {
         dictionary.insert("APTicket".to_owned(), Value::Data(vec![0x30, 0x82, 0x01]));
         let ticket = SigningTicket::from_dictionary(dictionary).unwrap();
         assert_eq!(extract_apticket_der(&ticket), vec![0x30, 0x82, 0x01]);
+    }
+
+    #[tokio::test]
+    async fn skip_first_requires_an_existing_part2() {
+        let root = tempfile::tempdir().unwrap();
+        let request = MultipartPrepareRequest::new(
+            ProductType::from("iPhone3,1"),
+            BoardConfig::from("n90ap"),
+            root.path().join("target.ipsw"),
+            root.path().join("custom.ipsw"),
+            root.path().join("base.ipsw"),
+            NorSource::Local(root.path().join("nor.ipsw")),
+            root.path().join("ticket.shsh2"),
+            root.path().join("part1.ipsw"),
+            root.path().join("part2.ipsw"),
+            root.path().join("cache"),
+        )
+        .with_skip_first(true);
+        let error = prepare(request).await.err().unwrap();
+        assert!(
+            matches!(error, KitError::MultipartMissingPart2(_)),
+            "{error}"
+        );
     }
 
     #[tokio::test]
