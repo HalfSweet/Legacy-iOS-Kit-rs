@@ -130,6 +130,9 @@ pub enum DataType {
     FirmwareUpdater,
     FirmwareUpdaterPreflight,
     DeviceRestoreInfoPreflight,
+    SourceBootObjectV4,
+    PersonalizedBootObjectV3,
+    BuildIdentityDict,
     Unknown(String),
 }
 
@@ -149,6 +152,9 @@ impl DataType {
             "FirmwareUpdaterData" => Self::FirmwareUpdater,
             "FirmwareUpdaterPreflight" => Self::FirmwareUpdaterPreflight,
             "DeviceRestoreInfoPreflight" => Self::DeviceRestoreInfoPreflight,
+            "SourceBootObjectV4" => Self::SourceBootObjectV4,
+            "PersonalizedBootObjectV3" => Self::PersonalizedBootObjectV3,
+            "BuildIdentityDict" => Self::BuildIdentityDict,
             value => Self::Unknown(value.to_owned()),
         }
     }
@@ -182,6 +188,64 @@ impl DataRequest {
             .get("Arguments")
             .and_then(Value::as_dictionary)
             .is_some_and(|arguments| arguments.contains_key("FlashVersion1"))
+    }
+
+    /// Parse a `SourceBootObjectV4`/`PersonalizedBootObjectV3` request into
+    /// its image name and optional variant (idevicerestore
+    /// `restore_send_source_boot_object_v4` /
+    /// `restore_send_personalized_boot_object_v3`).
+    pub fn boot_object(&self) -> Result<BootObjectRequest, RestoredError> {
+        let arguments = self
+            .message
+            .get("Arguments")
+            .and_then(Value::as_dictionary)
+            .ok_or_else(|| RestoredError::MissingValue("Arguments".into()))?;
+        let image_name = arguments
+            .get("ImageName")
+            .and_then(Value::as_string)
+            .ok_or_else(|| RestoredError::MissingValue("ImageName".into()))?;
+        let variant = arguments
+            .get("Variant")
+            .and_then(Value::as_string)
+            .map(ToOwned::to_owned);
+        let image = match image_name {
+            "__GlobalManifest__" => BootObjectImage::GlobalManifest,
+            "__RestoreVersion__" => BootObjectImage::RestoreVersion,
+            "__SystemVersion__" => BootObjectImage::SystemVersion,
+            name => BootObjectImage::Component(name.to_owned()),
+        };
+        Ok(BootObjectRequest { image, variant })
+    }
+}
+
+/// Parsed image name of a boot-object data request.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum BootObjectImage {
+    /// `__GlobalManifest__`: the restore global manifest (`apticket` im4m)
+    /// selected by the request variant.
+    GlobalManifest,
+    /// `__RestoreVersion__`: the IPSW's `RestoreVersion.plist`.
+    RestoreVersion,
+    /// `__SystemVersion__`: the IPSW's `SystemVersion.plist`.
+    SystemVersion,
+    /// Any other component name, resolved through the TSS response or the
+    /// build identity.
+    Component(String),
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct BootObjectRequest {
+    image: BootObjectImage,
+    variant: Option<String>,
+}
+
+impl BootObjectRequest {
+    pub const fn image(&self) -> &BootObjectImage {
+        &self.image
+    }
+
+    pub fn variant(&self) -> Option<&str> {
+        self.variant.as_deref()
     }
 }
 
@@ -404,6 +468,79 @@ mod tests {
             panic!("expected data request");
         };
         assert_eq!(request.data_type(), &DataType::RootTicket);
+    }
+
+    #[test]
+    fn parses_boot_object_and_build_identity_data_types() {
+        for (name, expected) in [
+            ("SourceBootObjectV4", DataType::SourceBootObjectV4),
+            (
+                "PersonalizedBootObjectV3",
+                DataType::PersonalizedBootObjectV3,
+            ),
+            ("BuildIdentityDict", DataType::BuildIdentityDict),
+        ] {
+            let mut message = Dictionary::new();
+            message.insert("MsgType".into(), "DataRequestMsg".into());
+            message.insert("DataType".into(), name.into());
+
+            let RestoredMessage::DataRequest(request) = RestoredMessage::parse(message) else {
+                panic!("expected data request");
+            };
+            assert_eq!(request.data_type(), &expected);
+        }
+    }
+
+    #[test]
+    fn parses_boot_object_special_image_names() {
+        let request = |image_name: &str, variant: Option<&str>| {
+            let mut arguments = Dictionary::new();
+            arguments.insert("ImageName".into(), image_name.into());
+            if let Some(variant) = variant {
+                arguments.insert("Variant".into(), variant.into());
+            }
+            let mut message = Dictionary::new();
+            message.insert("MsgType".into(), "DataRequestMsg".into());
+            message.insert("DataType".into(), "SourceBootObjectV4".into());
+            message.insert("Arguments".into(), arguments.into());
+            let RestoredMessage::DataRequest(request) = RestoredMessage::parse(message) else {
+                panic!("expected data request");
+            };
+            request.boot_object().unwrap()
+        };
+
+        let global = request("__GlobalManifest__", Some("Customer Erase Install (IPSW)"));
+        assert_eq!(global.image(), &BootObjectImage::GlobalManifest);
+        assert_eq!(global.variant(), Some("Customer Erase Install (IPSW)"));
+        assert_eq!(
+            request("__RestoreVersion__", None).image(),
+            &BootObjectImage::RestoreVersion
+        );
+        assert_eq!(
+            request("__SystemVersion__", None).image(),
+            &BootObjectImage::SystemVersion
+        );
+        let component = request("Cryptex1,SystemOS", None);
+        assert_eq!(
+            component.image(),
+            &BootObjectImage::Component("Cryptex1,SystemOS".to_owned())
+        );
+        assert_eq!(component.variant(), None);
+    }
+
+    #[test]
+    fn boot_object_requires_an_image_name() {
+        let mut message = Dictionary::new();
+        message.insert("MsgType".into(), "DataRequestMsg".into());
+        message.insert("DataType".into(), "PersonalizedBootObjectV3".into());
+
+        let RestoredMessage::DataRequest(request) = RestoredMessage::parse(message) else {
+            panic!("expected data request");
+        };
+        assert!(matches!(
+            request.boot_object(),
+            Err(RestoredError::MissingValue(_))
+        ));
     }
 
     #[tokio::test]

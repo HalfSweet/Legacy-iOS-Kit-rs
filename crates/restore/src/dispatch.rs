@@ -3,6 +3,27 @@ use thiserror::Error;
 
 use crate::{DataRequest, DataType};
 
+/// Chunk size of the `FileData` message sequence used to answer boot-object
+/// requests (idevicerestore `_restore_send_file_data`, restore.c:4681).
+pub const FILE_DATA_CHUNK_SIZE: usize = 8192;
+
+/// Build the `{FileData: <chunk>}` message sequence for `data`, terminated by
+/// a `{FileDataDone: true}` message (also the only message for empty data).
+pub fn file_data_messages(data: &[u8]) -> Vec<Dictionary> {
+    let mut messages = data
+        .chunks(FILE_DATA_CHUNK_SIZE)
+        .map(|chunk| {
+            let mut message = Dictionary::new();
+            message.insert("FileData".into(), Value::Data(chunk.to_vec()));
+            message
+        })
+        .collect::<Vec<_>>();
+    let mut done = Dictionary::new();
+    done.insert("FileDataDone".into(), true.into());
+    messages.push(done);
+    messages
+}
+
 #[derive(Clone, Debug, Default)]
 pub struct PreparedRestoreData {
     root_ticket: Option<Vec<u8>>,
@@ -15,6 +36,7 @@ pub struct PreparedRestoreData {
     baseband: Option<Dictionary>,
     fud: Option<Dictionary>,
     firmware_updater: Option<Dictionary>,
+    build_identity: Option<Dictionary>,
 }
 
 impl PreparedRestoreData {
@@ -71,6 +93,14 @@ impl PreparedRestoreData {
         self
     }
 
+    /// Build identity dictionary answered to `BuildIdentityDict` requests
+    /// (already rewritten against the cryptex source when the restore plan
+    /// calls for it).
+    pub fn with_build_identity(mut self, identity: Dictionary) -> Self {
+        self.build_identity = Some(identity);
+        self
+    }
+
     pub fn dispatch(&self, request: &DataRequest) -> Result<DispatchAction, RestoreDispatchError> {
         match request.data_type() {
             DataType::SystemImage => Ok(DispatchAction::SystemImage),
@@ -115,6 +145,28 @@ impl PreparedRestoreData {
             DataType::FirmwareUpdaterPreflight | DataType::DeviceRestoreInfoPreflight => {
                 Ok(DispatchAction::Send(Dictionary::new()))
             }
+            // Boot objects are streamed by a live resolver (`FileData`
+            // sequence); the static prepared data cannot answer them.
+            DataType::SourceBootObjectV4 | DataType::PersonalizedBootObjectV3 => {
+                Err(RestoreDispatchError::MissingData("boot object"))
+            }
+            DataType::BuildIdentityDict => {
+                let identity = self
+                    .build_identity
+                    .clone()
+                    .ok_or(RestoreDispatchError::MissingData("BuildIdentityDict"))?;
+                let variant = request
+                    .message()
+                    .get("Arguments")
+                    .and_then(Value::as_dictionary)
+                    .and_then(|arguments| arguments.get("Variant"))
+                    .and_then(Value::as_string)
+                    .unwrap_or("Erase");
+                let mut response = Dictionary::new();
+                response.insert("BuildIdentityDict".into(), identity.into());
+                response.insert("Variant".into(), variant.into());
+                Ok(DispatchAction::Send(response))
+            }
             DataType::Unknown(value) => Err(RestoreDispatchError::UnknownDataType(value.clone())),
         }
     }
@@ -147,6 +199,17 @@ fn response(
 pub enum DispatchAction {
     SystemImage,
     Send(Dictionary),
+    /// Stream the payload as a `FileData` chunk sequence terminated by
+    /// `FileDataDone` (boot-object requests).
+    FileData(Vec<u8>),
+}
+
+/// Payload routed to a request's separate data port: either a single
+/// response message or a `FileData` chunk sequence.
+#[derive(Clone, Debug)]
+pub enum DataResponse {
+    Message(Dictionary),
+    FileData(Vec<u8>),
 }
 
 #[derive(Debug, Error, Eq, PartialEq)]
@@ -248,5 +311,89 @@ mod tests {
             panic!("expected plist response");
         };
         assert!(response.contains_key("LlbImageData"));
+    }
+
+    #[test]
+    fn file_data_messages_chunk_at_8192_and_terminate_with_done() {
+        // Empty payloads send only the terminator.
+        let messages = file_data_messages(&[]);
+        assert_eq!(messages.len(), 1);
+        assert_eq!(
+            messages[0].get("FileDataDone").and_then(Value::as_boolean),
+            Some(true)
+        );
+
+        // An exact chunk boundary does not produce a trailing empty chunk.
+        let data = vec![7_u8; FILE_DATA_CHUNK_SIZE];
+        let messages = file_data_messages(&data);
+        assert_eq!(messages.len(), 2);
+        assert_eq!(
+            messages[0].get("FileData").and_then(Value::as_data),
+            Some(data.as_slice())
+        );
+        assert!(messages[1].contains_key("FileDataDone"));
+
+        let data = vec![9_u8; FILE_DATA_CHUNK_SIZE + 1];
+        let messages = file_data_messages(&data);
+        assert_eq!(messages.len(), 3);
+        assert_eq!(
+            messages[1]
+                .get("FileData")
+                .and_then(Value::as_data)
+                .map(<[u8]>::len),
+            Some(1)
+        );
+        assert!(messages[2].contains_key("FileDataDone"));
+    }
+
+    #[test]
+    fn build_identity_response_carries_the_request_variant() {
+        let mut identity = Dictionary::new();
+        identity.insert("ApBoardID".into(), 8_u64.into());
+        let prepared = PreparedRestoreData::default().with_build_identity(identity);
+
+        let DispatchAction::Send(response) = prepared
+            .dispatch(&data_request("BuildIdentityDict", false))
+            .unwrap()
+        else {
+            panic!("expected plist response");
+        };
+        assert!(response.contains_key("BuildIdentityDict"));
+        // Without Arguments.Variant the response defaults to "Erase"
+        // (idevicerestore restore_send_buildidentity, restore.c:5189-5194).
+        assert_eq!(
+            response.get("Variant").and_then(Value::as_string),
+            Some("Erase")
+        );
+
+        let mut message = Dictionary::new();
+        message.insert("MsgType".into(), "DataRequestMsg".into());
+        message.insert("DataType".into(), "BuildIdentityDict".into());
+        let mut arguments = Dictionary::new();
+        arguments.insert("Variant".into(), "Customer Erase Install (IPSW)".into());
+        message.insert("Arguments".into(), arguments.into());
+        let RestoredMessage::DataRequest(request) = RestoredMessage::parse(message) else {
+            panic!("expected data request");
+        };
+        let DispatchAction::Send(response) = prepared.dispatch(&request).unwrap() else {
+            panic!("expected plist response");
+        };
+        assert_eq!(
+            response.get("Variant").and_then(Value::as_string),
+            Some("Customer Erase Install (IPSW)")
+        );
+    }
+
+    #[test]
+    fn boot_object_requests_are_not_answered_from_static_data() {
+        let prepared = PreparedRestoreData::default();
+        assert!(matches!(
+            prepared.dispatch(&data_request("SourceBootObjectV4", false)),
+            Err(RestoreDispatchError::MissingData("boot object"))
+        ));
+        assert!(matches!(
+            prepared.dispatch(&data_request("PersonalizedBootObjectV3", false)),
+            Err(RestoreDispatchError::MissingData("boot object"))
+        ));
     }
 }

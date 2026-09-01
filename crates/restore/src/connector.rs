@@ -139,6 +139,18 @@ impl RestoredDataConnector {
         Ok(())
     }
 
+    /// Stream a boot-object payload as a `FileData` chunk sequence over a
+    /// single data-port connection, terminated by `FileDataDone`
+    /// (idevicerestore `_restore_send_file_data`).
+    pub async fn send_file_data(&self, port: u16, data: &[u8]) -> Result<(), RestoredConnectError> {
+        let stream = self.connect(port).await?;
+        let mut framed = PlistFramed::new(stream);
+        for message in crate::file_data_messages(data) {
+            framed.send(&message).await?;
+        }
+        Ok(())
+    }
+
     pub async fn connect_fdr(
         &self,
         proxy: Arc<dyn FdrProxyConnector>,

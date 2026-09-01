@@ -6,9 +6,9 @@ use tokio::io::{AsyncRead, AsyncWrite};
 use tracing::{debug, warn};
 
 use crate::{
-    AsrError, DataRequest, DispatchAction, PreparedRestoreData, RestoreDispatchError,
+    AsrError, DataRequest, DataResponse, DispatchAction, PreparedRestoreData, RestoreDispatchError,
     RestoreOptions, RestoredClient, RestoredConnectError, RestoredError, RestoredMessage,
-    RestoredSession,
+    RestoredSession, file_data_messages,
 };
 
 pub async fn run_restored_session<F, Fut, P>(
@@ -55,7 +55,11 @@ where
         move |port, response| {
             let data = data.clone();
             async move {
-                data.send(port, &response).await?;
+                match response {
+                    DataResponse::Message(response) => data.send(port, &response).await?,
+                    // Boot-object payloads stream over a single connection.
+                    DataResponse::FileData(bytes) => data.send_file_data(port, &bytes).await?,
+                }
                 Ok(())
             }
         },
@@ -106,7 +110,7 @@ where
     S: AsyncRead + AsyncWrite + Unpin,
     F: FnMut(Option<u16>) -> Fut,
     Fut: Future<Output = Result<(), RestoreRunError>>,
-    D: FnMut(u16, Dictionary) -> DFut,
+    D: FnMut(u16, DataResponse) -> DFut,
     DFut: Future<Output = Result<(), RestoreRunError>>,
     P: FnMut(RestoreProgress),
 {
@@ -138,7 +142,7 @@ where
     S: AsyncRead + AsyncWrite + Unpin,
     F: FnMut(Option<u16>) -> Fut,
     Fut: Future<Output = Result<(), RestoreRunError>>,
-    D: FnMut(u16, Dictionary) -> DFut,
+    D: FnMut(u16, DataResponse) -> DFut,
     DFut: Future<Output = Result<(), RestoreRunError>>,
     R: FnMut(DataRequest) -> RFut,
     RFut: Future<Output = Result<DispatchAction, RestoreRunError>>,
@@ -156,9 +160,18 @@ where
                     DispatchAction::SystemImage => send_system_image(data_port).await?,
                     DispatchAction::Send(response) => {
                         if let Some(port) = data_port {
-                            send_data_response(port, response).await?;
+                            send_data_response(port, DataResponse::Message(response)).await?;
                         } else {
                             client.send(&response).await?;
+                        }
+                    }
+                    DispatchAction::FileData(data) => {
+                        if let Some(port) = data_port {
+                            send_data_response(port, DataResponse::FileData(data)).await?;
+                        } else {
+                            for message in file_data_messages(&data) {
+                                client.send(&message).await?;
+                            }
                         }
                     }
                 }
@@ -303,7 +316,7 @@ mod tests {
     use plist::Dictionary;
 
     use super::*;
-    use crate::PlistFramed;
+    use crate::{DataType, FILE_DATA_CHUNK_SIZE, PlistFramed};
 
     #[tokio::test]
     async fn responds_to_ticket_and_finishes_on_zero_status() {
@@ -396,6 +409,9 @@ mod tests {
             move |port, response| {
                 let response_sink = response_sink.clone();
                 async move {
+                    let DataResponse::Message(response) = response else {
+                        panic!("expected a single response message");
+                    };
                     response_sink
                         .lock()
                         .expect("response mutex must remain available")
@@ -420,5 +436,61 @@ mod tests {
     fn adapts_legacy_progress_operations() {
         assert_eq!(adapt_operation(36, 13), 37);
         assert_eq!(adapt_operation(36, 14), 36);
+    }
+
+    #[tokio::test]
+    async fn streams_file_data_chunks_for_boot_object_requests() {
+        let payload = vec![5_u8; FILE_DATA_CHUNK_SIZE + 1];
+        let (client_stream, server_stream) = tokio::io::duplex(64 * 1024);
+        let mut client = RestoredClient::new(client_stream, "test");
+        let server_payload = payload.clone();
+        let server = tokio::spawn(async move {
+            let mut framed = PlistFramed::new(server_stream);
+            framed.receive().await.unwrap();
+            let mut request = Dictionary::new();
+            request.insert("MsgType".into(), "DataRequestMsg".into());
+            request.insert("DataType".into(), "SourceBootObjectV4".into());
+            framed.send(&request).await.unwrap();
+
+            let mut received = Vec::new();
+            loop {
+                let message = framed.receive().await.unwrap();
+                if message.get("FileDataDone").and_then(Value::as_boolean) == Some(true) {
+                    break;
+                }
+                received.extend_from_slice(
+                    message
+                        .get("FileData")
+                        .and_then(Value::as_data)
+                        .expect("chunk messages carry FileData"),
+                );
+            }
+            assert_eq!(received, server_payload);
+
+            let mut status = Dictionary::new();
+            status.insert("MsgType".into(), "StatusMsg".into());
+            status.insert("Status".into(), 0_u64.into());
+            framed.send(&status).await.unwrap();
+            framed.receive().await.unwrap();
+        });
+
+        let result = run_restored_with_dispatcher(
+            &mut client,
+            &RestoreOptions::erase(),
+            15,
+            move |request| {
+                let payload = payload.clone();
+                async move {
+                    assert_eq!(request.data_type(), &DataType::SourceBootObjectV4);
+                    Ok(DispatchAction::FileData(payload))
+                }
+            },
+            |_| async { Ok(()) },
+            |_port, _response| async { Err(RestoreRunError::DataPortNotConfigured) },
+            |_| {},
+        )
+        .await;
+        server.await.unwrap();
+        assert!(result.is_ok());
     }
 }

@@ -17,7 +17,10 @@ pub use connector::{
     RestoredConnectError, RestoredConnector, RestoredDataConnector, RestoredSession,
     TcpFdrProxyConnector,
 };
-pub use dispatch::{DispatchAction, PreparedRestoreData, RestoreDispatchError};
+pub use dispatch::{
+    DataResponse, DispatchAction, FILE_DATA_CHUNK_SIZE, PreparedRestoreData, RestoreDispatchError,
+    file_data_messages,
+};
 pub use engine::{
     RestoreOutcome, RestoreProgress, RestoreRunError, run_restored, run_restored_session,
     run_restored_session_with_dispatcher, run_restored_with_data_ports,
@@ -30,6 +33,6 @@ pub use fdr::{
 pub use options::RestoreOptions;
 pub use plist_framed::{PlistFrameError, PlistFramed};
 pub use restored::{
-    BasebandStatus, CheckpointMessage, DataRequest, DataType, ProgressMessage, RestoredClient,
-    RestoredError, RestoredMessage, RestoredType, StatusMessage,
+    BasebandStatus, BootObjectImage, BootObjectRequest, CheckpointMessage, DataRequest, DataType,
+    ProgressMessage, RestoredClient, RestoredError, RestoredMessage, RestoredType, StatusMessage,
 };
