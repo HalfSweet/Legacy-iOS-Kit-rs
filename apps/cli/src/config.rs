@@ -86,6 +86,9 @@ impl AppConfig {
         if let Ok(value) = env::var("LIK_TSS_ENDPOINT") {
             config.network.tss_endpoint = Some(value);
         }
+        if let Ok(value) = env::var("LIK_ANISETTE_URL") {
+            config.network.anisette_url = Some(value);
+        }
         if let Ok(value) = env::var("LIK_RESOURCE_BASE") {
             config.network.resource_base = Some(value);
         }
@@ -148,6 +151,7 @@ pub(crate) struct TransportConfig {
 pub(crate) struct NetworkConfig {
     pub(crate) firmware_catalog: Option<String>,
     pub(crate) tss_endpoint: Option<String>,
+    pub(crate) anisette_url: Option<String>,
     pub(crate) resource_base: Option<String>,
     pub(crate) download_concurrency: Option<usize>,
 }

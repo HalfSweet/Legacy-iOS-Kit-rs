@@ -23,6 +23,7 @@ mod ramdisk_boot;
 mod recovery;
 mod restore_execution;
 mod shsh;
+pub mod signing;
 mod trollstore;
 
 pub use bootstrap::{
@@ -79,6 +80,7 @@ pub use ramdisk_boot::RamdiskBootExecutionRequest;
 pub use recovery::{RecoveryDevice, RecoveryManager, RecoveryUploadResult};
 pub use restore_execution::RestoreExecutionRequest;
 pub use shsh::{ShshRequest, ShshSummary};
+pub use signing::{AppSignOutcome, AppSignRequest};
 
 #[derive(Clone, Debug, Default)]
 pub struct LegacyIosKit {

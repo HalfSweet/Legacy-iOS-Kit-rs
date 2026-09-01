@@ -6,20 +6,39 @@ rust-version.workspace = true
 publish = false
 
 [dependencies]
+aes = "=0.8.4"
+aes-gcm = "=0.10.3"
+apple-codesign = { version = "=0.29.0", default-features = false }
+base64 = "=0.22.1"
+cbc = "=0.1.2"
+hmac = "=0.12.1"
 idevice = { version = "=0.1.65", default-features = false, features = ["afc", "diagnostics_relay", "house_arrest", "pair", "ring", "springboardservices", "syslog_relay", "usbmuxd"] }
 legacy-ios-core = { path = "../core" }
 legacy-ios-transport = { path = "../transport" }
+num-bigint = { version = "=0.4.6", features = ["rand"] }
 nusb = { version = "=0.2.7", features = ["tokio"] }
+pbkdf2 = "=0.12.2"
+pkcs8 = "=0.10.2"
 plist = "=1.10.0"
+rand = "=0.8.5"
+reqwest = { version = "=0.12.15", default-features = false, features = ["rustls-tls"] }
+rsa = { version = "=0.9.7", features = ["sha1"] }
 russh = { version = "=0.63.1", default-features = false, features = ["des", "dsa", "ring", "rsa"] }
 rusbmux = { version = "=0.2.0", default-features = false, features = ["nusb"] }
 serde.workspace = true
+serde_json = "1.0.140"
+sha1 = { version = "=0.10.6", features = ["oid"] }
+sha2 = "=0.10.9"
+tempfile = "3.20.0"
 thiserror.workspace = true
 time = "=0.3.47"
 tokio = { workspace = true, features = ["fs", "io-util"] }
 tracing.workspace = true
 uuid = { version = "1.16.0", features = ["v4"] }
+x509-cert = { version = "=0.2.5", features = ["pem"] }
+x509-certificate = "=0.24.0"
 zeroize = "=1.9.0"
+zip = { version = "=2.4.2", default-features = false, features = ["deflate"] }
 
 # FUSE mounting backend. On Linux/BSD, fuser 0.18 mounts through /dev/fuse in
 # pure Rust, so no system library is needed at build time; a missing driver is

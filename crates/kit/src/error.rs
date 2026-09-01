@@ -10,6 +10,16 @@ pub enum KitError {
     Service(#[from] legacy_ios_services::ServiceError),
     #[error("device backup failed: {0}")]
     Backup(#[from] legacy_ios_services::BackupError),
+    #[error("anisette data provisioning failed: {0}")]
+    Anisette(#[from] legacy_ios_services::signing::AnisetteError),
+    #[error("Apple ID authentication failed: {0}")]
+    AppleIdAuth(#[from] legacy_ios_services::signing::GsaError),
+    #[error("developer services operation failed: {0}")]
+    DeveloperApi(#[from] legacy_ios_services::signing::DeveloperApiError),
+    #[error("IPA re-signing failed: {0}")]
+    Resign(#[from] legacy_ios_services::signing::ResignError),
+    #[error("developer team {0} was not found on the Apple ID account")]
+    UnknownDeveloperTeam(String),
     #[error("ramdisk SSH failed: {0}")]
     Ssh(#[from] legacy_ios_services::SshError),
     #[error("firmware operation failed: {0}")]
@@ -144,7 +154,8 @@ impl KitError {
             | Self::UnknownResource(_)
             | Self::MissingHfsPartition
             | Self::UnknownBoardConfig { .. }
-            | Self::MissingDeviceSelector => OperationPhase::Planning,
+            | Self::MissingDeviceSelector
+            | Self::UnknownDeveloperTeam(_) => OperationPhase::Planning,
             Self::EraseConsentMismatch => OperationPhase::Preflight,
             Self::UnsupportedBootstrapVersion(_)
             | Self::MissingBootstrapPackage(_)
@@ -164,6 +175,7 @@ impl KitError {
             Self::RamdiskPreparation(_) => OperationPhase::Preflight,
             Self::RamdiskBoot(_) => OperationPhase::Booting,
             Self::Signing(_)
+            | Self::Resign(_)
             | Self::Plist(_)
             | Self::OnboardTicket(_)
             | Self::Dmg(_)
@@ -178,6 +190,9 @@ impl KitError {
             Self::Transport(_)
             | Self::Service(_)
             | Self::Ssh(_)
+            | Self::Anisette(_)
+            | Self::AppleIdAuth(_)
+            | Self::DeveloperApi(_)
             | Self::DeviceDiscovery { .. }
             | Self::Io(_) => OperationPhase::Preflight,
             Self::Backup(_) => OperationPhase::TransferringFilesystem,
@@ -203,16 +218,20 @@ impl KitError {
             Self::Transport(_) | Self::Service(_) | Self::Ssh(_) | Self::DeviceDiscovery { .. } => {
                 Recoverability::ReconnectDevice
             }
-            Self::Signing(_) | Self::Artifact(_) | Self::Io(_) => Recoverability::RetryImmediately,
+            Self::Signing(_) | Self::Artifact(_) | Self::Anisette(_) | Self::Io(_) => {
+                Recoverability::RetryImmediately
+            }
             Self::Recovery(_) | Self::Limera1n(_) | Self::Checkm8(_) | Self::RamdiskBoot(_) => {
                 Recoverability::ReenterDfu
             }
             Self::PwnVerificationFailed | Self::ExternalExploitTimeout => {
                 Recoverability::ReenterDfu
             }
-            Self::Plist(_) | Self::Backup(_) | Self::RestoreExecution(_) | Self::Task(_) => {
-                Recoverability::RestartOperation
-            }
+            Self::Plist(_)
+            | Self::Backup(_)
+            | Self::Resign(_)
+            | Self::RestoreExecution(_)
+            | Self::Task(_) => Recoverability::RestartOperation,
             Self::VerificationTimeout => Recoverability::ReconnectDevice,
             Self::PwnageVerificationTimeout | Self::KdfuTimeout => Recoverability::ReenterDfu,
             Self::PwnageWtfDigest => Recoverability::NotRecoverable,
@@ -239,6 +258,9 @@ impl KitError {
             | Self::UnknownResource(_)
             | Self::MissingHfsPartition
             | Self::UnknownBoardConfig { .. }
+            | Self::AppleIdAuth(_)
+            | Self::DeveloperApi(_)
+            | Self::UnknownDeveloperTeam(_)
             | Self::MissingDeviceSelector => Recoverability::NotRecoverable,
             Self::EraseConsentMismatch
             | Self::UnsupportedBootstrapVersion(_)

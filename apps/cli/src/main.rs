@@ -10,12 +10,12 @@ use std::{
 use anyhow::{Context, Result, anyhow};
 use clap::{ArgAction, Parser, Subcommand, ValueEnum};
 use legacy_ios_kit::{
-    ActivationState, AfcPath, AppFilter, BackupOptions, BackupOutcome, BackupPassword,
-    BackupRestoreOptions, BasebandPolicy, BoardConfig, BootNonce, CustomRootfsRequest,
-    DeviceDiagnostics, DeviceFileInfo, DeviceInventory, DeviceStorageInfo, DeviceSummary,
-    DmgFirmwareKey, Ecid, ExploitPolicy, FirmwareSummary, HfsEntrySummary, HfsMutation,
-    HfsStatSummary, HostKeyPolicy, ImageCipher, InstalledApp, LegacyIosKit, MountOptions,
-    NoncePolicy, OperationEvent, OperationHandle, OperationOutcome, ProductType,
+    ActivationState, AfcPath, AppFilter, AppSignRequest, BackupOptions, BackupOutcome,
+    BackupPassword, BackupRestoreOptions, BasebandPolicy, BoardConfig, BootNonce,
+    CustomRootfsRequest, DeviceDiagnostics, DeviceFileInfo, DeviceInventory, DeviceStorageInfo,
+    DeviceSummary, DmgFirmwareKey, Ecid, ExploitPolicy, FirmwareSummary, HfsEntrySummary,
+    HfsMutation, HfsStatSummary, HostKeyPolicy, ImageCipher, InstalledApp, LegacyIosKit,
+    MountOptions, NoncePolicy, OperationEvent, OperationHandle, OperationOutcome, ProductType,
     RamdiskBootExecutionRequest, RamdiskBootRequest, RamdiskBuildRequest, RamdiskBuildSummary,
     RamdiskSsh, RecoveryDeviceInfo, RecoveryUploadResult, RemoteFirmwareSummary, ResourceId,
     RestoreBehavior, RestoreExecutionRequest, RestorePlan, RestoreRequest, ScpPath, SepPolicy,
@@ -430,6 +430,19 @@ enum AppCommand {
     Install {
         udid: Udid,
         ipa: PathBuf,
+        #[arg(long)]
+        yes: bool,
+    },
+    /// Sign an IPA with an Apple ID and install it (AltServer equivalent).
+    Sign {
+        udid: Udid,
+        ipa: PathBuf,
+        /// AltServer/SideStore-compatible anisette server URL.
+        #[arg(long)]
+        anisette_url: Option<String>,
+        /// Developer team identifier; defaults to the account's first team.
+        #[arg(long)]
+        team: Option<String>,
         #[arg(long)]
         yes: bool,
     },
@@ -1115,6 +1128,45 @@ async fn main() -> Result<()> {
                 .await
                 .context("failed to install IPA")?;
             write_message(output, "installed-ipa", &udid)?;
+        }
+        Command::App {
+            command:
+                AppCommand::Sign {
+                    udid,
+                    ipa,
+                    anisette_url,
+                    team,
+                    yes,
+                },
+        } => {
+            confirm("sign and install the IPA with an Apple ID", yes)?;
+            let anisette_url = anisette_url
+                .or_else(|| config.network.anisette_url.clone())
+                .context(
+                    "an anisette server is required: pass --anisette-url or set \
+                     network.anisette_url in the configuration",
+                )?;
+            let apple_id = prompt_text("Apple ID: ")?;
+            let password = zeroize::Zeroizing::new(
+                rpassword::prompt_password("Apple ID password: ")
+                    .context("failed to read Apple ID password")?,
+            );
+            let request = AppSignRequest {
+                anisette_url,
+                apple_id,
+                password,
+                team_id: team,
+            };
+            let mut two_factor = || {
+                prompt_text("Two-factor verification code: ")
+                    .map_err(|_| legacy_ios_kit::signing::GsaError::TwoFactorCancelled)
+            };
+            let outcome = kit
+                .devices()
+                .sign_and_install_app(&udid, &ipa, &request, &mut two_factor)
+                .await
+                .context("failed to sign and install the IPA")?;
+            write_sign_outcome(output, &outcome)?;
         }
         Command::App {
             command:
@@ -3397,6 +3449,50 @@ fn confirm(action: &str, accepted: bool) -> Result<()> {
     } else {
         Err(anyhow!("operation cancelled"))
     }
+}
+
+fn prompt_text(prompt: &str) -> Result<String> {
+    let mut stdout = io::stdout().lock();
+    write!(stdout, "{prompt}")?;
+    stdout.flush()?;
+    let mut input = String::new();
+    io::stdin().read_line(&mut input)?;
+    let value = input.trim().to_owned();
+    if value.is_empty() {
+        return Err(anyhow!("no input provided"));
+    }
+    Ok(value)
+}
+
+fn write_sign_outcome(
+    format: OutputFormat,
+    outcome: &legacy_ios_kit::AppSignOutcome,
+) -> Result<()> {
+    let stdout = io::stdout();
+    let mut output = stdout.lock();
+    match format {
+        OutputFormat::Json => {
+            serde_json::to_writer_pretty(
+                &mut output,
+                &serde_json::json!({
+                    "status": "signed-and-installed-app",
+                    "team_id": outcome.team_id,
+                    "bundle_id": outcome.bundle_id,
+                    "device_registered": outcome.device_registered,
+                    "app_id_registered": outcome.app_id_registered,
+                }),
+            )?;
+            writeln!(output)?;
+        }
+        OutputFormat::Human => {
+            writeln!(output, "signed-and-installed-app")?;
+            writeln!(output, "Team: {}", outcome.team_id)?;
+            writeln!(output, "Bundle ID: {}", outcome.bundle_id)?;
+            writeln!(output, "Device registered: {}", outcome.device_registered)?;
+            writeln!(output, "App ID registered: {}", outcome.app_id_registered)?;
+        }
+    }
+    Ok(())
 }
 
 fn write_message(format: OutputFormat, action: &str, udid: &Udid) -> Result<()> {

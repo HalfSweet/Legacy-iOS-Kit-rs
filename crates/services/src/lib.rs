@@ -9,6 +9,7 @@ mod files;
 mod mount;
 mod normal;
 mod plist_service;
+pub mod signing;
 mod ssh;
 
 pub use activation::ActivationState;

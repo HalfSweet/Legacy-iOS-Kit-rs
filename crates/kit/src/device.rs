@@ -315,7 +315,7 @@ impl DeviceManager {
         Ok(())
     }
 
-    async fn find_normal(&self, udid: &Udid) -> Result<NormalDevice, KitError> {
+    pub(crate) async fn find_normal(&self, udid: &Udid) -> Result<NormalDevice, KitError> {
         let device = self.normal.find_device(udid).await?;
         if let Some(store) = &self.pairing_store
             && self.normal.pairing_record(udid).await.is_none()
