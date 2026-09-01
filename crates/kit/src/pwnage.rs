@@ -21,7 +21,7 @@ const WTF_SHA1: [u8; 20] = [
     0xa3, 0x18, 0xc3, 0x0f,
 ];
 const PWNAGE_PATCH_RESOURCE: &str = "s5l8900-wtf-pwnage-patch";
-const PWNED_SRTG: &str = "iBoot-636.66.3x";
+pub(crate) const PWNED_SRTG: &str = "iBoot-636.66.3x";
 const RECONNECT_TIMEOUT: Duration = Duration::from_secs(30);
 
 pub(crate) async fn pwn_wtf(ecid: Option<Ecid>, cache_root: PathBuf) -> Result<(), KitError> {
@@ -58,7 +58,7 @@ pub(crate) async fn pwn_wtf(ecid: Option<Ecid>, cache_root: PathBuf) -> Result<(
     }
 }
 
-async fn pwnage_payload(cache_root: PathBuf) -> Result<Vec<u8>, KitError> {
+pub(crate) async fn pwnage_payload(cache_root: PathBuf) -> Result<Vec<u8>, KitError> {
     let record = ResourceCatalog::bundled()
         .get(&ResourceId::new(PWNAGE_PATCH_RESOURCE))
         .ok_or_else(|| KitError::UnknownResource(ResourceId::new(PWNAGE_PATCH_RESOURCE)))?;
@@ -77,7 +77,7 @@ async fn pwnage_payload(cache_root: PathBuf) -> Result<Vec<u8>, KitError> {
     Ok(legacy_ios_image::apply_bsdiff(&wtf, &patch)?)
 }
 
-fn is_pwned_wtf_srtg(srtg: Option<&str>) -> bool {
+pub(crate) fn is_pwned_wtf_srtg(srtg: Option<&str>) -> bool {
     srtg == Some(PWNED_SRTG)
 }
 

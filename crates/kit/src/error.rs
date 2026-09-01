@@ -101,10 +101,40 @@ pub enum KitError {
     ClassicMissingComponent(&'static str),
     #[error("the restore ramdisk has no options plist at the per-board or default path")]
     ClassicMissingRamdiskOptions,
+    #[error(
+        "classic restores support iPhone1,1/iPhone1,2/iPod1,1 (S5L8900) and iPod2,1/iPhone2,1 devices, found {0}"
+    )]
+    ClassicRestoreUnsupportedDevice(String),
+    #[error(
+        "classic restores support iOS 3.x/4.x targets, found {0}; iPhone2,1 5.x/6.x restores go through `lik restore execute`"
+    )]
+    ClassicRestoreUnsupportedVersion(String),
+    #[error("the device identity has no board config")]
+    ClassicRestoreMissingBoardConfig,
+    #[error("the custom IPSW is missing the {0} entry")]
+    ClassicRestoreMissingComponent(String),
+    #[error("this classic restore requires a 3.x/4.x SHSH blob for the device")]
+    ClassicRestoreTicketRequired,
+    #[error("{0}")]
+    ClassicRestoreTicketRejected(&'static str),
+    #[error("the SHSH blob does not fit this restore: {0}")]
+    ClassicRestoreTicketMismatch(&'static str),
+    #[error("destructive consent does not match the classic restore plan")]
+    ClassicRestoreConsentMismatch,
+    #[error("the device is not in pwned DFU mode: {0}")]
+    ClassicRestoreNotPwned(&'static str),
+    #[error("timed out waiting for the device to enter {0} mode")]
+    ClassicRestoreDeviceTimeout(&'static str),
+    #[error("restore mode connection failed: {0}")]
+    RestoredConnect(#[from] legacy_ios_restore::RestoredConnectError),
+    #[error("restored session failed: {0}")]
+    RestoredRun(#[from] legacy_ios_restore::RestoreRunError),
     #[error("layered image patch failed: {0}")]
     Layered(#[from] legacy_ios_image::LayeredError),
     #[error("8900 image operation failed: {0}")]
     Img1(#[from] legacy_ios_image::Img1Error),
+    #[error("IMG3 personalization failed: {0}")]
+    Img3(#[from] legacy_ios_image::Img3Error),
     #[error("LZSS payload processing failed: {0}")]
     Lzss(#[from] legacy_ios_image::LzssError),
     #[error("signing ticket operation failed: {0}")]
@@ -353,6 +383,17 @@ impl KitError {
             | Self::ClassicMissingIbootSidecar
             | Self::ClassicMissingComponent(_)
             | Self::ClassicMissingRamdiskOptions => OperationPhase::Planning,
+            Self::ClassicRestoreUnsupportedDevice(_)
+            | Self::ClassicRestoreUnsupportedVersion(_)
+            | Self::ClassicRestoreMissingBoardConfig
+            | Self::ClassicRestoreMissingComponent(_)
+            | Self::ClassicRestoreTicketRequired
+            | Self::ClassicRestoreTicketRejected(_)
+            | Self::ClassicRestoreTicketMismatch(_) => OperationPhase::Planning,
+            Self::ClassicRestoreConsentMismatch => OperationPhase::Preflight,
+            Self::ClassicRestoreNotPwned(_) => OperationPhase::Exploiting,
+            Self::ClassicRestoreDeviceTimeout(_) => OperationPhase::WaitingForDevice,
+            Self::RestoredConnect(_) | Self::RestoredRun(_) => OperationPhase::Restoring,
             Self::PowderRestoreUnsupportedDevice(_)
             | Self::PowderRestoreRequiresMultipart(_)
             | Self::PowderRestoreTicketFetchUnsupported(_) => OperationPhase::Planning,
@@ -374,6 +415,7 @@ impl KitError {
             | Self::PowderTruncatedNorImage(_)
             | Self::Layered(_)
             | Self::Img1(_)
+            | Self::Img3(_)
             | Self::Lzss(_)
             | Self::Ticket(_)
             | Self::TicketPolicyMismatch
@@ -525,7 +567,20 @@ impl KitError {
             | Self::ClassicMissingComponent(_)
             | Self::ClassicMissingRamdiskOptions
             | Self::Layered(_)
-            | Self::Img1(_) => Recoverability::NotRecoverable,
+            | Self::Img1(_)
+            | Self::Img3(_) => Recoverability::NotRecoverable,
+            Self::ClassicRestoreUnsupportedDevice(_)
+            | Self::ClassicRestoreUnsupportedVersion(_)
+            | Self::ClassicRestoreMissingBoardConfig
+            | Self::ClassicRestoreMissingComponent(_)
+            | Self::ClassicRestoreTicketRequired
+            | Self::ClassicRestoreTicketRejected(_)
+            | Self::ClassicRestoreTicketMismatch(_)
+            | Self::ClassicRestoreConsentMismatch => Recoverability::NotRecoverable,
+            Self::ClassicRestoreNotPwned(_) | Self::ClassicRestoreDeviceTimeout(_) => {
+                Recoverability::ReenterDfu
+            }
+            Self::RestoredConnect(_) | Self::RestoredRun(_) => Recoverability::RestartOperation,
             Self::PowderRestoreUnsupportedDevice(_)
             | Self::PowderRestoreRequiresMultipart(_)
             | Self::PowderRestoreTicketFetchUnsupported(_) => Recoverability::NotRecoverable,

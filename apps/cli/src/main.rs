@@ -12,18 +12,19 @@ use clap::{ArgAction, Parser, Subcommand, ValueEnum};
 use legacy_ios_kit::{
     ActivationState, AfcPath, AppFilter, AppSignRequest, BackupOptions, BackupOutcome,
     BackupPassword, BackupRestoreOptions, BasebandPolicy, BoardConfig, BootMode, BootNonce,
-    BootPartition, ClassicPrepareRequest, CustomRootfsRequest, DeviceDiagnostics, DeviceFileInfo,
-    DeviceInventory, DeviceStorageInfo, DeviceSummary, DmgFirmwareKey, Ecid, ExploitPolicy,
-    FirmwareSummary, FourThreeComponentSource, FourThreePrepareRequest, HfsEntrySummary,
-    HfsMutation, HfsStatSummary, HostKeyPolicy, Iboot32PatchOptions, ImageCipher, InstalledApp,
-    IosVersion, LegacyIosKit, MountOptions, MultipartPrepareRequest, MultipartRestoreRequest,
-    NoncePolicy, NorSource, OperationEvent, OperationHandle, OperationOutcome,
-    PowderPrepareRequest, PowderPwnMethod, PowderRestoreRequest, PowderTicketSource, ProductType,
-    RamdiskBootExecutionRequest, RamdiskBootRequest, RamdiskBuildRequest, RamdiskBuildSummary,
-    RamdiskSsh, RecoveryDeviceInfo, RecoveryUploadResult, RemoteFirmwareSummary, ResourceId,
-    RestoreBehavior, RestoreExecutionRequest, RestorePlan, RestoreRequest, ScpPath, SepPolicy,
-    ShshRequest, ShshSummary, SigningTicket, Soc, SshCommandOutput, SshPassword, SshTarget,
-    TicketPolicy, Udid, UsbHostDiagnostics, extract_apticket_der,
+    BootPartition, ClassicPrepareRequest, ClassicRestoreRequest, CustomRootfsRequest,
+    DeviceDiagnostics, DeviceFileInfo, DeviceInventory, DeviceStorageInfo, DeviceSummary,
+    DmgFirmwareKey, Ecid, ExploitPolicy, FirmwareSummary, FourThreeComponentSource,
+    FourThreePrepareRequest, HfsEntrySummary, HfsMutation, HfsStatSummary, HostKeyPolicy,
+    Iboot32PatchOptions, ImageCipher, InstalledApp, IosVersion, LegacyIosKit, MountOptions,
+    MultipartPrepareRequest, MultipartRestoreRequest, NoncePolicy, NorSource, OperationEvent,
+    OperationHandle, OperationOutcome, PowderPrepareRequest, PowderPwnMethod, PowderRestoreRequest,
+    PowderTicketSource, ProductType, RamdiskBootExecutionRequest, RamdiskBootRequest,
+    RamdiskBuildRequest, RamdiskBuildSummary, RamdiskSsh, RecoveryDeviceInfo, RecoveryUploadResult,
+    RemoteFirmwareSummary, ResourceId, RestoreBehavior, RestoreExecutionRequest, RestorePlan,
+    RestoreRequest, ScpPath, SepPolicy, ShshRequest, ShshSummary, SigningTicket, Soc,
+    SshCommandOutput, SshPassword, SshTarget, TicketPolicy, Udid, UsbHostDiagnostics,
+    extract_apticket_der,
 };
 use tracing::level_filters::LevelFilter;
 use tracing::{debug, info, warn};
@@ -1360,6 +1361,65 @@ enum RestoreCommand {
         /// Do not send baseband firmware during the restore.
         #[arg(long)]
         no_baseband: bool,
+        #[arg(long)]
+        yes: bool,
+    },
+    /// Restore a self-built classic custom IPSW (from
+    /// `lik firmware classic-prepare`): S5L8900 devices on 3.1.3/4.x and
+    /// iPod2,1/iPhone2,1 on 3.x/4.x, via the pwnage/limera1n chain.
+    Classic {
+        #[arg(long)]
+        device: ProductType,
+        #[arg(long)]
+        board: BoardConfig,
+        #[arg(long)]
+        ecid: Ecid,
+        /// Classic custom IPSW of the target version.
+        #[arg(long)]
+        firmware: PathBuf,
+        /// Per-component signing ticket; required for self-built
+        /// iPod2,1/iPhone2,1 restores (upstream's `-w`), unused on S5L8900.
+        #[arg(long)]
+        ticket: Option<PathBuf>,
+        /// Artifact cache for the pwnage payload (defaults to the artifact
+        /// cache directory).
+        #[arg(long)]
+        cache_dir: Option<PathBuf>,
+        #[arg(long)]
+        work_dir: Option<PathBuf>,
+        /// limera1n payload used to pwn the S5L8920 (iPod2,1).
+        #[arg(long)]
+        limera1n_payload: Option<PathBuf>,
+        /// Skip the post-restore normal-mode version verification.
+        #[arg(long)]
+        no_verify: bool,
+        #[arg(long)]
+        yes: bool,
+    },
+    /// Restore a foreign classic custom IPSW (`restore_customipsw`):
+    /// ticket-free on every supported classic device.
+    CustomIpsw {
+        #[arg(long)]
+        device: ProductType,
+        #[arg(long)]
+        board: BoardConfig,
+        #[arg(long)]
+        ecid: Ecid,
+        /// Foreign (externally built) classic custom IPSW.
+        #[arg(long)]
+        firmware: PathBuf,
+        /// Artifact cache for the pwnage payload (defaults to the artifact
+        /// cache directory).
+        #[arg(long)]
+        cache_dir: Option<PathBuf>,
+        #[arg(long)]
+        work_dir: Option<PathBuf>,
+        /// limera1n payload used to pwn the S5L8920 (iPod2,1).
+        #[arg(long)]
+        limera1n_payload: Option<PathBuf>,
+        /// Skip the post-restore normal-mode version verification.
+        #[arg(long)]
+        no_verify: bool,
         #[arg(long)]
         yes: bool,
     },
@@ -3538,6 +3598,71 @@ async fn main() -> Result<()> {
             )
             .await?;
         }
+        Command::Restore {
+            command:
+                RestoreCommand::Classic {
+                    device,
+                    board,
+                    ecid,
+                    firmware,
+                    ticket,
+                    cache_dir,
+                    work_dir,
+                    limera1n_payload,
+                    no_verify,
+                    yes,
+                },
+        } => {
+            run_classic_restore(
+                &kit,
+                &config,
+                output,
+                device,
+                board,
+                ecid,
+                firmware,
+                ticket,
+                false,
+                cache_dir,
+                work_dir,
+                limera1n_payload,
+                no_verify,
+                yes,
+            )
+            .await?;
+        }
+        Command::Restore {
+            command:
+                RestoreCommand::CustomIpsw {
+                    device,
+                    board,
+                    ecid,
+                    firmware,
+                    cache_dir,
+                    work_dir,
+                    limera1n_payload,
+                    no_verify,
+                    yes,
+                },
+        } => {
+            run_classic_restore(
+                &kit,
+                &config,
+                output,
+                device,
+                board,
+                ecid,
+                firmware,
+                None,
+                true,
+                cache_dir,
+                work_dir,
+                limera1n_payload,
+                no_verify,
+                yes,
+            )
+            .await?;
+        }
         Command::Ramdisk {
             command:
                 RamdiskCommand::Boot {
@@ -4488,6 +4613,66 @@ fn write_apps(format: OutputFormat, apps: &[InstalledApp]) -> Result<()> {
         }
     }
     Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn run_classic_restore(
+    kit: &LegacyIosKit,
+    config: &AppConfig,
+    output: OutputFormat,
+    device: ProductType,
+    board: BoardConfig,
+    ecid: Ecid,
+    firmware: PathBuf,
+    ticket: Option<PathBuf>,
+    foreign: bool,
+    cache_dir: Option<PathBuf>,
+    work_dir: Option<PathBuf>,
+    limera1n_payload: Option<PathBuf>,
+    no_verify: bool,
+    yes: bool,
+) -> Result<()> {
+    let device = kit.resolve_device_identity(device, board)?.with_ecid(ecid);
+    let cache_root = match cache_dir {
+        Some(path) => path,
+        None => config.artifact_cache_dir()?,
+    };
+    let mut request = ClassicRestoreRequest::new(device, firmware, cache_root)
+        .with_foreign(foreign)
+        .with_ticket(ticket)
+        .with_final_verification(!no_verify);
+    if let Some(path) = limera1n_payload {
+        request = request.with_limera1n_payload(
+            tokio::fs::read(&path)
+                .await
+                .with_context(|| format!("failed to read {}", path.display()))?,
+        );
+    }
+    let plan = kit
+        .plan_classic_restore(request)
+        .context("failed to plan the classic restore")?;
+    info!(
+        sequence = plan.sequence().name(),
+        version = %plan.version(),
+        build = %plan.build_id(),
+        "classic restore planned"
+    );
+    confirm(
+        &format!(
+            "erase/restore the selected device with classic restore plan {}",
+            plan.id()
+        ),
+        yes,
+    )?;
+    let consent = plan.confirm_destructive();
+    let work_directory = work_dir
+        .or_else(|| config.storage.work_dir.clone())
+        .unwrap_or_else(|| std::env::temp_dir().join("legacy-ios-kit"));
+    consume_operation(
+        output,
+        kit.execute_classic_restore(plan, consent, work_directory),
+    )
+    .await
 }
 
 fn confirm(action: &str, accepted: bool) -> Result<()> {

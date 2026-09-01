@@ -7,6 +7,7 @@ mod baseband;
 mod bootstrap;
 mod classic;
 mod classic_post;
+mod classic_restore;
 mod device;
 mod erase;
 mod error;
@@ -42,6 +43,9 @@ pub use classic::{ClassicPreparePlan, ClassicPrepareRequest, DEFAULT_CLASSIC_RAM
 pub use classic_post::{
     IOS4P_BOOT_ARGS, IOS41_BUILD, IOS41_IPSW_URL, IOS41_VERSION, PatchcompComponent,
     ios4patches_apply, patchcomp_components,
+};
+pub use classic_restore::{
+    ClassicBootSequence, ClassicRestoreConsent, ClassicRestorePlan, ClassicRestoreRequest,
 };
 pub use device::{
     BackendFailure, DeviceDiagnostics, DeviceInventory, DeviceManager, DeviceSummary,
@@ -428,6 +432,31 @@ impl LegacyIosKit {
             self.leases.clone(),
             self.tss.clone(),
             plan.into_execution_request(consent, work_directory),
+        )
+    }
+
+    /// Plan a classic custom IPSW restore (S5L8900 and iPod2,1/iPhone2,1 on
+    /// iOS 3.x/4.x), self-built or foreign (`restore_customipsw`).
+    pub fn plan_classic_restore(
+        &self,
+        request: ClassicRestoreRequest,
+    ) -> Result<ClassicRestorePlan, KitError> {
+        classic_restore::plan(request)
+    }
+
+    /// Execute a classic restore after destructive consent.
+    pub fn execute_classic_restore(
+        &self,
+        plan: ClassicRestorePlan,
+        consent: ClassicRestoreConsent,
+        work_directory: impl Into<std::path::PathBuf>,
+    ) -> OperationHandle {
+        classic_restore::spawn(
+            self.devices.clone(),
+            self.leases.clone(),
+            plan,
+            consent,
+            work_directory.into(),
         )
     }
 
