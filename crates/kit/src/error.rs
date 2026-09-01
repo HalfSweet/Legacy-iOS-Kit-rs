@@ -10,6 +10,8 @@ pub enum KitError {
     Service(#[from] legacy_ios_services::ServiceError),
     #[error("device backup failed: {0}")]
     Backup(#[from] legacy_ios_services::BackupError),
+    #[error("synthetic backup generation failed: {0}")]
+    SparseBackup(#[from] legacy_ios_services::SparseBackupError),
     #[error("anisette data provisioning failed: {0}")]
     Anisette(#[from] legacy_ios_services::signing::AnisetteError),
     #[error("Apple ID authentication failed: {0}")]
@@ -167,6 +169,28 @@ pub enum KitError {
     MissingDeviceSelector,
     #[error("erase consent does not belong to the erase plan")]
     EraseConsentMismatch,
+    #[error("TrollRestore consent does not belong to the TrollRestore plan")]
+    TrollRestoreConsentMismatch,
+    #[error(
+        "TrollRestore does not support {product_type} on iOS {version} ({build}); it requires an A9+ device on iOS 15.2-16.6.1, 16.7 RC (20H18), or 17.0"
+    )]
+    TrollRestoreUnsupported {
+        product_type: String,
+        version: String,
+        build: String,
+    },
+    #[error(
+        "system app {0} was not found on the device; TrollRestore requires a removable Apple app such as Tips"
+    )]
+    TrollRestoreAppNotFound(String),
+    #[error(
+        "app {0} is not a removable system app; choose an Apple app that can be deleted and re-downloaded, such as Tips"
+    )]
+    TrollRestoreAppNotRemovable(String),
+    #[error(
+        "Find My must be disabled to install TrollStore; disable it in Settings > [Your Name] > Find My and retry"
+    )]
+    TrollRestoreFindMyEnabled,
     #[error("both device discovery backends failed (bootloader: {bootloader}; normal: {normal})")]
     DeviceDiscovery { bootloader: String, normal: String },
 }
@@ -187,7 +211,13 @@ impl KitError {
             | Self::UnknownBoardConfig { .. }
             | Self::MissingDeviceSelector
             | Self::UnknownDeveloperTeam(_) => OperationPhase::Planning,
-            Self::EraseConsentMismatch => OperationPhase::Preflight,
+            Self::EraseConsentMismatch | Self::TrollRestoreConsentMismatch => {
+                OperationPhase::Preflight
+            }
+            Self::TrollRestoreUnsupported { .. }
+            | Self::TrollRestoreAppNotFound(_)
+            | Self::TrollRestoreAppNotRemovable(_) => OperationPhase::Planning,
+            Self::TrollRestoreFindMyEnabled => OperationPhase::Restoring,
             Self::UnsupportedBootstrapVersion(_)
             | Self::MissingBootstrapPackage(_)
             | Self::AlreadyJailbroken
@@ -237,6 +267,7 @@ impl KitError {
             | Self::AppleIdAuth(_)
             | Self::DeveloperApi(_)
             | Self::DeviceDiscovery { .. }
+            | Self::SparseBackup(_)
             | Self::Io(_) => OperationPhase::Preflight,
             Self::Backup(_) => OperationPhase::TransferringFilesystem,
             Self::RestoreExecution(_) => OperationPhase::Restoring,
@@ -263,9 +294,11 @@ impl KitError {
             Self::Transport(_) | Self::Service(_) | Self::Ssh(_) | Self::DeviceDiscovery { .. } => {
                 Recoverability::ReconnectDevice
             }
-            Self::Signing(_) | Self::Artifact(_) | Self::Anisette(_) | Self::Io(_) => {
-                Recoverability::RetryImmediately
-            }
+            Self::Signing(_)
+            | Self::Artifact(_)
+            | Self::Anisette(_)
+            | Self::Io(_)
+            | Self::SparseBackup(_) => Recoverability::RetryImmediately,
             Self::Recovery(_) | Self::Limera1n(_) | Self::Checkm8(_) | Self::RamdiskBoot(_) => {
                 Recoverability::ReenterDfu
             }
@@ -281,7 +314,9 @@ impl KitError {
             Self::VerificationTimeout => Recoverability::ReconnectDevice,
             Self::PwnageVerificationTimeout | Self::KdfuTimeout => Recoverability::ReenterDfu,
             Self::PwnageWtfDigest | Self::Alloc8IbssDigest => Recoverability::NotRecoverable,
-            Self::VersionMismatch { .. } => Recoverability::ManualRecoveryRequired,
+            Self::VersionMismatch { .. } | Self::TrollRestoreFindMyEnabled => {
+                Recoverability::ManualRecoveryRequired
+            }
             Self::Firmware(_)
             | Self::FirmwareKey(_)
             | Self::RemoteFirmware(_)
@@ -310,6 +345,10 @@ impl KitError {
             | Self::UnknownDeveloperTeam(_)
             | Self::MissingDeviceSelector => Recoverability::NotRecoverable,
             Self::EraseConsentMismatch
+            | Self::TrollRestoreConsentMismatch
+            | Self::TrollRestoreUnsupported { .. }
+            | Self::TrollRestoreAppNotFound(_)
+            | Self::TrollRestoreAppNotRemovable(_)
             | Self::UnsupportedBootstrapVersion(_)
             | Self::MissingBootstrapPackage(_)
             | Self::AlreadyJailbroken

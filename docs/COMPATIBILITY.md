@@ -55,6 +55,7 @@ Legend: ✅ implemented · 🟡 partial / bounded · ❌ not implemented ·
 | bootstrap 64-bit iOS 7/8/9 | ✅ | Cydia + OpenSSH |
 | iOS 7 untethers | ✅ | panguaxe / evasi0n7 |
 | TrollStore (iOS 14/15) | ✅ | Tips persistence helper |
+| TrollStore via TrollRestore (iOS 15.2–16.6.1, 16.7 RC, 17.0; A9+) | ✅ ⚠️ | sparserestore exploit (CVE-2024-44252) over mobilebackup2, `lik device trollrestore`; unit-tested only — not yet run against a live device |
 | hacktivate / revert | ✅ | data_ark fast path + lockdownd patches |
 | Hacktivation via IPSW (iPhone 2G/3G/3GS) | ❌ | |
 

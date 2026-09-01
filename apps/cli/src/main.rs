@@ -540,6 +540,18 @@ enum DeviceCommand {
         #[arg(long)]
         yes: bool,
     },
+    /// Install TrollStore on iOS 15.2-16.6.1, 16.7 RC, or 17.0 (A9+) via the
+    /// TrollRestore sparserestore exploit, replacing a removable system app.
+    Trollrestore {
+        udid: Udid,
+        /// System app to replace with the TrollStore helper (default: Tips).
+        #[arg(long)]
+        app: Option<String>,
+        #[arg(long)]
+        work_dir: Option<PathBuf>,
+        #[arg(long)]
+        yes: bool,
+    },
     /// Ask lockdownd to reboot a normal-mode device into Recovery mode.
     EnterRecovery {
         udid: Udid,
@@ -1731,6 +1743,42 @@ async fn main() -> Result<()> {
                 .or_else(|| config.storage.work_dir.clone())
                 .unwrap_or_else(|| std::env::temp_dir().join("legacy-ios-kit-erase"));
             consume_operation(output, kit.execute_erase(plan, consent, work_directory)).await?;
+        }
+        Command::Device {
+            command:
+                DeviceCommand::Trollrestore {
+                    udid,
+                    app,
+                    work_dir,
+                    yes,
+                },
+        } => {
+            let app = match app {
+                Some(app) => app,
+                None => prompt_with_default(
+                    "Enter the removable system app to replace with the TrollStore helper",
+                    legacy_ios_kit::TROLLRESTORE_DEFAULT_APP,
+                )?,
+            };
+            let plan = kit.plan_trollrestore(udid, &app).await?;
+            confirm(
+                &format!(
+                    "replace {} with the TrollStore helper and reboot, with plan {}",
+                    plan.app(),
+                    plan.id()
+                ),
+                yes,
+            )?;
+            let consent = plan.confirm_destructive();
+            let cache = config.artifact_cache_dir()?;
+            let work_directory = work_dir
+                .or_else(|| config.storage.work_dir.clone())
+                .unwrap_or_else(|| std::env::temp_dir().join("legacy-ios-kit-trollrestore"));
+            consume_operation(
+                output,
+                kit.execute_trollrestore(plan, consent, cache, work_directory),
+            )
+            .await?;
         }
         Command::Device {
             command: DeviceCommand::EnterRecovery { udid, yes },
@@ -3929,16 +3977,28 @@ fn confirm(action: &str, accepted: bool) -> Result<()> {
 }
 
 fn prompt_text(prompt: &str) -> Result<String> {
+    let value = prompt_line(prompt)?;
+    if value.is_empty() {
+        return Err(anyhow!("no input provided"));
+    }
+    Ok(value)
+}
+
+fn prompt_with_default(prompt: &str, default: &str) -> Result<String> {
+    let value = prompt_line(&format!("{prompt} [{default}]: "))?;
+    if value.is_empty() {
+        return Ok(default.to_owned());
+    }
+    Ok(value)
+}
+
+fn prompt_line(prompt: &str) -> Result<String> {
     let mut stdout = io::stdout().lock();
     write!(stdout, "{prompt}")?;
     stdout.flush()?;
     let mut input = String::new();
     io::stdin().read_line(&mut input)?;
-    let value = input.trim().to_owned();
-    if value.is_empty() {
-        return Err(anyhow!("no input provided"));
-    }
-    Ok(value)
+    Ok(input.trim().to_owned())
 }
 
 fn write_sign_outcome(

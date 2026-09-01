@@ -26,6 +26,7 @@ mod recovery;
 mod restore_execution;
 mod shsh;
 pub mod signing;
+mod trollrestore;
 mod trollstore;
 
 pub use bootstrap::{
@@ -93,6 +94,10 @@ pub use recovery::{RecoveryDevice, RecoveryManager, RecoveryUploadResult};
 pub use restore_execution::RestoreExecutionRequest;
 pub use shsh::{ShshRequest, ShshSummary};
 pub use signing::{AppSignOutcome, AppSignRequest};
+pub use trollrestore::{
+    DEFAULT_APP as TROLLRESTORE_DEFAULT_APP, TrollRestoreConsent, TrollRestorePlan,
+    trollrestore_support,
+};
 
 #[derive(Clone, Debug, Default)]
 pub struct LegacyIosKit {
@@ -485,6 +490,35 @@ impl LegacyIosKit {
     pub async fn plan_erase(&self, udid: Udid) -> Result<ErasePlan, KitError> {
         self.devices.ensure_normal(&udid).await?;
         Ok(ErasePlan::new(udid))
+    }
+
+    /// Plan a TrollRestore installation: gate the device version, resolve the
+    /// removable system app to replace, and produce a consent-ready plan.
+    pub async fn plan_trollrestore(
+        &self,
+        udid: Udid,
+        app: &str,
+    ) -> Result<TrollRestorePlan, KitError> {
+        trollrestore::plan(&self.devices, udid, app).await
+    }
+
+    /// Install the TrollStore persistence helper over the planned system app
+    /// via the sparserestore exploit, then reboot the device.
+    pub fn execute_trollrestore(
+        &self,
+        plan: TrollRestorePlan,
+        consent: TrollRestoreConsent,
+        cache_root: impl Into<std::path::PathBuf>,
+        work_directory: impl Into<std::path::PathBuf>,
+    ) -> OperationHandle {
+        trollrestore::spawn(
+            self.devices.clone(),
+            self.leases.clone(),
+            plan,
+            consent,
+            cache_root.into(),
+            work_directory.into(),
+        )
     }
 
     pub fn execute_erase(
