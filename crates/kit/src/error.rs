@@ -125,6 +125,22 @@ pub enum KitError {
     ClassicRestoreNotPwned(&'static str),
     #[error("timed out waiting for the device to enter {0} mode")]
     ClassicRestoreDeviceTimeout(&'static str),
+    #[error(
+        "the iPhone X restore component build requires an iPhone10,3/iPhone10,6 IPSW, found {0}"
+    )]
+    IpxUnsupportedDevice(String),
+    #[error("the iPhone X restore component build requires an iOS 14.3-15.x target, found {0}")]
+    IpxUnsupportedVersion(String),
+    #[error("the BuildManifest has no BuildIdentities array")]
+    IpxInvalidManifest,
+    #[error("IMG4 payload processing failed: {0}")]
+    Img4(#[from] legacy_ios_image::Img4Error),
+    #[error("KPlooshFinder kernelcache patch failed: {0}")]
+    IpxKernelPatch(#[from] legacy_ios_image::Kernel64Error),
+    #[error("restored_external FaceID patch failed: {0}")]
+    IpxRestoredPatch(#[from] legacy_ios_image::IpxRestoredError),
+    #[error("restored_external re-signing failed: {0}")]
+    MachoSign(#[from] legacy_ios_services::signing::MachoSignError),
     #[error("restore mode connection failed: {0}")]
     RestoredConnect(#[from] legacy_ios_restore::RestoredConnectError),
     #[error("restored session failed: {0}")]
@@ -393,6 +409,9 @@ impl KitError {
             Self::ClassicRestoreConsentMismatch => OperationPhase::Preflight,
             Self::ClassicRestoreNotPwned(_) => OperationPhase::Exploiting,
             Self::ClassicRestoreDeviceTimeout(_) => OperationPhase::WaitingForDevice,
+            Self::IpxUnsupportedDevice(_)
+            | Self::IpxUnsupportedVersion(_)
+            | Self::IpxInvalidManifest => OperationPhase::Planning,
             Self::RestoredConnect(_) | Self::RestoredRun(_) => OperationPhase::Restoring,
             Self::PowderRestoreUnsupportedDevice(_)
             | Self::PowderRestoreRequiresMultipart(_)
@@ -416,6 +435,10 @@ impl KitError {
             | Self::Layered(_)
             | Self::Img1(_)
             | Self::Img3(_)
+            | Self::Img4(_)
+            | Self::IpxKernelPatch(_)
+            | Self::IpxRestoredPatch(_)
+            | Self::MachoSign(_)
             | Self::Lzss(_)
             | Self::Ticket(_)
             | Self::TicketPolicyMismatch
@@ -471,6 +494,7 @@ impl KitError {
             | Self::Backup(_)
             | Self::Mbdb(_)
             | Self::Resign(_)
+            | Self::MachoSign(_)
             | Self::RestoreExecution(_)
             | Self::Task(_) => Recoverability::RestartOperation,
             Self::GilbertJbCleanedUp | Self::GilbertJbInvalidDump(_) | Self::GilbertJbCancelled => {
@@ -576,7 +600,13 @@ impl KitError {
             | Self::ClassicRestoreTicketRequired
             | Self::ClassicRestoreTicketRejected(_)
             | Self::ClassicRestoreTicketMismatch(_)
-            | Self::ClassicRestoreConsentMismatch => Recoverability::NotRecoverable,
+            | Self::ClassicRestoreConsentMismatch
+            | Self::IpxUnsupportedDevice(_)
+            | Self::IpxUnsupportedVersion(_)
+            | Self::IpxInvalidManifest
+            | Self::Img4(_)
+            | Self::IpxKernelPatch(_)
+            | Self::IpxRestoredPatch(_) => Recoverability::NotRecoverable,
             Self::ClassicRestoreNotPwned(_) | Self::ClassicRestoreDeviceTimeout(_) => {
                 Recoverability::ReenterDfu
             }

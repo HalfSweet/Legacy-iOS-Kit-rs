@@ -18,6 +18,7 @@ mod gilbertjb;
 mod hacktivate;
 mod hfs;
 mod image_payload;
+mod ipx;
 mod jailbreak;
 mod kdfu;
 mod lease;
@@ -66,6 +67,7 @@ pub use gilbertjb::{GilbertJbConsent, GilbertJbPlan, gilbertjb_support};
 pub use hacktivate::{HacktivateMethod, hacktivate_method};
 pub use hfs::{HfsEntrySummary, HfsKind, HfsMutation, HfsStatSummary};
 pub use image_payload::{ImageCipher, ImageCipherError};
+pub use ipx::{IpxPrepareOutcome, IpxPrepareRequest};
 pub use jailbreak::{FstabReplacement, JailbreakPackages, JailbreakPlan, UntetherPackage};
 pub use kdfu::{prepare_pwned_ibss, select_kloader};
 pub use lease::DeviceLease;
@@ -503,6 +505,15 @@ impl LegacyIosKit {
         request: FourThreePrepareRequest,
     ) -> Result<FourThreePrepareOutcome, KitError> {
         fourthree::prepare(request).await
+    }
+
+    /// Build the iPhone X iOS 14.3-15.x downgrade restore components
+    /// (`kcache.im4p`/`rdsk.im4p`), mirroring upstream's `ipsw_prepare_ipx`.
+    pub async fn prepare_ipx_components(
+        &self,
+        request: IpxPrepareRequest,
+    ) -> Result<IpxPrepareOutcome, KitError> {
+        ipx::prepare(request).await
     }
 
     /// FourThree step 2: install the dualboot packages and partition the

@@ -14,9 +14,10 @@
 //! (`CPU_TYPE_ARM64`) is patched in place and the rest of the file passes
 //! through untouched, so the output always has the same length as the input.
 //! The kit-side ipx builder rewraps the patched bytes with
-//! [`crate::replace_im4p_payload`]; upstream's `kerneldiff`/`img4 -P` bpatch
-//! round-trip is deliberately not ported because the patched bytes are
-//! consumed directly here, leaving no consumer for a textual byte diff.
+//! [`crate::rebuild_im4p`] (type `rkrn`, `complzss` LZSS payload); upstream's
+//! `kerneldiff`/`img4 -P` bpatch round-trip is deliberately not ported because
+//! the patched bytes are consumed directly here, leaving no consumer for a
+//! textual byte diff.
 //!
 //! Ported scope: the five AMFI patch points (`patches/amfi.c`: sha1 hash
 //! type check, launch constraints, developer mode, old/new trustcache) and

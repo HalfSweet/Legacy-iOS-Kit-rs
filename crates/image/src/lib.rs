@@ -38,7 +38,10 @@ pub use iboot32::{
 pub use img1::{FOOTER_SIGNATURE_SIZE, HEADER_SIZE, Img1, Img1Error, apply_wtf_exploit};
 pub use img2::{IMG2_HEADER_SIZE, IMG2_MAGIC, Img2, Img2Error};
 pub use img3::{Img3, Img3Element, Img3Error, Img3Tag};
-pub use img4::{Img4Error, extract_im4p_payload, personalize_img4, replace_im4p_payload};
+pub use img4::{
+    Img4Error, decode_im4p_payload, extract_im4p_payload, personalize_img4, rebuild_im4p,
+    replace_im4p_payload,
+};
 pub use ipx_restored::{IpxRestoredError, patch_restored_external};
 pub use kernel32::{Kernel32Error, patch_kernel32};
 pub use kernel64::{Kernel64Error, Kernel64Patch, Kernel64PatchOutcome, patch_kernel64};
