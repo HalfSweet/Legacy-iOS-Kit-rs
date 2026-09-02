@@ -88,6 +88,9 @@ The public library is `legacy-ios-kit`; the reference CLI is `lik`.
 - Test: `cargo test --workspace --all-features`
 - MSRV check: `cargo +1.88.0 check --workspace --all-targets --all-features`
 - Lefthook runs formatting followed by Clippy before every commit.
+- `--all-features` enables the opt-in `macfuse` mount backend, which links
+  macFUSE at build time; on macOS hosts without macFUSE installed, run the
+  gates without `--all-features` (as Lefthook and the macOS CI leg do).
 
 ## Commit Discipline
 

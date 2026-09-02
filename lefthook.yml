@@ -4,6 +4,7 @@ pre-commit:
     01-format:
       run: cargo fmt --all
       stage_fixed: true
+    # Not --all-features: the `macfuse` feature links macFUSE at build time and
+    # cannot compile on macOS hosts without the driver installed.
     02-clippy:
-      run: cargo clippy --workspace --all-targets --all-features -- -D warnings
-
+      run: cargo clippy --workspace --all-targets -- -D warnings

@@ -26,3 +26,7 @@ zeroize = "=1.9.0"
 
 [lints]
 workspace = true
+
+# Opt-in macOS mount backend; requires macFUSE installed at build time.
+[features]
+macfuse = ["legacy-ios-kit/macfuse"]

@@ -7,17 +7,18 @@
 //! pass [`MountOptions::read_only`] for a read-only mount.
 //!
 //! Requires a system FUSE driver: FUSE on Linux/BSD, macFUSE on macOS (a
-//! build-time link dependency, so macOS builds currently report
-//! [`MountError::Unsupported`]/[`MountError::DriverMissing`] instead), and
-//! WinFsp on Windows (not yet implemented). Real mounts need hardware and a
-//! system driver, so they are not exercised in CI; the AFC-to-FUSE
-//! conversions are tested as pure logic.
+//! build-time link dependency, gated behind the opt-in `macfuse` cargo
+//! feature; builds without it report
+//! [`MountError::Unsupported`]/[`MountError::DriverMissing`]), and WinFsp on
+//! Windows (not supported: fuser 0.18 has no Windows backend). Real mounts
+//! need hardware and a system driver, so they are not exercised in CI; the
+//! AFC-to-FUSE conversions are tested as pure logic.
 
-#[cfg(any(test, all(unix, not(target_os = "macos"))))]
+#[cfg(any(test, all(unix, any(not(target_os = "macos"), feature = "macfuse"))))]
 mod attr;
-#[cfg(all(unix, not(target_os = "macos")))]
+#[cfg(all(unix, any(not(target_os = "macos"), feature = "macfuse")))]
 mod bridge;
-#[cfg(any(test, all(unix, not(target_os = "macos"))))]
+#[cfg(any(test, all(unix, any(not(target_os = "macos"), feature = "macfuse"))))]
 mod inode;
 mod platform;
 

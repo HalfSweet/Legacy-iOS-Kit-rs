@@ -525,7 +525,18 @@ fn ensure_fuse_driver() -> Result<(), MountError> {
     )))
 }
 
-#[cfg(not(target_os = "linux"))]
+#[cfg(target_os = "macos")]
+fn ensure_fuse_driver() -> Result<(), MountError> {
+    if Path::new("/Library/Filesystems/macfuse.fs").exists() {
+        return Ok(());
+    }
+    Err(MountError::DriverMissing(HostRequirement::new(
+        HostRequirementCode::FuseDriver,
+        "Install macFUSE (https://macfuse.io), then retry the mount",
+    )))
+}
+
+#[cfg(not(any(target_os = "linux", target_os = "macos")))]
 fn ensure_fuse_driver() -> Result<(), MountError> {
     Ok(())
 }

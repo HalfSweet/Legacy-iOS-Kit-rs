@@ -69,7 +69,7 @@ Legend: ✅ implemented · 🟡 partial / bounded · ❌ not implemented ·
 | backup / restore / encryption | ✅ | |
 | activation state / deactivate / erase | ✅ | |
 | Apple ID sign + install (`lik app sign`) | ✅ ⚠️ | untested against live Apple services |
-| OS mount over FUSE | 🟡 | Linux/BSD ✅; macOS stub (needs macFUSE build link); Windows ❌ (WinFsp) |
+| OS mount over FUSE | 🟡 | Linux/BSD ✅; macOS ✅ with opt-in `macfuse` cargo feature (links macFUSE at build time; not compile-verified on a macFUSE host yet); Windows ❌ (fuser 0.18 has no WinFsp backend — the plan assumed fuser wraps WinFsp, which 0.18 does not; needs a separate decision) |
 | syslog / battery / restart / shutdown / uicache | ✅ | |
 
 ## Platform / host
@@ -79,4 +79,4 @@ Legend: ✅ implemented · 🟡 partial / bounded · ❌ not implemented ·
 | Device discovery, Normal/Recovery/DFU/WTF/KIS | ✅ all three OSes |
 | Normal backend: system usbmux / direct rusbmux | ✅ |
 | Host requirement diagnostics (udev, drivers, contention) | ✅ |
-| Mount driver as declared host precondition | ✅ Linux/BSD, 🟡 macOS, ❌ Windows |
+| Mount driver as declared host precondition | ✅ Linux/BSD, ✅ macOS (macFUSE + `macfuse` feature build), ❌ Windows (no fuser WinFsp backend) |
