@@ -224,21 +224,6 @@ impl DeviceFileInfo {
     pub const fn modified_unix(&self) -> i64 {
         self.modified_unix
     }
-
-    #[cfg(test)]
-    pub(crate) fn new_for_test(
-        size: u64,
-        kind: DeviceFileKind,
-        link_target: Option<String>,
-        modified_unix: i64,
-    ) -> Self {
-        Self {
-            size,
-            kind,
-            link_target,
-            modified_unix,
-        }
-    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]

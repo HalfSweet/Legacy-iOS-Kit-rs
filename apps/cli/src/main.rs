@@ -17,14 +17,14 @@ use legacy_ios_kit::{
     DeviceSummary, DmgFirmwareKey, Ecid, ExploitPolicy, FirmwareSummary, FourThreeComponentSource,
     FourThreePrepareRequest, HfsEntrySummary, HfsMutation, HfsStatSummary, HostKeyPolicy,
     Iboot32PatchOptions, ImageCipher, InstalledApp, IosVersion, IpxPrepareRequest, LegacyIosKit,
-    MountOptions, MultipartPrepareRequest, MultipartRestoreRequest, NoncePolicy, NorSource,
-    OperationEvent, OperationHandle, OperationOutcome, PowderPrepareRequest, PowderPwnMethod,
-    PowderRestoreRequest, PowderTicketSource, ProductType, RamdiskBootExecutionRequest,
-    RamdiskBootRequest, RamdiskBuildRequest, RamdiskBuildSummary, RamdiskSsh, RecoveryDeviceInfo,
-    RecoveryUploadResult, RemoteFirmwareSummary, ResourceId, RestoreBehavior,
-    RestoreExecutionRequest, RestorePlan, RestoreRequest, RsepPolicy, ScpPath, SepPolicy,
-    ShshRequest, ShshSummary, SigningTicket, Soc, SshCommandOutput, SshPassword, SshTarget,
-    TicketPolicy, Udid, UsbHostDiagnostics, extract_apticket_der,
+    MultipartPrepareRequest, MultipartRestoreRequest, NoncePolicy, NorSource, OperationEvent,
+    OperationHandle, OperationOutcome, PowderPrepareRequest, PowderPwnMethod, PowderRestoreRequest,
+    PowderTicketSource, ProductType, RamdiskBootExecutionRequest, RamdiskBootRequest,
+    RamdiskBuildRequest, RamdiskBuildSummary, RamdiskSsh, RecoveryDeviceInfo, RecoveryUploadResult,
+    RemoteFirmwareSummary, ResourceId, RestoreBehavior, RestoreExecutionRequest, RestorePlan,
+    RestoreRequest, RsepPolicy, ScpPath, SepPolicy, ShshRequest, ShshSummary, SigningTicket, Soc,
+    SshCommandOutput, SshPassword, SshTarget, TicketPolicy, Udid, UsbHostDiagnostics,
+    extract_apticket_der,
 };
 use tracing::level_filters::LevelFilter;
 use tracing::{debug, info, warn};
@@ -399,18 +399,6 @@ enum DataCommand {
         destination: AfcPath,
         #[arg(long)]
         yes: bool,
-    },
-    /// Mount the device media directory over FUSE until Ctrl-C.
-    Mount {
-        udid: Udid,
-        /// Existing empty host directory to mount on.
-        mountpoint: PathBuf,
-        /// Mount this app's Documents container instead of the media directory.
-        #[arg(long)]
-        documents: Option<String>,
-        /// Mount read-only.
-        #[arg(long)]
-        read_only: bool,
     },
 }
 
@@ -1978,28 +1966,6 @@ async fn main() -> Result<()> {
                 .rename(&source, &destination)
                 .await?;
             write_status(output, "moved-path")?;
-        }
-        Command::Data {
-            command:
-                DataCommand::Mount {
-                    udid,
-                    mountpoint,
-                    documents,
-                    read_only,
-                },
-        } => {
-            let files = match &documents {
-                Some(bundle_id) => kit.devices().app_documents(&udid, bundle_id).await?,
-                None => kit.devices().files(&udid).await?,
-            };
-            let guard = files
-                .mount(&mountpoint, MountOptions::default().read_only(read_only))
-                .context("failed to mount device files")?;
-            write_status(output, "mounted")?;
-            info!(mountpoint = %mountpoint.display(), "mounted; press Ctrl-C to unmount");
-            tokio::signal::ctrl_c().await?;
-            guard.unmount().context("failed to unmount device files")?;
-            write_status(output, "unmounted")?;
         }
         Command::Device {
             command: DeviceCommand::List,

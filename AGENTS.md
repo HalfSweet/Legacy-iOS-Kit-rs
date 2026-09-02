@@ -11,11 +11,9 @@ The public library is `legacy-ios-kit`; the reference CLI is `lik`.
 ## Non-Negotiable Constraints
 
 - Do not invoke host-side shells, command-line tools, or subprocess fallbacks.
-- Do not add C FFI compatibility layers or bundle host executables. The sole
-  exception is the `fuser` crate, which wraps the system FUSE driver
-  (libfuse/macFUSE/WinFsp); those drivers are declared host preconditions.
-  Device mounting lives in `crates/services/src/mount/` with platform code
-  confined to `services::mount::platform`.
+- Do not add C FFI compatibility layers, bundle host executables, or depend on
+  external mount drivers. Device file access is exposed only through the Rust
+  API (AFC and friends); mounting device files on the host OS is out of scope.
 - Device payloads and binary patches are data assets, not host tools. Every
   asset must record its source, source revision, digest, purpose, and
   redistribution status.
@@ -23,7 +21,7 @@ The public library is `legacy-ios-kit`; the reference CLI is `lik`.
   explicitly requests a licensing decision.
 - Keep the public API Tokio-native and asynchronous.
 - Support macOS, Linux, and Windows from the design stage. Keep platform code
-  confined to the transport and mount platform adapters.
+  confined to the transport platform adapters.
 - Do not stop, restart, or reconfigure system USB services from the library.
 - Do not request privilege escalation from the library. Return actionable host
   requirement errors instead.
@@ -88,9 +86,6 @@ The public library is `legacy-ios-kit`; the reference CLI is `lik`.
 - Test: `cargo test --workspace --all-features`
 - MSRV check: `cargo +1.88.0 check --workspace --all-targets --all-features`
 - Lefthook runs formatting followed by Clippy before every commit.
-- `--all-features` enables the opt-in `macfuse` mount backend, which links
-  macFUSE at build time; on macOS hosts without macFUSE installed, run the
-  gates without `--all-features` (as Lefthook and the macOS CI leg do).
 
 ## Commit Discipline
 

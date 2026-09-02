@@ -40,23 +40,5 @@ x509-certificate = "=0.24.0"
 zeroize = "=1.9.0"
 zip = { version = "=2.4.2", default-features = false, features = ["deflate"] }
 
-# Opt-in macOS mount backend. On macOS, fuser 0.18 links against macFUSE
-# (libfuse2 API) at build time via pkg-config, so hosts without macFUSE cannot
-# compile that path at all: the dependency stays optional behind this feature,
-# and builds without it use the stub backend, which reports the requirement at
-# mount time. On non-macOS targets this feature is a no-op. fuser 0.18 has no
-# Windows backend, so WinFsp support is not wired up.
-[features]
-macfuse = ["dep:fuser"]
-
-# FUSE mounting backend. On Linux/BSD, fuser 0.18 mounts through /dev/fuse in
-# pure Rust, so no system library is needed at build time; a missing driver is
-# reported at mount time as a host requirement.
-[target.'cfg(all(unix, not(target_os = "macos")))'.dependencies]
-fuser = "=0.18.0"
-
-[target.'cfg(target_os = "macos")'.dependencies]
-fuser = { version = "=0.18.0", optional = true }
-
 [lints]
 workspace = true

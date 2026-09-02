@@ -8,7 +8,6 @@ mod backup;
 mod file_relay;
 mod files;
 mod mbdb;
-mod mount;
 mod normal;
 mod plist_service;
 pub mod signing;
@@ -22,7 +21,6 @@ pub use files::{
     AfcPath, AfcPathError, DeviceFileInfo, DeviceFileKind, DeviceFiles, DeviceStorageInfo,
 };
 pub use mbdb::{Mbdb, MbdbError, MbdbRecord, mode};
-pub use mount::{MountError, MountGuard, MountOptions};
 pub use normal::{
     DeviceSyslog, DirectMux, MuxDevice, NormalBackend, NormalDevice, NormalDeviceInfo, NormalMux,
     PairingRecord, RawServiceConnection, ServiceError, SystemMux,
