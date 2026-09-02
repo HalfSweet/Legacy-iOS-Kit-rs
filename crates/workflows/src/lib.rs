@@ -30,9 +30,9 @@ pub use ramdisk_boot::{
     RamdiskPreparationError, boot_ramdisk,
 };
 pub use restore::{
-    BasebandPolicy, CryptexPolicy, CryptexSource, DestructiveConsent, ExploitPolicy, NoncePolicy,
-    PlanId, RestoreComponent, RestorePlan, RestorePlanError, RestoreRequest, RestoreStep,
-    RestoreStepKind, RsepPolicy, SepPolicy, TicketPolicy,
+    BasebandPolicy, BootComponentOverrides, CryptexPolicy, CryptexSource, DestructiveConsent,
+    ExploitPolicy, NoncePolicy, PlanId, RestoreComponent, RestorePlan, RestorePlanError,
+    RestoreRequest, RestoreStep, RestoreStepKind, RsepPolicy, SepPolicy, TicketPolicy,
 };
 pub use runner::{
     RestoreExecutionError, RestoreExecutionOutcome, RestoreExecutionProgress, run_restore,

@@ -655,6 +655,8 @@ mod tests {
             }),
             exploit: ExploitPolicy::AlreadyPwned,
             nonce: NoncePolicy::Manual,
+            rdsk: None,
+            rkrn: None,
         })
         .unwrap();
         CryptexResolver::new(&plan, Dictionary::new(), TssClient::new()).unwrap()

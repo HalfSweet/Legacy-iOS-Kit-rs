@@ -32,6 +32,17 @@ impl ComponentPersonalizer {
         self.personalize_path(component, &path)
     }
 
+    /// Personalize component bytes that did not come from the archive (the
+    /// rdsk/rkrn boot overrides), applying the same ticket rules as
+    /// [`Self::personalize`].
+    pub fn personalize_data(
+        &self,
+        component: &str,
+        data: Vec<u8>,
+    ) -> Result<Vec<u8>, PersonalizationError> {
+        personalize_data(component, data, &self.tss)
+    }
+
     pub fn nor_response(
         &self,
         flash_version_1: bool,

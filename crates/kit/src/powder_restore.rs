@@ -282,6 +282,8 @@ pub(crate) async fn plan(
         cryptex_source: CryptexSource::Target,
         exploit,
         nonce: NoncePolicy::Manual,
+        rdsk: None,
+        rkrn: None,
     })?;
 
     Ok(PowderRestorePlan {

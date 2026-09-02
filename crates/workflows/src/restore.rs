@@ -22,6 +22,20 @@ pub struct RestoreRequest {
     pub cryptex_source: CryptexSource,
     pub exploit: ExploitPolicy,
     pub nonce: NoncePolicy,
+    /// Patched ramdisk IM4P replacing RestoreRamDisk (futurerestore
+    /// `--rdsk`); must be given together with `rkrn`.
+    pub rdsk: Option<PathBuf>,
+    /// Patched kernelcache IM4P replacing RestoreKernelCache (futurerestore
+    /// `--rkrn`); must be given together with `rdsk`.
+    pub rkrn: Option<PathBuf>,
+}
+
+/// The paired rdsk/rkrn boot component overrides of the iPhone X downgrade
+/// flow (futurerestore `--rdsk rdsk.im4p --rkrn kcache.im4p`).
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct BootComponentOverrides {
+    pub rdsk: PathBuf,
+    pub rkrn: PathBuf,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -58,8 +72,9 @@ pub enum SepPolicy {
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum RsepPolicy {
-    /// Send RestoreSEP only for iOS 16+ targets (the iPhone X flow, which
-    /// always sends, is not implemented yet).
+    /// Send RestoreSEP for iOS 16+ targets, or whenever rdsk/rkrn boot
+    /// overrides are set (the iPhone X flow always sends; upstream does not
+    /// pass `--no-rsep` there).
     #[default]
     Auto,
     Send,
@@ -138,6 +153,7 @@ pub struct RestorePlan {
     cryptex: Option<CryptexSource>,
     exploit: ExploitPolicy,
     nonce: NoncePolicy,
+    boot_overrides: Option<BootComponentOverrides>,
     components: Vec<RestoreComponent>,
     steps: Vec<RestoreStep>,
 }
@@ -197,6 +213,19 @@ impl RestorePlan {
         {
             return Err(RestorePlanError::CryptexSourceNotFound(path.clone()));
         }
+        let boot_overrides = match (request.rdsk.take(), request.rkrn.take()) {
+            (Some(rdsk), Some(rkrn)) => {
+                if !rdsk.is_file() {
+                    return Err(RestorePlanError::BootOverrideNotFound(rdsk));
+                }
+                if !rkrn.is_file() {
+                    return Err(RestorePlanError::BootOverrideNotFound(rkrn));
+                }
+                Some(BootComponentOverrides { rdsk, rkrn })
+            }
+            (None, None) => None,
+            _ => return Err(RestorePlanError::BootOverridePair),
+        };
 
         let archive = FirmwareArchive::open(&request.firmware)?;
         let manifest = archive.build_manifest()?;
@@ -208,6 +237,9 @@ impl RestorePlan {
         }
         let identity = manifest.select_identity(board_config, request.behavior)?;
         let rsep = match request.rsep {
+            // The iPhone X flow (rdsk/rkrn overrides) always sends RestoreSEP:
+            // upstream passes --rdsk/--rkrn without --no-rsep.
+            RsepPolicy::Auto if boot_overrides.is_some() => RsepPolicy::Send,
             RsepPolicy::Auto => match major_version(manifest.product_version().as_str()) {
                 Some(major) if major >= 16 => RsepPolicy::Send,
                 _ => RsepPolicy::Skip,
@@ -237,6 +269,7 @@ impl RestorePlan {
             manifest.build_id().as_str(),
             rsep,
             cryptex.as_ref(),
+            boot_overrides.as_ref(),
         );
 
         Ok(Self {
@@ -254,6 +287,7 @@ impl RestorePlan {
             cryptex,
             exploit: request.exploit,
             nonce: request.nonce,
+            boot_overrides,
             components,
             steps,
         })
@@ -320,6 +354,12 @@ impl RestorePlan {
 
     pub const fn nonce_policy(&self) -> NoncePolicy {
         self.nonce
+    }
+
+    /// The rdsk/rkrn boot component overrides of the iPhone X downgrade flow,
+    /// when set.
+    pub const fn boot_overrides(&self) -> Option<&BootComponentOverrides> {
+        self.boot_overrides.as_ref()
     }
 
     pub fn steps(&self) -> &[RestoreStep] {
@@ -442,9 +482,10 @@ fn plan_id(
     build_id: &str,
     rsep: RsepPolicy,
     cryptex: Option<&CryptexSource>,
+    boot_overrides: Option<&BootComponentOverrides>,
 ) -> PlanId {
     let material = format!(
-        "{}|{}|{}|{}|{}|{:?}|{:?}|{:?}|{:?}|{:?}|{:?}|{:?}|{:?}",
+        "{}|{}|{}|{}|{}|{:?}|{:?}|{:?}|{:?}|{:?}|{:?}|{:?}|{:?}|{:?}",
         request.device.product_type(),
         request
             .device
@@ -461,6 +502,7 @@ fn plan_id(
         cryptex,
         request.exploit,
         request.nonce,
+        boot_overrides,
     );
     PlanId(hex::encode(Sha256::digest(material.as_bytes())))
 }
@@ -494,6 +536,10 @@ pub enum RestorePlanError {
     SepNotFound(PathBuf),
     #[error("provided cryptex source IPSW does not exist: {}", .0.display())]
     CryptexSourceNotFound(PathBuf),
+    #[error("--rdsk and --rkrn boot overrides must be given together")]
+    BootOverridePair,
+    #[error("provided boot component override does not exist: {}", .0.display())]
+    BootOverrideNotFound(PathBuf),
     #[error("skipping the signing ticket requires a pwned boot chain")]
     SkipTicketRequiresExploit,
     #[error(transparent)]
@@ -527,6 +573,8 @@ mod tests {
             cryptex_source: CryptexSource::Target,
             exploit: ExploitPolicy::Auto,
             nonce: NoncePolicy::Manual,
+            rdsk: None,
+            rkrn: None,
         };
 
         let plan = RestorePlan::resolve(request).unwrap();
@@ -555,6 +603,8 @@ mod tests {
             cryptex_source: CryptexSource::Target,
             exploit: ExploitPolicy::Auto,
             nonce: NoncePolicy::Manual,
+            rdsk: None,
+            rkrn: None,
         };
 
         let plan = RestorePlan::resolve(request(&legacy, RsepPolicy::Auto)).unwrap();
@@ -593,6 +643,8 @@ mod tests {
             cryptex_source: CryptexSource::Target,
             exploit: ExploitPolicy::Auto,
             nonce: NoncePolicy::Manual,
+            rdsk: None,
+            rkrn: None,
         };
 
         // iOS 16+ with a Cryptex1,SystemOS manifest entry enables handling.
@@ -624,6 +676,8 @@ mod tests {
             cryptex_source: CryptexSource::Provided(PathBuf::from("/nonexistent.ipsw")),
             exploit: ExploitPolicy::Auto,
             nonce: NoncePolicy::Manual,
+            rdsk: None,
+            rkrn: None,
         };
 
         assert!(matches!(
@@ -649,11 +703,79 @@ mod tests {
             cryptex_source: CryptexSource::Target,
             exploit,
             nonce: NoncePolicy::Manual,
+            rdsk: None,
+            rkrn: None,
         };
 
         let error = RestorePlan::resolve(request(ExploitPolicy::None)).unwrap_err();
         assert!(matches!(error, RestorePlanError::SkipTicketRequiresExploit));
         RestorePlan::resolve(request(ExploitPolicy::AlreadyPwned)).unwrap();
+    }
+
+    #[test]
+    fn boot_overrides_must_be_paired_and_exist() {
+        let firmware = firmware_fixture();
+        let rdsk = NamedTempFile::new().unwrap();
+        let base = |rdsk, rkrn| RestoreRequest {
+            device: DeviceIdentity::new(ProductType::from("iPhone3,1"), Soc::A4)
+                .with_board_config(BoardConfig::from("n90"))
+                .with_ecid(Ecid::new(42)),
+            firmware: firmware.path().to_owned(),
+            behavior: RestoreBehavior::Erase,
+            ticket: TicketPolicy::Signed,
+            baseband: BasebandPolicy::Auto,
+            sep: SepPolicy::Auto,
+            rsep: RsepPolicy::Auto,
+            cryptex: CryptexPolicy::Auto,
+            cryptex_source: CryptexSource::Target,
+            exploit: ExploitPolicy::Auto,
+            nonce: NoncePolicy::Manual,
+            rdsk,
+            rkrn,
+        };
+
+        // Only one of the pair is rejected.
+        let error = RestorePlan::resolve(base(Some(rdsk.path().to_owned()), None)).unwrap_err();
+        assert!(matches!(error, RestorePlanError::BootOverridePair));
+        // A missing file is rejected.
+        let error = RestorePlan::resolve(base(
+            Some(rdsk.path().to_owned()),
+            Some(PathBuf::from("/nonexistent-kcache.im4p")),
+        ))
+        .unwrap_err();
+        assert!(matches!(error, RestorePlanError::BootOverrideNotFound(_)));
+    }
+
+    #[test]
+    fn boot_overrides_force_rsep_send() {
+        let firmware = firmware_fixture();
+        let rdsk = NamedTempFile::new().unwrap();
+        let rkrn = NamedTempFile::new().unwrap();
+        let request = |rsep| RestoreRequest {
+            device: DeviceIdentity::new(ProductType::from("iPhone3,1"), Soc::A4)
+                .with_board_config(BoardConfig::from("n90"))
+                .with_ecid(Ecid::new(42)),
+            firmware: firmware.path().to_owned(),
+            behavior: RestoreBehavior::Erase,
+            ticket: TicketPolicy::Signed,
+            baseband: BasebandPolicy::Auto,
+            sep: SepPolicy::Auto,
+            rsep,
+            cryptex: CryptexPolicy::Auto,
+            cryptex_source: CryptexSource::Target,
+            exploit: ExploitPolicy::Auto,
+            nonce: NoncePolicy::Manual,
+            rdsk: Some(rdsk.path().to_owned()),
+            rkrn: Some(rkrn.path().to_owned()),
+        };
+
+        // The iPhone X flow always sends RestoreSEP, even for a pre-16 target.
+        let plan = RestorePlan::resolve(request(RsepPolicy::Auto)).unwrap();
+        assert_eq!(plan.rsep_policy(), RsepPolicy::Send);
+        assert!(plan.boot_overrides().is_some());
+        // Explicit policies still win.
+        let plan = RestorePlan::resolve(request(RsepPolicy::Skip)).unwrap();
+        assert_eq!(plan.rsep_policy(), RsepPolicy::Skip);
     }
 
     fn firmware_fixture() -> NamedTempFile {

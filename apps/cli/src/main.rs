@@ -16,15 +16,15 @@ use legacy_ios_kit::{
     CustomRootfsRequest, DeviceDiagnostics, DeviceFileInfo, DeviceInventory, DeviceStorageInfo,
     DeviceSummary, DmgFirmwareKey, Ecid, ExploitPolicy, FirmwareSummary, FourThreeComponentSource,
     FourThreePrepareRequest, HfsEntrySummary, HfsMutation, HfsStatSummary, HostKeyPolicy,
-    Iboot32PatchOptions, ImageCipher, InstalledApp, IosVersion, LegacyIosKit, MountOptions,
-    MultipartPrepareRequest, MultipartRestoreRequest, NoncePolicy, NorSource, OperationEvent,
-    OperationHandle, OperationOutcome, PowderPrepareRequest, PowderPwnMethod, PowderRestoreRequest,
-    PowderTicketSource, ProductType, RamdiskBootExecutionRequest, RamdiskBootRequest,
-    RamdiskBuildRequest, RamdiskBuildSummary, RamdiskSsh, RecoveryDeviceInfo, RecoveryUploadResult,
-    RemoteFirmwareSummary, ResourceId, RestoreBehavior, RestoreExecutionRequest, RestorePlan,
-    RestoreRequest, RsepPolicy, ScpPath, SepPolicy, ShshRequest, ShshSummary, SigningTicket, Soc,
-    SshCommandOutput, SshPassword, SshTarget, TicketPolicy, Udid, UsbHostDiagnostics,
-    extract_apticket_der,
+    Iboot32PatchOptions, ImageCipher, InstalledApp, IosVersion, IpxPrepareRequest, LegacyIosKit,
+    MountOptions, MultipartPrepareRequest, MultipartRestoreRequest, NoncePolicy, NorSource,
+    OperationEvent, OperationHandle, OperationOutcome, PowderPrepareRequest, PowderPwnMethod,
+    PowderRestoreRequest, PowderTicketSource, ProductType, RamdiskBootExecutionRequest,
+    RamdiskBootRequest, RamdiskBuildRequest, RamdiskBuildSummary, RamdiskSsh, RecoveryDeviceInfo,
+    RecoveryUploadResult, RemoteFirmwareSummary, ResourceId, RestoreBehavior,
+    RestoreExecutionRequest, RestorePlan, RestoreRequest, RsepPolicy, ScpPath, SepPolicy,
+    ShshRequest, ShshSummary, SigningTicket, Soc, SshCommandOutput, SshPassword, SshTarget,
+    TicketPolicy, Udid, UsbHostDiagnostics, extract_apticket_der,
 };
 use tracing::level_filters::LevelFilter;
 use tracing::{debug, info, warn};
@@ -1081,6 +1081,20 @@ enum FirmwareCommand {
         #[arg(long)]
         cache_dir: Option<PathBuf>,
     },
+    /// Build the iPhone X (iPhone10,3/10,6) iOS 14.3-15.x downgrade restore
+    /// components: kcache.im4p (AMFI-patched kernelcache, type rkrn) and
+    /// rdsk.im4p (restore ramdisk with the patched, re-signed
+    /// restored_external, type rdsk), for `lik restore plan/execute --rkrn
+    /// --rdsk` (upstream's ipsw_prepare_ipx + futurerestore --rkrn/--rdsk).
+    #[command(name = "ipx-prepare")]
+    IpxPrepare {
+        /// Stock iOS 14.3-15.x iPhone X IPSW.
+        #[arg(long)]
+        ipsw: PathBuf,
+        /// Directory kcache.im4p and rdsk.im4p are written to.
+        #[arg(long)]
+        output_dir: PathBuf,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -1291,6 +1305,14 @@ enum RestoreCommand {
         /// the target IPSW.
         #[arg(long)]
         cryptex_ipsw: Option<PathBuf>,
+        /// Patched rdsk.im4p from `lik firmware ipx-prepare` replacing the
+        /// restore ramdisk (iPhone X downgrades); requires --rkrn.
+        #[arg(long, requires = "rkrn")]
+        rdsk: Option<PathBuf>,
+        /// Patched kcache.im4p from `lik firmware ipx-prepare` replacing the
+        /// restore kernelcache (iPhone X downgrades); requires --rdsk.
+        #[arg(long, requires = "rdsk")]
+        rkrn: Option<PathBuf>,
         #[arg(long, value_enum, default_value_t = ExploitArg::Auto)]
         exploit: ExploitArg,
         /// Write the ticket generator to the device boot nonce NVRAM variable.
@@ -1345,6 +1367,14 @@ enum RestoreCommand {
         /// the target IPSW.
         #[arg(long)]
         cryptex_ipsw: Option<PathBuf>,
+        /// Patched rdsk.im4p from `lik firmware ipx-prepare` replacing the
+        /// restore ramdisk (iPhone X downgrades); requires --rkrn.
+        #[arg(long, requires = "rkrn")]
+        rdsk: Option<PathBuf>,
+        /// Patched kcache.im4p from `lik firmware ipx-prepare` replacing the
+        /// restore kernelcache (iPhone X downgrades); requires --rdsk.
+        #[arg(long, requires = "rdsk")]
+        rkrn: Option<PathBuf>,
         #[arg(long)]
         flash_version_1: bool,
         /// Write the ticket generator to the device boot nonce NVRAM variable.
@@ -3302,6 +3332,21 @@ async fn main() -> Result<()> {
                 "FourThree dualboot components built"
             );
         }
+        Command::Firmware {
+            command: FirmwareCommand::IpxPrepare { ipsw, output_dir },
+        } => {
+            let outcome = kit
+                .prepare_ipx_components(IpxPrepareRequest::new(ipsw, output_dir))
+                .await
+                .context("failed to build the iPhone X restore components")?;
+            info!(
+                version = %outcome.version(),
+                build = %outcome.build(),
+                kcache = %outcome.kcache().display(),
+                rdsk = %outcome.rdsk().display(),
+                "iPhone X restore components built"
+            );
+        }
         Command::Restore {
             command:
                 RestoreCommand::Plan {
@@ -3321,6 +3366,8 @@ async fn main() -> Result<()> {
                     no_rsep,
                     no_cryptex,
                     cryptex_ipsw,
+                    rdsk,
+                    rkrn,
                     exploit,
                     set_nonce,
                 },
@@ -3361,6 +3408,8 @@ async fn main() -> Result<()> {
                         .map_or(CryptexSource::Target, CryptexSource::Provided),
                     exploit: exploit.into(),
                     nonce: nonce_policy(set_nonce),
+                    rdsk,
+                    rkrn,
                 })
                 .context("failed to resolve restore plan")?;
             write_restore_plan(output, &plan)?;
@@ -3386,6 +3435,8 @@ async fn main() -> Result<()> {
                     no_rsep,
                     no_cryptex,
                     cryptex_ipsw,
+                    rdsk,
+                    rkrn,
                     flash_version_1,
                     set_nonce,
                     yes,
@@ -3420,6 +3471,8 @@ async fn main() -> Result<()> {
                 cryptex_source: cryptex_ipsw.map_or(CryptexSource::Target, CryptexSource::Provided),
                 exploit: exploit.into(),
                 nonce: nonce_policy(set_nonce),
+                rdsk,
+                rkrn,
             })?;
             confirm(
                 &format!(
@@ -3487,6 +3540,8 @@ async fn main() -> Result<()> {
                     cryptex_source: CryptexSource::Target,
                     exploit: exploit.into(),
                     nonce: NoncePolicy::Manual,
+                    rdsk: None,
+                    rkrn: None,
                 })
                 .context("failed to resolve the part 1 restore plan")?;
             let part2_plan = kit
@@ -3514,6 +3569,8 @@ async fn main() -> Result<()> {
                     cryptex_source: CryptexSource::Target,
                     exploit: exploit.into(),
                     nonce: NoncePolicy::Manual,
+                    rdsk: None,
+                    rkrn: None,
                 })
                 .context("failed to resolve the part 2 restore plan")?;
             confirm(

@@ -112,6 +112,19 @@ impl RestorePreparation {
         };
         let personalizer =
             ComponentPersonalizer::new(archive, identity.clone(), ticket_dictionary.clone());
+        // futurerestore --rdsk/--rkrn: the override files replace the archive
+        // bytes of RestoreRamDisk/RestoreKernelCache and are still
+        // personalized with the ticket afterwards (idevicerestore
+        // recovery.c's personalize_component call chain).
+        let overrides = plan
+            .boot_overrides()
+            .map(|overrides| {
+                Ok::<_, std::io::Error>((
+                    std::fs::read(&overrides.rdsk)?,
+                    std::fs::read(&overrides.rkrn)?,
+                ))
+            })
+            .transpose()?;
         let include_sep = !matches!(plan.sep_policy(), SepPolicy::None);
         let sep = match plan.sep_policy() {
             SepPolicy::Auto | SepPolicy::None => None,
@@ -149,9 +162,18 @@ impl RestorePreparation {
                     None
                 }
                 .unwrap_or(&personalizer);
+                let override_data = match (name, &overrides) {
+                    ("RestoreRamDisk", Some((rdsk, _))) => Some(rdsk.clone()),
+                    ("RestoreKernelCache", Some((_, rkrn))) => Some(rkrn.clone()),
+                    _ => None,
+                };
+                let data = match override_data {
+                    Some(data) => personalizer.personalize_data(name, data)?,
+                    None => source.personalize(name)?,
+                };
                 Ok(PreparedBootComponent {
                     name: name.to_owned(),
-                    data: source.personalize(name)?,
+                    data,
                 })
             })
             .collect::<Result<Vec<_>, RestorePreparationError>>()?;
@@ -298,6 +320,8 @@ pub enum RestorePreparationError {
     InvalidGenerator(String),
     #[error("provided SEP firmware has no RestoreSEP component")]
     MissingProvidedSep,
+    #[error("boot component override read failed: {0}")]
+    Io(#[from] std::io::Error),
     #[error(transparent)]
     Firmware(#[from] FirmwareError),
     #[error(transparent)]
@@ -335,6 +359,8 @@ mod tests {
             cryptex_source: crate::CryptexSource::Target,
             exploit: ExploitPolicy::None,
             nonce: crate::NoncePolicy::Manual,
+            rdsk: None,
+            rkrn: None,
         })
         .unwrap();
         let consent = plan.confirm_destructive();
@@ -392,6 +418,8 @@ mod tests {
             cryptex_source: crate::CryptexSource::Target,
             exploit: ExploitPolicy::AlreadyPwned,
             nonce: crate::NoncePolicy::Manual,
+            rdsk: None,
+            rkrn: None,
         })
         .unwrap();
         let consent = plan.confirm_destructive();
@@ -402,6 +430,52 @@ mod tests {
         assert!(prepared.boot_nonce().is_none());
         assert_eq!(prepared.boot_components()[0].name(), "iBSS");
         assert_eq!(prepared.boot_components()[0].data(), b"ibss.img3");
+    }
+
+    #[test]
+    fn boot_overrides_replace_archive_bytes() {
+        let firmware = firmware_fixture();
+        let mut rdsk = NamedTempFile::new().unwrap();
+        rdsk.write_all(b"patched rdsk.im4p").unwrap();
+        let mut rkrn = NamedTempFile::new().unwrap();
+        rkrn.write_all(b"patched kcache.im4p").unwrap();
+        let plan = RestorePlan::resolve(RestoreRequest {
+            device: DeviceIdentity::new(ProductType::from("iPhone3,1"), Soc::A4)
+                .with_board_config(BoardConfig::from("n90"))
+                .with_ecid(Ecid::new(42)),
+            firmware: firmware.path().to_owned(),
+            behavior: RestoreBehavior::Erase,
+            ticket: TicketPolicy::Skip,
+            baseband: BasebandPolicy::None,
+            sep: SepPolicy::Auto,
+            rsep: crate::RsepPolicy::Auto,
+            cryptex: crate::CryptexPolicy::Auto,
+            cryptex_source: crate::CryptexSource::Target,
+            exploit: ExploitPolicy::AlreadyPwned,
+            nonce: crate::NoncePolicy::Manual,
+            rdsk: Some(rdsk.path().to_owned()),
+            rkrn: Some(rkrn.path().to_owned()),
+        })
+        .unwrap();
+        // The ipx mode always sends RestoreSEP.
+        assert_eq!(plan.rsep_policy(), crate::RsepPolicy::Send);
+
+        let prepared =
+            RestorePreparation::without_ticket(&plan, &plan.confirm_destructive(), false).unwrap();
+
+        // Without a ticket the override bytes pass through unpersonalized.
+        let kernel = prepared
+            .boot_components()
+            .iter()
+            .find(|component| component.name() == "RestoreKernelCache")
+            .unwrap();
+        assert_eq!(kernel.data(), b"patched kcache.im4p");
+        let ibss = prepared
+            .boot_components()
+            .iter()
+            .find(|component| component.name() == "iBSS")
+            .unwrap();
+        assert_eq!(ibss.data(), b"ibss.img3");
     }
 
     #[test]
@@ -424,6 +498,8 @@ mod tests {
             cryptex_source: crate::CryptexSource::Target,
             exploit: ExploitPolicy::AlreadyPwned,
             nonce: crate::NoncePolicy::Manual,
+            rdsk: None,
+            rkrn: None,
         };
         let plan = RestorePlan::resolve(request(SepPolicy::Auto)).unwrap();
         let prepared =
