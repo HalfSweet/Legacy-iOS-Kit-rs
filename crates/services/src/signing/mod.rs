@@ -12,6 +12,7 @@
 mod anisette;
 mod developer_api;
 mod gsa;
+mod macho;
 mod resign;
 mod srp;
 
@@ -20,4 +21,5 @@ pub use developer_api::{
     DeveloperApiError, DeveloperClient, DevelopmentCertificate, ProvisioningProfile, Team,
 };
 pub use gsa::{DeveloperSession, GsaClient, GsaError, TwoFactorPrompt};
+pub use macho::{MachoSignError, adhoc_sign, extract_entitlements};
 pub use resign::{ResignError, read_ipa_bundle_id, resign_ipa};
