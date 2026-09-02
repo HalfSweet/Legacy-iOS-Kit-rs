@@ -13,6 +13,7 @@ mod img2;
 mod img3;
 mod img4;
 mod kernel32;
+mod kernel64;
 mod layered;
 mod lzss;
 mod mbn;
@@ -38,6 +39,7 @@ pub use img2::{IMG2_HEADER_SIZE, IMG2_MAGIC, Img2, Img2Error};
 pub use img3::{Img3, Img3Element, Img3Error, Img3Tag};
 pub use img4::{Img4Error, extract_im4p_payload, personalize_img4, replace_im4p_payload};
 pub use kernel32::{Kernel32Error, patch_kernel32};
+pub use kernel64::{Kernel64Error, Kernel64Patch, Kernel64PatchOutcome, patch_kernel64};
 pub use layered::{LayeredError, patch_layered};
 pub use lzss::{
     COMPLZSS_HEADER_SIZE, CompLzssHeader, LzssError, adler32, compress_lzss, decompress_lzss,
