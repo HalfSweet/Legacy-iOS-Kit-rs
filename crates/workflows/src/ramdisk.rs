@@ -145,6 +145,12 @@ impl RamdiskBootPlan {
                         path: path.clone(),
                         source,
                     })?;
+                ticket.claims().verify_signature().map_err(|source| {
+                    RamdiskBootPlanError::InvalidTicket {
+                        path: path.clone(),
+                        source,
+                    }
+                })?;
                 pin_component(APTICKET, path)
             })
             .transpose()?;
@@ -344,8 +350,6 @@ pub enum RamdiskBootPlanError {
 
 #[cfg(test)]
 mod tests {
-    use std::io::Write;
-
     use legacy_ios_core::{BoardConfig, ProductType, Soc};
     use tempfile::NamedTempFile;
 
@@ -440,15 +444,12 @@ mod tests {
     fn rejects_ticket_for_another_ecid() {
         let components = ComponentFixture::new();
         let ticket = NamedTempFile::new().unwrap();
-        ticket
-            .reopen()
-            .unwrap()
-            .write_all(
-                br#"<?xml version="1.0"?><plist version="1.0"><dict>
-<key>APTicket</key><data>AQID</data><key>ApECID</key><integer>43</integer>
-</dict></plist>"#,
-            )
-            .unwrap();
+        let mut dictionary = plist::Dictionary::new();
+        dictionary.insert(
+            "APTicket".into(),
+            plist::Value::Data(legacy_ios_test_support::tickets::scab(43, None, None)),
+        );
+        plist::to_file_xml(ticket.path(), &dictionary).unwrap();
         let mut request = components.request(ExploitPolicy::None);
         request.ticket = Some(ticket.path().to_owned());
 

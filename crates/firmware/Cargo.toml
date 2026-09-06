@@ -15,9 +15,11 @@ legacy-ios-core = { path = "../core" }
 plist = "=1.10.0"
 reqwest = { version = "=0.12.15", default-features = false, features = ["rustls-tls"] }
 serde.workspace = true
-sha1 = "=0.10.6"
-sha2 = "=0.10.9"
+sha1 = { version = "=0.10.6", features = ["oid"] }
+sha2 = { version = "=0.10.9", features = ["oid"] }
 tempfile = "3.20.0"
+rsa = "=0.9.7"
+x509-cert = "=0.2.5"
 thiserror.workspace = true
 tokio = { workspace = true, features = ["fs", "io-util"] }
 tracing.workspace = true
@@ -25,6 +27,8 @@ uuid = { version = "1.16.0", features = ["v4"] }
 zip = { version = "=2.4.2", default-features = false, features = ["deflate"] }
 
 [dev-dependencies]
+rand = "=0.8.5"
+legacy-ios-test-support = { path = "../test-support" }
 tempfile = "3.20.0"
 
 [lints]

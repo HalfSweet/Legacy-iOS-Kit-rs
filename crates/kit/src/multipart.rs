@@ -1532,9 +1532,15 @@ mod tests {
     #[test]
     fn extracts_apticket_der() {
         let mut dictionary = plist::Dictionary::new();
-        dictionary.insert("APTicket".to_owned(), Value::Data(vec![0x30, 0x82, 0x01]));
+        dictionary.insert(
+            "APTicket".to_owned(),
+            Value::Data(legacy_ios_test_support::tickets::scab(42, None, None)),
+        );
         let ticket = SigningTicket::from_dictionary(dictionary).unwrap();
-        assert_eq!(extract_apticket_der(&ticket), vec![0x30, 0x82, 0x01]);
+        assert_eq!(
+            extract_apticket_der(&ticket),
+            legacy_ios_test_support::tickets::scab(42, None, None)
+        );
     }
 
     #[tokio::test]

@@ -449,7 +449,10 @@ mod tests {
     fn ticket_blob(directory: &std::path::Path, ecid: u64) -> PathBuf {
         let path = directory.join("ticket.shsh");
         let mut dictionary = plist::Dictionary::new();
-        dictionary.insert("APTicket".to_owned(), plist::Value::Data(vec![0x30, 0x82]));
+        dictionary.insert(
+            "APTicket".to_owned(),
+            plist::Value::Data(legacy_ios_test_support::tickets::scab(ecid, None, None)),
+        );
         dictionary.insert("ApECID".to_owned(), plist::Value::Integer(ecid.into()));
         plist::to_file_xml(&path, &plist::Value::Dictionary(dictionary)).unwrap();
         path

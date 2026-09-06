@@ -11,6 +11,7 @@ mod manifest;
 mod powder_bundle;
 mod remote_zip;
 mod ticket;
+mod ticket_claims;
 mod tss;
 mod ustar;
 
@@ -39,3 +40,5 @@ pub use tss::{
     apply_restore_request_rules,
 };
 pub use ustar::{UstarBuilder, UstarError};
+
+pub use ticket_claims::{TicketClaims, TicketFormat};

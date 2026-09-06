@@ -413,12 +413,13 @@ mod tests {
 
     #[test]
     fn prefers_img4_root_ticket_when_ticket_contains_legacy_data() {
-        let ticket = br#"<?xml version="1.0"?><plist version="1.0"><dict>
-<key>APTicket</key><data>AQ==</data>
-<key>ApImg4Ticket</key><data>Ag==</data>
-</dict></plist>"#;
-
-        assert_eq!(ticket_payload(ticket).unwrap(), [2]);
+        let payload = legacy_ios_test_support::tickets::im4m(42, &[7; 20], &[]);
+        let mut dictionary = plist::Dictionary::new();
+        dictionary.insert("APTicket".into(), plist::Value::Data(vec![1]));
+        dictionary.insert("ApImg4Ticket".into(), plist::Value::Data(payload.clone()));
+        let mut ticket = Vec::new();
+        plist::to_writer_xml(&mut ticket, &dictionary).unwrap();
+        assert_eq!(ticket_payload(&ticket).unwrap(), payload);
     }
 
     #[test]

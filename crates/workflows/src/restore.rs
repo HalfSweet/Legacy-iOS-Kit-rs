@@ -255,6 +255,20 @@ impl RestorePlan {
             return Err(RestorePlanError::UnsupportedProduct);
         }
         let identity = manifest.select_identity(board_config, request.behavior)?;
+        if let TicketPolicy::Provided(path) = &request.ticket {
+            let validate = || -> Result<(), TicketError> {
+                let ticket = SigningTicket::open(path)?;
+                ticket.claims().verify_signature()?;
+                if request.exploit == ExploitPolicy::None {
+                    ticket.claims().verify_identity(identity)?;
+                }
+                Ok(())
+            };
+            validate().map_err(|source| RestorePlanError::InvalidTicket {
+                path: path.clone(),
+                source,
+            })?;
+        }
         let rsep = match request.rsep {
             // The iPhone X flow (rdsk/rkrn overrides) always sends RestoreSEP:
             // upstream passes --rdsk/--rkrn without --no-rsep.

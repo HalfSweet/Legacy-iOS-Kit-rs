@@ -84,6 +84,12 @@ impl RestorePreparation {
             .board_config()
             .ok_or(RestorePreparationError::MissingBoardConfig)?;
         let identity = manifest.select_identity(board, plan.behavior())?.clone();
+        if let Some(ticket) = &ticket {
+            ticket.claims().verify_signature()?;
+            if plan.exploit_policy() == crate::ExploitPolicy::None {
+                ticket.claims().verify_identity(&identity)?;
+            }
+        }
         let build_major = plan
             .build_id()
             .chars()
@@ -372,12 +378,12 @@ mod tests {
         })
         .unwrap();
         let consent = plan.confirm_destructive();
-        let ticket = SigningTicket::from_reader(std::io::Cursor::new(
-            br#"<?xml version="1.0"?><plist version="1.0"><dict>
-<key>APTicket</key><data>AQID</data><key>ApECID</key><integer>42</integer>
-</dict></plist>"#,
-        ))
-        .unwrap();
+        let mut dictionary = Dictionary::new();
+        dictionary.insert(
+            "APTicket".into(),
+            Value::Data(legacy_ios_test_support::tickets::scab(42, None, None)),
+        );
+        let ticket = SigningTicket::from_dictionary(dictionary).unwrap();
 
         let prepared = RestorePreparation::with_ticket(&plan, &consent, ticket, false).unwrap();
 

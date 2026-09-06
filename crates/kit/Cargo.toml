@@ -37,5 +37,6 @@ zeroize = "=1.9.0"
 workspace = true
 
 [dev-dependencies]
+legacy-ios-test-support = { path = "../test-support" }
 hfsplus = { version = "=0.2.4", features = ["testutil"] }
 zip = { version = "=2.4.2", default-features = false, features = ["deflate"] }

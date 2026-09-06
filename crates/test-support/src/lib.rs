@@ -2,6 +2,8 @@
 
 //! Protocol transcripts and test doubles for meaningful integration tests.
 
+pub mod tickets;
+
 use std::{
     collections::VecDeque,
     pin::Pin,
