@@ -10,9 +10,11 @@ mod files;
 mod mbdb;
 mod normal;
 mod plist_service;
+mod session;
 pub mod signing;
 mod sparse_backup;
 mod ssh;
+mod system_mux;
 
 pub use activation::ActivationState;
 pub use app::{AppFilter, InstalledApp};
@@ -25,6 +27,9 @@ pub use normal::{
     DeviceSyslog, DirectMux, MuxDevice, NormalBackend, NormalDevice, NormalDeviceInfo, NormalMux,
     PairingRecord, RawServiceConnection, ServiceError, SystemMux,
 };
+pub use session::DeviceSession;
+#[cfg(feature = "legacy-tls")]
+pub use session::LegacyTlsError;
 pub use sparse_backup::{
     BackupEntry, DirectoryEntry, FileEntry, SparseBackup, SparseBackupError, SymlinkEntry,
     blob_name,

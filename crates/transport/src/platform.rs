@@ -46,3 +46,21 @@ fn is_direct_usb_driver(driver: Option<&str>) -> bool {
         driver.contains("winusb") || driver.contains("libusb")
     })
 }
+
+/// The operating system's existing usbmux service. Never creates a listener
+/// or changes service configuration.
+#[cfg(unix)]
+pub type SystemMuxSocket = tokio::net::UnixStream;
+#[cfg(windows)]
+pub type SystemMuxSocket = tokio::net::TcpStream;
+
+pub async fn connect_system_mux() -> std::io::Result<SystemMuxSocket> {
+    #[cfg(unix)]
+    {
+        tokio::net::UnixStream::connect("/var/run/usbmuxd").await
+    }
+    #[cfg(windows)]
+    {
+        tokio::net::TcpStream::connect((std::net::Ipv4Addr::LOCALHOST, 27015)).await
+    }
+}

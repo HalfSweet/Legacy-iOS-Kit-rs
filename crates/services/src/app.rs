@@ -1,12 +1,9 @@
 use std::path::Path;
 
-use idevice::{
-    IdeviceService,
-    services::{
-        afc::{AfcClient, opcode::AfcFopenMode},
-        house_arrest::HouseArrestClient,
-        springboardservices::SpringBoardServicesClient,
-    },
+use idevice::services::{
+    afc::{AfcClient, opcode::AfcFopenMode},
+    house_arrest::HouseArrestClient,
+    springboardservices::SpringBoardServicesClient,
 };
 use plist::{Dictionary, Value};
 use serde::{Deserialize, Serialize};
@@ -108,7 +105,7 @@ impl NormalDevice {
             .ok_or(ServiceError::InvalidIpaPath)?;
         let device_path = format!("/PublicStaging/{file_name}");
         let mut local = tokio::fs::File::open(ipa).await?;
-        let mut afc = AfcClient::connect(self.provider()).await?;
+        let mut afc = self.service_client::<AfcClient>().await?;
         let mut remote = afc.open(&device_path, AfcFopenMode::WrOnly).await?;
         let copied = tokio::io::copy(&mut local, &mut remote).await?;
         remote.shutdown().await?;
@@ -144,31 +141,31 @@ impl NormalDevice {
     }
 
     pub async fn app_container(&self, bundle_id: &str) -> Result<DeviceFiles, ServiceError> {
-        let client = HouseArrestClient::connect(self.provider()).await?;
+        let client = self.service_client::<HouseArrestClient>().await?;
         Ok(DeviceFiles::new(
             client.vend_container(bundle_id.to_owned()).await?,
         ))
     }
 
     pub async fn app_documents(&self, bundle_id: &str) -> Result<DeviceFiles, ServiceError> {
-        let client = HouseArrestClient::connect(self.provider()).await?;
+        let client = self.service_client::<HouseArrestClient>().await?;
         Ok(DeviceFiles::new(
             client.vend_documents(bundle_id.to_owned()).await?,
         ))
     }
 
     pub async fn app_icon(&self, bundle_id: &str) -> Result<Vec<u8>, ServiceError> {
-        let mut client = SpringBoardServicesClient::connect(self.provider()).await?;
+        let mut client = self.service_client::<SpringBoardServicesClient>().await?;
         Ok(client.get_icon_pngdata(bundle_id.to_owned()).await?)
     }
 
     pub async fn icon_state(&self) -> Result<Value, ServiceError> {
-        let mut client = SpringBoardServicesClient::connect(self.provider()).await?;
+        let mut client = self.service_client::<SpringBoardServicesClient>().await?;
         Ok(client.get_icon_state(None).await?)
     }
 
     pub async fn set_icon_state(&self, state: Value) -> Result<(), ServiceError> {
-        let mut client = SpringBoardServicesClient::connect(self.provider()).await?;
+        let mut client = self.service_client::<SpringBoardServicesClient>().await?;
         client.set_icon_state(state).await?;
         Ok(())
     }

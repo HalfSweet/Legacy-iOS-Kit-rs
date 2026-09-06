@@ -16,7 +16,7 @@ use idevice::{
         diagnostics_relay::DiagnosticsRelayClient, lockdown::LockdownClient,
         syslog_relay::SyslogRelayClient,
     },
-    usbmuxd::{Connection, UsbmuxdAddr},
+    usbmuxd::UsbmuxdAddr,
 };
 use legacy_ios_core::{BoardConfig, DeviceMode, Ecid, ProductType, Udid};
 use legacy_ios_transport::classify_apple_mode;
@@ -39,12 +39,9 @@ pub struct SystemMux {
 
 impl SystemMux {
     pub async fn list_mux_devices(&self) -> Result<Vec<MuxDevice>, ServiceError> {
-        let mut connection = self.address.connect(0).await?;
-        Ok(connection
-            .get_devices()
+        Ok(crate::system_mux::list()
             .await?
             .into_iter()
-            .filter(|device| device.connection_type == Connection::Usb)
             .map(|device| MuxDevice {
                 id: device.device_id,
                 udid: Udid::new(device.udid),
@@ -68,19 +65,16 @@ impl SystemMux {
     }
 
     pub async fn list_devices(&self) -> Result<Vec<NormalDevice>, ServiceError> {
-        let mut connection = self.address.connect(0).await?;
-        let devices = connection
-            .get_devices()
+        let devices = crate::system_mux::list()
             .await?
             .into_iter()
-            .filter(|device| device.connection_type == Connection::Usb)
             .map(|device| {
                 let udid = Udid::new(device.udid.clone());
                 let provider = device.to_provider(self.address.clone(), "legacy-ios-kit");
                 NormalDevice {
                     udid,
                     provider: Arc::new(provider),
-                    pairing: PairingBackend::System(self.address.clone()),
+                    pairing: PairingBackend::System,
                 }
             })
             .collect::<Vec<_>>();
@@ -92,13 +86,16 @@ impl SystemMux {
     }
 
     pub async fn find_device(&self, udid: &Udid) -> Result<NormalDevice, ServiceError> {
-        let mut connection = self.address.connect(0).await?;
-        let device = connection.get_device(udid.as_str()).await?;
+        let device = crate::system_mux::list()
+            .await?
+            .into_iter()
+            .find(|device| device.udid == udid.as_str())
+            .ok_or(ServiceError::DeviceNotFound)?;
         let provider = device.to_provider(self.address.clone(), "legacy-ios-kit");
         Ok(NormalDevice {
             udid: udid.clone(),
             provider: Arc::new(provider),
-            pairing: PairingBackend::System(self.address.clone()),
+            pairing: PairingBackend::System,
         })
     }
 }
@@ -360,14 +357,14 @@ pub struct NormalDevice {
 
 #[derive(Clone)]
 enum PairingBackend {
-    System(UsbmuxdAddr),
+    System,
     Direct(PairingRecords),
 }
 
 impl fmt::Debug for PairingBackend {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::System(_) => formatter.write_str("System"),
+            Self::System => formatter.write_str("System"),
             Self::Direct(_) => formatter.write_str("Direct"),
         }
     }
@@ -378,45 +375,73 @@ impl NormalDevice {
         &self.udid
     }
 
-    pub(crate) fn provider(&self) -> &dyn IdeviceProvider {
-        self.provider.as_ref()
+    /// Open an existing authenticated pairing. This never pairs the device.
+    pub async fn session(&self) -> Result<crate::DeviceSession, ServiceError> {
+        crate::DeviceSession::open(self).await
+    }
+
+    pub(crate) async fn pairing_file(&self) -> Result<PairingFile, ServiceError> {
+        match &self.pairing {
+            PairingBackend::System => crate::system_mux::pairing(self.udid.as_str()).await,
+            PairingBackend::Direct(records) => records
+                .read()
+                .await
+                .get(&self.udid)
+                .cloned()
+                .ok_or(ServiceError::Idevice(IdeviceError::InvalidHostID)),
+        }
     }
 
     pub(crate) async fn connect_service(
         &self,
         identifier: &str,
     ) -> Result<RawServiceConnection, ServiceError> {
-        let mut lockdown = LockdownClient::connect(self.provider()).await?;
-        let product_version = lockdown
-            .get_value(Some("ProductVersion"), None)
-            .await?
-            .as_string()
-            .map(ToOwned::to_owned)
-            .ok_or(ServiceError::UnexpectedValue("ProductVersion"))?;
-        let pairing = self.provider.get_pairing_file().await?;
-        lockdown.start_session(&pairing).await?;
-        let (port, ssl) = lockdown.start_service(identifier).await?;
-        let mut connection = self.provider.connect(port).await?;
-        if ssl {
-            let legacy = product_version
-                .split('.')
-                .next()
-                .and_then(|value| value.parse::<u8>().ok())
-                .is_some_and(|major| major < 5);
-            connection.start_session(&pairing, legacy).await?;
-        }
-        let inner = connection.get_socket().ok_or(ServiceError::MissingSocket)?;
-        Ok(RawServiceConnection { inner })
+        let mut session = self.session().await?;
+        let result = session.service(self, identifier).await;
+        let _ = session.close().await;
+        result
+    }
+
+    pub(crate) async fn service_client<T: IdeviceService>(&self) -> Result<T, ServiceError> {
+        let connection = self.connect_service(T::service_name().as_ref()).await?;
+        Ok(T::from_stream(Idevice::new(Box::new(connection), "legacy-ios-kit")).await?)
     }
 
     pub async fn query_info(&self) -> Result<NormalDeviceInfo, ServiceError> {
-        let mut lockdown = LockdownClient::connect(self.provider.as_ref()).await?;
-        let product_type = get_string(&mut lockdown, "ProductType").await?;
-        let hardware_model = get_string(&mut lockdown, "HardwareModel").await?;
-        let product_version = get_string(&mut lockdown, "ProductVersion").await?;
-        let build_version = get_string(&mut lockdown, "BuildVersion").await?;
-        let ecid = get_u64(&mut lockdown, "UniqueChipID").await?;
-        let device_name = get_string(&mut lockdown, "DeviceName").await?;
+        let keys = [
+            "ProductType",
+            "HardwareModel",
+            "ProductVersion",
+            "BuildVersion",
+            "UniqueChipID",
+            "DeviceName",
+        ];
+        let values = match crate::session::unpaired_values(self, &keys).await {
+            Ok(values) => values,
+            Err(ServiceError::LockdownRejected { code, .. }) if code == "GetProhibited" => {
+                let mut session = self.session().await?;
+                let mut values = Dictionary::new();
+                for key in keys {
+                    values.insert(key.into(), session.get_value(Some(key), None).await?);
+                }
+                let _ = session.close().await;
+                values
+            }
+            Err(error) => return Err(error),
+        };
+        let hardware_model = get_string(&values, "HardwareModel")?;
+        let product_type = if hardware_model.eq_ignore_ascii_case("n81ap") {
+            "iPod4,1".into()
+        } else {
+            get_string(&values, "ProductType")?
+        };
+        let product_version = get_string(&values, "ProductVersion")?;
+        let build_version = get_string(&values, "BuildVersion")?;
+        let ecid = values
+            .get("UniqueChipID")
+            .and_then(Value::as_unsigned_integer)
+            .ok_or(ServiceError::UnexpectedValue("UniqueChipID"))?;
+        let device_name = get_string(&values, "DeviceName")?;
 
         let info = NormalDeviceInfo {
             udid: self.udid.clone(),
@@ -444,7 +469,7 @@ impl NormalDevice {
 
     pub async fn pair(&self) -> Result<(), ServiceError> {
         let buid = match &self.pairing {
-            PairingBackend::System(address) => address.connect(0).await?.get_buid().await?,
+            PairingBackend::System => crate::system_mux::buid().await?,
             PairingBackend::Direct(_) => uuid::Uuid::new_v4().to_string().to_uppercase(),
         };
         let mut lockdown = LockdownClient::connect(self.provider.as_ref()).await?;
@@ -457,13 +482,8 @@ impl NormalDevice {
             .await?;
         pairing.udid = Some(self.udid.to_string());
         match &self.pairing {
-            PairingBackend::System(address) => {
-                let serialized = pairing.serialize()?;
-                address
-                    .connect(0)
-                    .await?
-                    .save_pair_record(self.udid.as_str(), serialized)
-                    .await?;
+            PairingBackend::System => {
+                crate::system_mux::save_pairing(self.udid.as_str(), pairing.serialize()?).await?;
             }
             PairingBackend::Direct(records) => {
                 records.write().await.insert(self.udid.clone(), pairing);
@@ -474,7 +494,7 @@ impl NormalDevice {
     }
 
     pub async fn battery_info(&self) -> Result<Dictionary, ServiceError> {
-        let mut diagnostics = DiagnosticsRelayClient::connect(self.provider.as_ref()).await?;
+        let mut diagnostics = self.service_client::<DiagnosticsRelayClient>().await?;
         diagnostics
             .gasguage()
             .await?
@@ -482,7 +502,7 @@ impl NormalDevice {
     }
 
     pub async fn restart(&self) -> Result<(), ServiceError> {
-        let mut diagnostics = DiagnosticsRelayClient::connect(self.provider.as_ref()).await?;
+        let mut diagnostics = self.service_client::<DiagnosticsRelayClient>().await?;
         diagnostics.restart().await?;
         Ok(())
     }
@@ -490,10 +510,11 @@ impl NormalDevice {
     /// Whether the device encrypts its backups (`WillEncrypt` in the
     /// `com.apple.mobile.backup` lockdown domain).
     pub async fn will_encrypt_backup(&self) -> Result<bool, ServiceError> {
-        let mut lockdown = LockdownClient::connect(self.provider.as_ref()).await?;
+        let mut lockdown = self.session().await?;
         let value = lockdown
             .get_value(Some("WillEncrypt"), Some("com.apple.mobile.backup"))
             .await?;
+        let _ = lockdown.close().await;
         Ok(value.as_boolean().unwrap_or(false))
     }
 
@@ -516,7 +537,7 @@ impl NormalDevice {
     }
 
     pub async fn shutdown(&self) -> Result<(), ServiceError> {
-        let mut diagnostics = DiagnosticsRelayClient::connect(self.provider.as_ref()).await?;
+        let mut diagnostics = self.service_client::<DiagnosticsRelayClient>().await?;
         diagnostics.shutdown().await?;
         Ok(())
     }
@@ -538,7 +559,7 @@ impl NormalDevice {
 
     pub async fn syslog(&self) -> Result<DeviceSyslog, ServiceError> {
         Ok(DeviceSyslog {
-            client: SyslogRelayClient::connect(self.provider()).await?,
+            client: self.service_client::<SyslogRelayClient>().await?,
         })
     }
 }
@@ -556,6 +577,12 @@ impl DeviceSyslog {
 
 pub struct RawServiceConnection {
     inner: Box<dyn idevice::ReadWrite>,
+}
+
+impl RawServiceConnection {
+    pub(crate) fn new(inner: Box<dyn idevice::ReadWrite>) -> Self {
+        Self { inner }
+    }
 }
 
 impl fmt::Debug for RawServiceConnection {
@@ -641,21 +668,11 @@ impl NormalDeviceInfo {
     }
 }
 
-async fn get_string(
-    client: &mut LockdownClient,
-    key: &'static str,
-) -> Result<String, ServiceError> {
-    let value = client.get_value(Some(key), None).await?;
-    value
-        .as_string()
-        .map(ToOwned::to_owned)
-        .ok_or(ServiceError::UnexpectedValue(key))
-}
-
-async fn get_u64(client: &mut LockdownClient, key: &'static str) -> Result<u64, ServiceError> {
-    let value = client.get_value(Some(key), None).await?;
-    value
-        .as_unsigned_integer()
+fn get_string(values: &Dictionary, key: &'static str) -> Result<String, ServiceError> {
+    values
+        .get(key)
+        .and_then(Value::as_string)
+        .map(str::to_owned)
         .ok_or(ServiceError::UnexpectedValue(key))
 }
 
@@ -669,6 +686,17 @@ fn normalize_board_config(hardware_model: &str) -> String {
 
 #[derive(Debug, Error)]
 pub enum ServiceError {
+    #[error("legacy iOS TLS requires the legacy-tls Cargo feature")]
+    LegacyTlsUnavailable,
+    #[cfg(feature = "legacy-tls")]
+    #[error(transparent)]
+    LegacyTls(#[from] crate::LegacyTlsError),
+    #[error("lockdown rejected {request}: {code}")]
+    LockdownRejected { request: &'static str, code: String },
+    #[error("paired device session timed out")]
+    SessionTimeout,
+    #[error("usbmux request failed with code {0}")]
+    MuxRequestRejected(u64),
     #[error("iOS device service failed: {0}")]
     Idevice(#[from] idevice::IdeviceError),
     #[error("lockdown returned an unexpected value for {0}")]

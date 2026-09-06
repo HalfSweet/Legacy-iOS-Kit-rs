@@ -21,3 +21,5 @@ pub use locator::{
 };
 pub use nusb::transfer::{ControlType, Recipient};
 pub use recovery::{RecoveryDeviceInfo, parse_iboot_serial};
+
+pub use platform::{SystemMuxSocket, connect_system_mux};

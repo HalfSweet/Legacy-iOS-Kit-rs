@@ -9,6 +9,10 @@ publish = false
 name = "lik"
 path = "src/main.rs"
 
+[features]
+default = ["legacy-tls"]
+legacy-tls = ["legacy-ios-kit/legacy-tls"]
+
 [dependencies]
 anyhow.workspace = true
 clap = { version = "4.5.35", features = ["derive"] }

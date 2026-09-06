@@ -4,14 +4,17 @@ These instructions apply to this repository and every subdirectory.
 
 ## Project Goal
 
-Build a pure-Rust, embeddable replacement for Legacy iOS Kit, using upstream
+Build a Rust, embeddable replacement for Legacy iOS Kit, using upstream
 commit `1ff4be07ea2946ccaeff2db60c4426488b8f6e32` as the behavioral baseline.
 The public library is `legacy-ios-kit`; the reference CLI is `lik`.
 
 ## Non-Negotiable Constraints
 
 - Do not invoke host-side shells, command-line tools, or subprocess fallbacks.
-- Do not add C FFI compatibility layers, bundle host executables, or depend on
+- The optional `legacy-tls` feature may use vendored OpenSSL solely for TLS 1.0
+  connections to legacy iOS devices. Keep modern device TLS on rustls and keep
+  the library build without this feature free of this compatibility backend.
+- Do not add other C FFI compatibility layers, bundle host executables, or depend on
   external mount drivers. Device file access is exposed only through the Rust
   API (AFC and friends); mounting device files on the host OS is out of scope.
 - Device payloads and binary patches are data assets, not host tools. Every

@@ -1,4 +1,3 @@
-use idevice::{IdeviceService, services::lockdown::LockdownClient};
 use plist::{Dictionary, Value};
 use serde::Serialize;
 use tracing::debug;
@@ -37,12 +36,13 @@ impl NormalDevice {
             }
             Err(error) => {
                 debug!(%error, "mobileactivationd state request failed; querying lockdown");
-                let mut lockdown = LockdownClient::connect(self.provider()).await?;
+                let mut lockdown = self.session().await?;
                 let state = lockdown
                     .get_value(Some("ActivationState"), None)
                     .await?
                     .into_string()
                     .ok_or(ServiceError::UnexpectedValue("ActivationState"))?;
+                let _ = lockdown.close().await;
                 Ok(ActivationState::from_device(state))
             }
         }

@@ -151,6 +151,14 @@ impl DeviceManager {
         Ok(())
     }
 
+    /// Batch protected device-property reads using an existing pairing.
+    pub async fn session(
+        &self,
+        udid: &Udid,
+    ) -> Result<legacy_ios_services::DeviceSession, KitError> {
+        Ok(self.find_normal(udid).await?.session().await?)
+    }
+
     pub async fn battery_info(&self, udid: &Udid) -> Result<DeviceDiagnostics, KitError> {
         let values = self.find_normal(udid).await?.battery_info().await?;
         Ok(DeviceDiagnostics { values })

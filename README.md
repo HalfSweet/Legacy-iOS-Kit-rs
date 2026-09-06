@@ -1,6 +1,6 @@
 # Legacy iOS Kit (Rust)
 
-A pure-Rust, embeddable reimplementation of
+An embeddable Rust reimplementation of
 [Legacy iOS Kit](https://github.com/LukeZGD/Legacy-iOS-Kit) (behavioral
 baseline: upstream commit `1ff4be07ea2946ccaeff2db60c4426488b8f6e32`) — a
 toolkit for restoring, downgrading, jailbreaking, and managing legacy iOS
@@ -11,8 +11,9 @@ devices (iPhoneOS 1.x through iOS 16, S5L8900 through A11).
 
 ## What makes this different from the upstream Bash project
 
-- **No host tooling.** No shells, no bundled executables, no C FFI, no
-  subprocess fallbacks. Every protocol (usbmux, lockdownd, AFC, restored,
+- **No host tooling.** No shells, no bundled executables, and no
+  subprocess fallbacks. The optional `legacy-tls` backend uses vendored
+  OpenSSL solely for old iOS device sessions. Every protocol (usbmux, lockdownd, AFC, restored,
   ASR, FDR, TSS, SSH), every image format (IPSW, IMG1–IMG4, IM4P/IM4M,
   HFS+, DMG), and every patch pipeline (iBoot32Patcher, powdersn0w
   patchfinders, KPlooshFinder-class kernel patching) is implemented in Rust.
@@ -45,8 +46,10 @@ Rust 1.88.0 or newer (see `rust-toolchain.toml`):
 cargo build --release -p legacy-ios-kit-cli
 ```
 
-The binary is `target/release/lik`. Nothing else is needed at build time —
-no macFUSE, no libimobiledevice, no compiled tools.
+The binary is `target/release/lik`. The CLI enables `legacy-tls` by default.
+Building that feature needs a C compiler, Make and Perl for vendored OpenSSL;
+no system OpenSSL installation, macFUSE, or libimobiledevice is needed.
+The built CLI does not need an OpenSSL executable or shared library.
 
 Host preconditions at runtime:
 
@@ -55,6 +58,18 @@ Host preconditions at runtime:
 - **macOS**: nothing; the system usbmuxd is used as-is.
 - **Windows**: the Apple Mobile Device USB driver (from iTunes) for the
   system backend, or a diagnosable WinUSB binding for the direct backend.
+
+## Paired legacy device sessions
+
+The library has no OpenSSL dependency unless the `legacy-tls` Cargo feature is enabled. Enable it on `legacy-ios-kit` (or `legacy-ios-services`) for iOS 2–9; without it, protected legacy sessions return `LegacyTlsUnavailable`. `cargo build -p legacy-ios-kit-cli --no-default-features` builds the CLI without this backend.
+
+Existing pairings are validated before protected reads on iOS < 7. TLS 1.0 is selected before connecting to iOS < 10; the compatibility backend authenticates with the pairing root identity and pins the server's exact paired device certificate. Modern device sessions continue to use rustls. Reads never initiate pairing, change USB services, or change device mode.
+
+Use `kit.devices().session(&udid)` to batch `get_value` calls, then `close()` the session. AFC, diagnostics, SpringBoard and the other normal-mode APIs share the same session connector. To run the opt-in iPod touch 4 read check:
+
+```sh
+cargo run -p legacy-ios-services --features legacy-tls --example read_legacy_device
+```
 
 ## Configuration
 

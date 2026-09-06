@@ -5,6 +5,10 @@ edition.workspace = true
 rust-version.workspace = true
 publish = false
 
+[features]
+default = []
+legacy-tls = ["legacy-ios-services/legacy-tls"]
+
 [dependencies]
 base64 = "=0.22.1"
 flate2 = "=1.1.10"

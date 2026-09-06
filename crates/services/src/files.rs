@@ -1,9 +1,6 @@
 use std::{fmt, io::SeekFrom, str::FromStr};
 
-use idevice::{
-    IdeviceService,
-    services::afc::{AfcClient, opcode::AfcFopenMode},
-};
+use idevice::services::afc::{AfcClient, opcode::AfcFopenMode};
 use serde::Serialize;
 use thiserror::Error;
 use tokio::io::AsyncSeekExt;
@@ -186,16 +183,17 @@ impl DeviceFiles {
 
 impl NormalDevice {
     pub async fn files(&self) -> Result<DeviceFiles, ServiceError> {
-        Ok(DeviceFiles::new(AfcClient::connect(self.provider()).await?))
+        Ok(DeviceFiles::new(self.service_client::<AfcClient>().await?))
     }
 
     /// AFC over the jailbroken-device root service (`com.apple.afc2`). The
     /// connection fails on a stock device, so a successful connect already
     /// indicates an existing jailbreak.
     pub async fn root_files(&self) -> Result<DeviceFiles, ServiceError> {
-        Ok(DeviceFiles::new(
-            AfcClient::new_afc2(self.provider()).await?,
-        ))
+        Ok(DeviceFiles::new(AfcClient::new(idevice::Idevice::new(
+            Box::new(self.connect_service("com.apple.afc2").await?),
+            "legacy-ios-kit",
+        ))))
     }
 }
 

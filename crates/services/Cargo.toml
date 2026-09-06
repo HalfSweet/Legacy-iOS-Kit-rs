@@ -5,6 +5,10 @@ edition.workspace = true
 rust-version.workspace = true
 publish = false
 
+[features]
+default = []
+legacy-tls = ["dep:openssl", "dep:tokio-openssl"]
+
 [dependencies]
 aes = "=0.8.4"
 aes-gcm = "=0.10.3"
@@ -19,6 +23,8 @@ num-bigint = { version = "=0.4.6", features = ["rand"] }
 nusb = { version = "=0.2.7", features = ["tokio"] }
 pbkdf2 = "=0.12.2"
 pkcs8 = "=0.10.2"
+openssl = { version = "=0.10.81", optional = true, features = ["vendored"] }
+tokio-openssl = { version = "=0.6.5", optional = true }
 plist = "=1.10.0"
 rand = "=0.8.5"
 reqwest = { version = "=0.12.15", default-features = false, features = ["rustls-tls"] }
