@@ -8,6 +8,7 @@ mod fls;
 mod hfs;
 mod hfs_btree;
 mod iboot32;
+mod iboot64;
 mod img1;
 mod img2;
 mod img3;
@@ -35,12 +36,16 @@ pub use iboot32::{
     BootMode, BootPartition, IBoot32, Iboot32PatchOptions, IbootPatchError, patch_iboot32,
     patch_iboot32_with_options,
 };
+pub use iboot64::{
+    IBoot64, Iboot64Patch, Iboot64PatchError, Iboot64PatchReport, patch_iboot64,
+    patch_iboot64_with_report,
+};
 pub use img1::{FOOTER_SIGNATURE_SIZE, HEADER_SIZE, Img1, Img1Error, apply_wtf_exploit};
 pub use img2::{IMG2_HEADER_SIZE, IMG2_MAGIC, Img2, Img2Error};
 pub use img3::{Img3, Img3Element, Img3Error, Img3Tag};
 pub use img4::{
-    Img4Error, decode_im4p_payload, extract_im4p_payload, personalize_img4, rebuild_im4p,
-    replace_im4p_payload,
+    Img4Error, decode_im4p_payload, decode_im4p_payload_with_key, extract_im4p_payload,
+    personalize_img4, rebuild_im4p, replace_im4p_payload,
 };
 pub use ipx_restored::{IpxRestoredError, patch_restored_external};
 pub use kernel32::{Kernel32Error, patch_kernel32};

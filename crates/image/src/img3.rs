@@ -153,6 +153,19 @@ impl Img3 {
         Ok(image)
     }
 
+    /// Replace the DATA payload and drop the KBAG elements, mirroring
+    /// libipatcher's `img3tool::replaceDATAinIMG3` followed by
+    /// `removeTagFromIMG3(KBAG)`: the payload is already in its final (same)
+    /// format, and every other element (TYPE/VERS/SEPO/BORD/CHIP/SHSH ...)
+    /// is kept.
+    pub fn replace_payload_and_strip_kbag(&self, payload: Vec<u8>) -> Result<Self, Img3Error> {
+        let mut image = self.with_payload(payload)?;
+        image
+            .elements
+            .retain(|element| element.tag != Img3Tag::KBAG);
+        Ok(image)
+    }
+
     /// Replace the DATA payload with a block-padded body, recording the real
     /// payload length in the element's data-size field (Apple's layout: the
     /// encrypted body covers the padding, the declared size does not).
@@ -328,6 +341,48 @@ mod tests {
                 .unwrap(),
             b"new"
         );
+    }
+
+    #[test]
+    fn replaces_payload_and_strips_kbag() {
+        let image = Img3::new(
+            0x6962_7373,
+            vec![
+                Img3Element::new(Img3Tag::TYPE, b"ibss".to_vec()),
+                Img3Element::new(Img3Tag::VERS, b"1".to_vec()),
+                Img3Element::new(Img3Tag::DATA, b"encrypted".to_vec()),
+                Img3Element::new(Img3Tag::KBAG, vec![0xaa; 32]),
+                Img3Element::new(Img3Tag::KBAG, vec![0xbb; 32]),
+                Img3Element::new(Img3Tag::SHSH, vec![0xcc; 128]),
+            ],
+        );
+
+        let replaced = image
+            .replace_payload_and_strip_kbag(b"patched".to_vec())
+            .unwrap();
+        let tags = replaced
+            .elements()
+            .iter()
+            .map(Img3Element::tag)
+            .collect::<Vec<_>>();
+        assert_eq!(
+            tags,
+            vec![Img3Tag::TYPE, Img3Tag::VERS, Img3Tag::DATA, Img3Tag::SHSH]
+        );
+        assert_eq!(replaced.payload().unwrap(), b"patched");
+
+        // The result round-trips through the serialized form.
+        let bytes = replaced.to_bytes();
+        assert_eq!(Img3::parse(&bytes).unwrap(), replaced);
+
+        assert!(matches!(
+            Img3::new(
+                0x6962_7373,
+                vec![Img3Element::new(Img3Tag::TYPE, b"ibss".to_vec())]
+            )
+            .replace_payload_and_strip_kbag(b"x".to_vec()),
+            Err(Img3Error::MissingPayload)
+        ));
     }
 
     #[test]

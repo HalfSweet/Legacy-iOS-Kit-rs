@@ -47,7 +47,31 @@ pub fn replace_im4p_payload(component: &[u8], payload: &[u8]) -> Result<Vec<u8>,
 /// layer (`-i` without `-D`): a `bvx2`-prefixed payload is LZFSE-compressed,
 /// a `complzss` blob is LZSS-compressed, anything else is raw.
 pub fn decode_im4p_payload(component: &[u8]) -> Result<Vec<u8>, Img4Error> {
+    decompress_im4p_payload(extract_im4p_payload(component)?)
+}
+
+/// Decode an IM4P payload with optional key material, mirroring
+/// libipatcher's `patchfile64`/`getPayloadFromIM4P`: when a `(key, iv)` pair
+/// is given the payload is AES-CBC decrypted first (encrypted payloads are
+/// block-aligned), then the same bvx2/complzss/raw dispatch as
+/// [`decode_im4p_payload`] runs on the decrypted bytes.
+pub fn decode_im4p_payload_with_key(
+    component: &[u8],
+    key: Option<(&[u8], &[u8; 16])>,
+) -> Result<Vec<u8>, Img4Error> {
     let payload = extract_im4p_payload(component)?;
+    let decrypted;
+    let payload = match key {
+        Some((key, iv)) => {
+            decrypted = crate::crypto::decrypt_cbc(payload, key, iv)?;
+            &decrypted
+        }
+        None => payload,
+    };
+    decompress_im4p_payload(payload)
+}
+
+fn decompress_im4p_payload(payload: &[u8]) -> Result<Vec<u8>, Img4Error> {
     if payload.starts_with(b"bvx2") {
         let mut output = Vec::new();
         lzfse_rust::decode_bytes(payload, &mut output)
@@ -227,6 +251,8 @@ pub enum Img4Error {
     PayloadDecode(String),
     #[error(transparent)]
     Lzss(#[from] crate::lzss::LzssError),
+    #[error(transparent)]
+    Crypto(#[from] crate::CryptoError),
 }
 
 #[cfg(test)]
@@ -301,6 +327,42 @@ mod tests {
         assert!(!rebuilt.windows(4).any(|window| window == b"lzss"));
         // The description survives the rebuild.
         assert!(rebuilt.windows(4).any(|window| window == b"test"));
+    }
+
+    #[test]
+    fn decodes_encrypted_payload_with_key() {
+        let key = [0x2b; 16];
+        let iv = [0x01; 16];
+        let plaintext = [0xabu8; 32]; // encrypted payloads are block-aligned
+        let ciphertext = crate::encrypt_cbc(&plaintext, &key, &iv).unwrap();
+        let component = component_with_payload(b"ibss", &ciphertext);
+
+        assert_eq!(
+            decode_im4p_payload_with_key(&component, Some((&key, &iv))).unwrap(),
+            plaintext
+        );
+        // Without key material the raw (still encrypted) bytes come back,
+        // like decode_im4p_payload.
+        assert_eq!(
+            decode_im4p_payload_with_key(&component, None).unwrap(),
+            ciphertext
+        );
+    }
+
+    #[test]
+    fn decrypts_then_decompresses_lzss_payload() {
+        let key = [0x2b; 16];
+        let iv = [0x01; 16];
+        let mut compressed = crate::lzss::compress_lzss(b"iBoot iBoot iBoot").unwrap();
+        // Encrypted payloads are block-aligned; pad the plaintext container.
+        compressed.resize(compressed.len().next_multiple_of(16), 0);
+        let ciphertext = crate::encrypt_cbc(&compressed, &key, &iv).unwrap();
+        let component = component_with_payload(b"ibec", &ciphertext);
+
+        assert_eq!(
+            decode_im4p_payload_with_key(&component, Some((&key, &iv))).unwrap(),
+            b"iBoot iBoot iBoot"
+        );
     }
 
     fn component_with_payload(tag: &[u8; 4], payload: &[u8]) -> Vec<u8> {
