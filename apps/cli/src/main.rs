@@ -206,6 +206,11 @@ enum RamdiskCommand {
     },
     /// Dump baseband firmware from the mounted root filesystem.
     DumpBaseband {
+        /// Product type of the connected 32-bit device.
+        #[arg(long)]
+        device: ProductType,
+        #[arg(long)]
+        ios_version: Option<String>,
         destination: PathBuf,
         #[arg(long)]
         device_id: Option<u32>,
@@ -4047,6 +4052,8 @@ async fn main() -> Result<()> {
         Command::Ramdisk {
             command:
                 RamdiskCommand::DumpBaseband {
+                    device,
+                    ios_version,
                     destination,
                     device_id,
                     username,
@@ -4055,11 +4062,14 @@ async fn main() -> Result<()> {
         } => {
             let ssh = connect_ramdisk_ssh(&kit, device_id, &username, host_key).await?;
             ssh.mount_filesystems(true).await?;
-            let dump = ssh.dump_baseband().await?;
+            let version = match ios_version {
+                Some(version) => version,
+                None => ssh.system_version().await?,
+            };
+            let request = legacy_ios_kit::BasebandDumpRequest::new(device.as_str(), &version)?;
+            ssh.mount_filesystems(false).await?;
+            let dump = kit.dump_baseband(&ssh, &request).await?;
             ssh.disconnect().await?;
-            if !legacy_ios_kit::tar_contains_entry(&dump, "bbticket.der") {
-                warn!("dump contains no bbticket.der");
-            }
             tokio::fs::write(&destination, dump)
                 .await
                 .with_context(|| format!("failed to write {}", destination.display()))?;

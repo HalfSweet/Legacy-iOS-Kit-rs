@@ -4,6 +4,7 @@
 
 mod alloc8;
 mod baseband;
+mod baseband_dump;
 mod bootstrap;
 mod classic;
 mod classic_post;
@@ -133,6 +134,8 @@ pub struct LegacyIosKit {
     leases: lease::DeviceLeaseRegistry,
     tss: legacy_ios_firmware::TssClient,
 }
+
+pub use baseband_dump::{BasebandDumpError, BasebandDumpRequest};
 
 impl LegacyIosKit {
     pub fn new() -> Self {
@@ -494,6 +497,15 @@ impl LegacyIosKit {
         original: Option<&[u8]>,
     ) -> Result<(), KitError> {
         hacktivate::revert_hacktivate(ssh, method, original).await
+    }
+
+    /// Export and normalize the mounted device's personalized baseband.
+    pub async fn dump_baseband(
+        &self,
+        ssh: &RamdiskSsh,
+        request: &BasebandDumpRequest,
+    ) -> Result<Vec<u8>, KitError> {
+        baseband_dump::dump(ssh, request).await
     }
 
     /// Query the highest completed FourThree step on the device.

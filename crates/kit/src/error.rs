@@ -4,6 +4,8 @@ use legacy_ios_core::{OperationPhase, Recoverability};
 
 #[derive(Debug, Error)]
 pub enum KitError {
+    #[error(transparent)]
+    BasebandDump(#[from] crate::baseband_dump::BasebandDumpError),
     #[error("bootloader device discovery failed: {0}")]
     Transport(#[from] legacy_ios_transport::TransportError),
     #[error("normal-mode device discovery failed: {0}")]
@@ -337,7 +339,8 @@ pub enum KitError {
 impl KitError {
     pub const fn stage(&self) -> OperationPhase {
         match self {
-            Self::Firmware(_)
+            Self::BasebandDump(_)
+            | Self::Firmware(_)
             | Self::FirmwareKey(_)
             | Self::RemoteFirmware(_)
             | Self::CustomIpsw(_)
@@ -517,7 +520,8 @@ impl KitError {
             Self::VersionMismatch { .. } | Self::TrollRestoreFindMyEnabled => {
                 Recoverability::ManualRecoveryRequired
             }
-            Self::Firmware(_)
+            Self::BasebandDump(_)
+            | Self::Firmware(_)
             | Self::FirmwareKey(_)
             | Self::RemoteFirmware(_)
             | Self::CustomIpsw(_)

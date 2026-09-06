@@ -10,6 +10,7 @@ default = []
 legacy-tls = ["legacy-ios-services/legacy-tls"]
 
 [dependencies]
+zip = { version = "=2.4.2", default-features = false, features = ["deflate"] }
 base64 = "=0.22.1"
 flate2 = "=1.1.10"
 futures-util = "0.3.31"

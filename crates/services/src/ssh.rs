@@ -410,23 +410,6 @@ impl RamdiskSsh {
             .await;
         Ok(())
     }
-
-    /// Build and fetch the baseband firmware tar from the mounted root
-    /// filesystem.
-    pub async fn dump_baseband(&self) -> Result<Vec<u8>, SshError> {
-        self.execute("cd /mnt1 && tar -cf /mnt2/tmp/baseband.tar usr/local/standalone/firmware")
-            .await?;
-        let check = self.execute("test -s /mnt2/tmp/baseband.tar").await?;
-        if !check.success() {
-            return Err(SshError::Scp("device did not produce baseband.tar".into()));
-        }
-        self.download(
-            &ScpPath::new("/mnt2/tmp/baseband.tar")
-                .map_err(|error| SshError::Scp(error.to_string()))?,
-            256 * 1024 * 1024,
-        )
-        .await
-    }
 }
 
 /// Activation record locations relative to the data partition, by iOS version.
