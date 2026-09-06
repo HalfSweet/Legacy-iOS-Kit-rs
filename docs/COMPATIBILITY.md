@@ -10,6 +10,13 @@ Legend: ✅ implemented · 🟡 partial / bounded · ❌ not implemented ·
 
 Normal-mode paired information reads, battery, AFC storage, and jailbreak inspection were verified on macOS with an iPod4,1 running iOS 6.1.6, using `legacy-tls`. The device was jailbroken through the upstream default path: Cydia was identified through SpringBoard plus SSH while AFC2 was unavailable. This does not validate restore, jailbreak execution, writes, or other device/host combinations.
 
+Device-level capability declarations live in `legacy-ios-assets`:
+`DeviceProfile::hardware_capabilities()` records what the hardware supports
+per the upstream baseline, `DeviceProfile::capabilities()` what the current
+entry points can execute, and `DeviceProfile::capability_gaps()` the
+difference (declared parity gaps). The tables below record entry-level
+status; ⚠️ marks offline-verified entries with no on-device record.
+
 ## Exploits / pwned DFU entry
 
 | Family | SoC | Method | Status |
@@ -25,11 +32,11 @@ Normal-mode paired information reads, battery, AFC storage, and jailbreak inspec
 
 | Feature | Status | Notes |
 |---|---|---|
-| SSH ramdisk boot 32/64-bit (`lik ramdisk boot`) | ✅ | iBSS/iBEC/ticket/ramdisk/devicetree/trustcache/kernel, custom boot-args |
+| SSH ramdisk boot 32/64-bit (`lik ramdisk boot`) | ✅ | iBSS/iBEC/ticket/ramdisk/devicetree/trustcache/kernel, custom boot-args; not applicable to iPhone10,\*/iPad6,\* (latest iOS 16) and the checkm8 iPads iPad6,\*/iPad7,\* (restore.sh:10667) |
 | Tethered just boot | ✅ | omit `--ramdisk` |
 | kDFU via kloader (`lik device enter-kdfu`) | ✅ | iBSS patch + kloader resource |
 | ramdisk SSH/SCP/push/pull | ✅ | |
-| onboard SHSH / activation / baseband dump | ✅ | version-aware paths |
+| onboard SHSH / activation / baseband dump | ✅ | version-aware paths; onboard blobs are not applicable to iPhone2,1/iPod3,1/iPad1,1 (restore.sh:8983); the 32-bit pwned-iBEC "go blobs" dump and IMG3-era raw dump conversion are not implemented |
 | NVRAM clear / erase iOS 7-8 / erase iOS 9+ / fix datetime | ✅ | |
 | iBoot32Patcher | ✅ | full Merculous patch set: RSA, debug, boot-args/env boot-args, cmd handler, ticket, local/remote boot, boot-partition(9), boot-ramdisk, setenv, disable-kaslr, bgcolor, logo/logo4, --433, dualboot |
 
@@ -38,12 +45,13 @@ Normal-mode paired information reads, battery, AFC storage, and jailbreak inspec
 | Feature | Status | Notes |
 |---|---|---|
 | Signed restore (TSS) 32/64-bit | ✅ | full restored/ASR/FDR/baseband chain |
-| Blob restore (provided/onboard ticket) | ✅ | |
+| Blob restore (provided/onboard ticket) | ✅ | not applicable to S5L8900 devices and iPod2,1 (restore.sh:9196) |
 | skip-blob pwned restore | ✅ | `--skip-blob` requires pwned boot chain |
 | SEP from file / no SEP | ✅ | `--sep` / `--no-sep` |
 | set-nonce from ticket generator | ✅ | `--set-nonce` |
 | iOS 3.x/4.x multipart two-stage restore | ✅ ⚠️ | part1 NOR IPSW (5.1.1 components, target iBoot/DeviceTree/AppleLogo, bundled ASR patch, APTicket scab); part2 built by `lik firmware powder-prepare`; `--skip-first` resume; optional `--part2-ticket` for upstream `-w` parity; hardware-unverified |
-| powdersn0w custom IPSW + restore | ✅ ⚠️ | builder (single/two-bundle/ios4powder) via `lik firmware powder-prepare`; single-stage powder restore via `lik restore powder` (A4 fetches the latest-version ticket from TSS, A5/A5X/A6/A6X take a base-version blob; kDFU/pwnDFU entry, external checkm8-a5/litera1n guidance); hardware-unverified |
+| powdersn0w custom IPSW + restore | ✅ ⚠️ | builder (single/two-bundle/ios4powder) via `lik firmware powder-prepare`; single-stage powder restore via `lik restore powder` (A4 fetches the latest-version ticket from TSS, A5/A5X/A6/A6X take a base-version blob; kDFU/pwnDFU entry, external checkm8-a5/litera1n guidance); latest-baseband replacement (`ipsw_bbreplace`) and baseband/activation tar merge are implemented at the library level (`with_baseband_replacement`, `with_extra_tars`), but automatic latest-baseband selection/download and CLI flags are missing; hardware-unverified |
+| 32-bit tethered downgrade restore ("Other (Tethered)") | ❌ | hardware-applicable on 32-bit devices past the S5L8900 except iPod2,1 (restore.sh:9196-9199); declared via `DeviceProfile::capability_gaps()` |
 | classic xpwn custom IPSW (old devices) | ✅ ⚠️ | builder via `lik firmware classic-prepare` (S5L8900 and S5L8720/8920/8922/A4 classic targets: jailbreak payload matrix, hacktivation lockdownd patch, 24kpwn/alloc8-era old mode, greenpois0n/aquila tars, baseband/activation tar merge, patchcomp/iOS 4.1 post-build steps); restore via `lik restore classic` (self-built; iPod2,1/iPhone2,1 require `--ticket`, upstream `-w`) and `lik restore custom-ipsw` (foreign, ticket-free, incl. iOS 2.x targets: S5L8900 enters stock WTF mode via buttons and gets the IPSW's own unpatched WTF, old-bootrom iPod2,1 enters 24kpwn DFU; pre-iOS 3 restored sessions skip HardwareInfo and answer FlashVersion1 NOR requests with the component-keyed dictionary; live baseband TSS for foreign IPSWs with a signable BasebandFirmware, else upstream's retry advice): pwnage-WTF/limera1n chain entry, per-component personalization, restored/ASR session; classic baseband replace (`ipsw_bbreplace`) is not applicable — upstream early-returns for `device_proc < 5` (restore.sh:4350); hardware-unverified (2.x WTF button entry, 2.x ramdisk handshake, live baseband TSS, old-ramdisk restored QueryValue replies, skipped RestoreLogo/setpicture and pre-bootx control transfer, iPod2,1 new bootrom cannot be pwned) |
 | RSEP send policy | ✅ | `--rsep` / `--no-rsep`; default sends RestoreSEP for iOS 16+ targets and whenever `--rdsk`/`--rkrn` overrides are set (the iPhone X flow always sends) |
 | Cryptex1 restore strategy (iOS 16+) | ✅ ⚠️ | boot-object answers (`SourceBootObjectV4`/`PersonalizedBootObjectV3` FileData streams), `BuildIdentityDict` with the source-identity rewrite, live Cryptex1/Cryptex1LocalPolicy TSS with source-identity retry; cryptex payloads default to the target IPSW (upstream `IDR_DISABLE_LATEST_CRYPTEX` path) or a user-provided latest IPSW via `--cryptex-ipsw`; `--no-cryptex` disables; hardware-unverified (FileData streaming, live cryptex TSS, identity rewrite) |

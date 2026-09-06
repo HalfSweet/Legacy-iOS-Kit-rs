@@ -123,20 +123,47 @@ impl DeviceProfile {
         self.aux.as_ref()
     }
 
+    /// Capabilities the current entry points can execute for this device:
+    /// [`DeviceProfile::hardware_capabilities`] minus
+    /// [`DeviceProfile::capability_gaps`]. Per-version, per-board, and
+    /// per-state constraints remain the restore planner's job; this set only
+    /// declares hardware-level applicability and entry-level executability.
+    /// Verification status (offline vs. on-device) is tracked per feature in
+    /// `docs/COMPATIBILITY.md`, not encoded here.
     pub fn capabilities(&self) -> CapabilitySet {
+        let gaps = self.capability_gaps();
+        CapabilitySet::from_capabilities(
+            self.hardware_capabilities()
+                .iter()
+                .filter(|capability| !gaps.contains(*capability)),
+        )
+    }
+
+    /// Capabilities the device's hardware supports in principle per the
+    /// upstream baseline, including ones with no executable entry point yet.
+    pub fn hardware_capabilities(&self) -> CapabilitySet {
         let mut capabilities = vec![
             Capability::Recovery,
             Capability::Dfu,
             Capability::PwnDfu,
             Capability::Restore,
-            Capability::BlobRestore,
-            Capability::OnboardShsh,
-            Capability::SshRamdisk,
             Capability::AppManagement,
             Capability::DataManagement,
         ];
+        if supports_blob_restore(self.soc, self.product_type.as_str()) {
+            capabilities.push(Capability::BlobRestore);
+        }
+        if supports_onboard_shsh(self.product_type.as_str()) {
+            capabilities.push(Capability::OnboardShsh);
+        }
+        if supports_ssh_ramdisk(self.product_type.as_str()) {
+            capabilities.push(Capability::SshRamdisk);
+        }
+        if supports_tethered_restore(self.soc, self.product_type.as_str()) {
+            capabilities.push(Capability::TetheredRestore);
+        }
         if is_32_bit(self.soc) {
-            capabilities.extend([Capability::TetheredRestore, Capability::Jailbreak]);
+            capabilities.push(Capability::Jailbreak);
         }
         if matches!(self.soc, Soc::A4 | Soc::A5 | Soc::A5x | Soc::A6 | Soc::A6x) {
             capabilities.push(Capability::KDfu);
@@ -151,6 +178,21 @@ impl DeviceProfile {
             capabilities.push(Capability::Hacktivation);
         }
         CapabilitySet::from_capabilities(capabilities)
+    }
+
+    /// Hardware-applicable capabilities the shipped entry points cannot
+    /// execute yet (upstream parity gaps).
+    pub fn capability_gaps(&self) -> CapabilitySet {
+        let mut gaps = Vec::new();
+        // The 32-bit tethered boot builder (upstream "Other (Tethered)",
+        // restore.sh:9197-9199) is not implemented.
+        if self
+            .hardware_capabilities()
+            .contains(Capability::TetheredRestore)
+        {
+            gaps.push(Capability::TetheredRestore);
+        }
+        CapabilitySet::from_capabilities(gaps)
     }
 }
 
@@ -167,6 +209,33 @@ const fn is_32_bit(soc: Soc) -> bool {
             | Soc::A6
             | Soc::A6x
     )
+}
+
+/// Upstream gates blob restores ("Other (Use SHSH Blobs)") to devices past
+/// the S5L8900, excluding iPod2,1 (restore.sh:9196).
+fn supports_blob_restore(soc: Soc, product_type: &str) -> bool {
+    soc != Soc::S5l8900 && product_type != "iPod2,1"
+}
+
+/// Upstream excludes iPhone2,1, iPod3,1, and iPad1,1 from onboard SHSH dumps
+/// (restore.sh:8983).
+fn supports_onboard_shsh(product_type: &str) -> bool {
+    !matches!(product_type, "iPhone2,1" | "iPod3,1" | "iPad1,1")
+}
+
+/// Upstream excludes devices whose latest release is iOS 16 (iPhone10,*,
+/// iPad6,*) and the checkm8 iPads (iPad[67],*) from the SSH ramdisk path
+/// (restore.sh:10667, with `device_checkm8ipad` set at restore.sh:1560).
+fn supports_ssh_ramdisk(product_type: &str) -> bool {
+    !(product_type.starts_with("iPhone10,")
+        || product_type.starts_with("iPad6,")
+        || product_type.starts_with("iPad7,"))
+}
+
+/// Upstream gates tethered restores ("Other (Tethered)") to 32-bit devices
+/// past the S5L8900, excluding iPod2,1 (restore.sh:9196-9199).
+fn supports_tethered_restore(soc: Soc, product_type: &str) -> bool {
+    is_32_bit(soc) && soc != Soc::S5l8900 && product_type != "iPod2,1"
 }
 
 fn supports_ota(product_type: &str) -> bool {
@@ -404,6 +473,76 @@ mod tests {
             .find_product(&ProductType::from("iPhone10,6"))
             .unwrap();
         assert!(!a11.capabilities().contains(Capability::Jailbreak));
+    }
+
+    #[test]
+    fn ssh_ramdisk_excludes_the_ios16_class_and_checkm8_ipads() {
+        // restore.sh:10667 excludes devices whose latest release is iOS 16
+        // (iPhone10,*, iPad6,*) and the checkm8 iPads (restore.sh:1560).
+        let database = DeviceDatabase::bundled();
+        for excluded in ["iPhone10,6", "iPad6,11", "iPad7,5"] {
+            let profile = database.find_product(&ProductType::from(excluded)).unwrap();
+            assert!(
+                !profile
+                    .hardware_capabilities()
+                    .contains(Capability::SshRamdisk),
+                "{excluded} must not declare SshRamdisk"
+            );
+        }
+        let a10 = database
+            .find_product(&ProductType::from("iPhone9,1"))
+            .unwrap();
+        assert!(a10.capabilities().contains(Capability::SshRamdisk));
+    }
+
+    #[test]
+    fn tethered_restore_is_a_hardware_capability_without_an_entry_point() {
+        // Hardware-applicable per restore.sh:9196-9199, but the 32-bit
+        // tethered boot builder is not implemented.
+        let database = DeviceDatabase::bundled();
+        let a5 = database
+            .find_product(&ProductType::from("iPhone4,1"))
+            .unwrap();
+        assert!(
+            a5.hardware_capabilities()
+                .contains(Capability::TetheredRestore)
+        );
+        assert!(a5.capability_gaps().contains(Capability::TetheredRestore));
+        assert!(!a5.capabilities().contains(Capability::TetheredRestore));
+
+        // S5L8900 and iPod2,1 are not hardware-applicable (restore.sh:9196).
+        for excluded in ["iPhone1,1", "iPod2,1"] {
+            let profile = database.find_product(&ProductType::from(excluded)).unwrap();
+            assert!(
+                !profile
+                    .hardware_capabilities()
+                    .contains(Capability::TetheredRestore),
+                "{excluded} must not declare TetheredRestore"
+            );
+        }
+    }
+
+    #[test]
+    fn blob_restore_and_onboard_shsh_follow_the_upstream_device_gates() {
+        // restore.sh:9196 (blob restores) and restore.sh:8983 (onboard blobs).
+        let database = DeviceDatabase::bundled();
+        let profile = |product: &str| {
+            database
+                .find_product(&ProductType::from(product))
+                .unwrap()
+                .hardware_capabilities()
+        };
+
+        assert!(!profile("iPhone1,1").contains(Capability::BlobRestore));
+        assert!(!profile("iPod2,1").contains(Capability::BlobRestore));
+        assert!(profile("iPhone2,1").contains(Capability::BlobRestore));
+        assert!(profile("iPhone8,1").contains(Capability::BlobRestore));
+
+        assert!(!profile("iPhone2,1").contains(Capability::OnboardShsh));
+        assert!(!profile("iPod3,1").contains(Capability::OnboardShsh));
+        assert!(!profile("iPad1,1").contains(Capability::OnboardShsh));
+        assert!(profile("iPhone1,1").contains(Capability::OnboardShsh));
+        assert!(profile("iPhone8,1").contains(Capability::OnboardShsh));
     }
 
     #[test]

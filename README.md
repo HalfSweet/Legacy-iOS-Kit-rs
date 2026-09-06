@@ -29,9 +29,10 @@ devices (iPhoneOS 1.x through iOS 16, S5L8900 through A11).
 
 ## Status
 
-**Development preview (`0.1.0`).** The feature surface of the upstream
-baseline is implemented, but most device-facing paths are **not yet
-verified on real hardware** — every such entry is marked ⚠️ in the
+**Development preview (`0.1.0`).** Most of the upstream baseline's feature
+surface is implemented (the remaining parity gaps are listed below), but
+most device-facing paths are **not yet verified on real hardware** — every
+such entry is marked ⚠️ in the
 [compatibility matrix](docs/COMPATIBILITY.md). Do not use this on devices
 holding data you care about.
 
@@ -173,6 +174,10 @@ lik ramdisk dump-onboard|dump-activation|dump-baseband ...
 lik ramdisk nvram-clear|fix-datetime|erase78|erase9 ...
 ```
 
+SSH ramdisks do not apply to the iOS-16-class devices (iPhone10,\*,
+iPad6,\*) or the checkm8 iPads (iPad6,\*/iPad7,\*); upstream excludes them
+from this path (restore.sh:10667).
+
 ### SHSH
 
 ```sh
@@ -243,8 +248,12 @@ authoritative per-feature record including hardware-verification caveats.
   mobileactivationd; state query and deactivate exist)
 - 32-bit onboard SHSH dump (pwned iBEC "go blobs") and IMG3-era raw dump
   conversion
-- Baseband dump stitching into powdersn0w IPSWs (`ipsw_bbreplace`; the
-  classic builder has it)
+- Automatic powdersn0w baseband replacement end-to-end (`ipsw_bbreplace`):
+  the library plans the latest-baseband swap and BuildManifest rewrite via
+  `with_baseband_replacement` (two-bundle builds, A5+ baseband devices) and
+  merges baseband/activation tars via `with_extra_tars` (the CLI wires
+  activation records), but automatic latest-baseband selection/download and
+  CLI flags for it are missing
 - 32-bit tethered-downgrade IPSW builds ("Other (Tethered)")
 - Disable/Enable Exploit for iOS 3.x (fdisk + exploit ramdisk)
 - Dump installed apps as IPA; standalone ramdisk OpenSSH install;
