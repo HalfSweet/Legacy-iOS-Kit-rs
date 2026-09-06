@@ -150,15 +150,21 @@ impl PreparedRestoreData {
             DataType::SourceBootObjectV4 | DataType::PersonalizedBootObjectV3 => {
                 Err(RestoreDispatchError::MissingData("boot object"))
             }
+            // PersonalizedData personalizes the `Arguments.ImageType` image
+            // per request (restore.c:5593) and URLAsset fetches
+            // `Arguments.RequestURL` over HTTP (restore.c:1261); both need a
+            // live resolver, so the static prepared data cannot answer them.
+            DataType::PersonalizedData => {
+                Err(RestoreDispatchError::MissingData("PersonalizedData"))
+            }
+            DataType::UrlAsset => Err(RestoreDispatchError::MissingData("URLAsset")),
             DataType::BuildIdentityDict => {
                 let identity = self
                     .build_identity
                     .clone()
                     .ok_or(RestoreDispatchError::MissingData("BuildIdentityDict"))?;
                 let variant = request
-                    .message()
-                    .get("Arguments")
-                    .and_then(Value::as_dictionary)
+                    .arguments()
                     .and_then(|arguments| arguments.get("Variant"))
                     .and_then(Value::as_string)
                     .unwrap_or("Erase");
@@ -199,6 +205,10 @@ fn response(
 pub enum DispatchAction {
     SystemImage,
     Send(Dictionary),
+    /// Send the response dictionary encoded as a binary plist frame instead
+    /// of XML (URLAsset responses; idevicerestore `_restore_service_send`
+    /// with `PLIST_FORMAT_BINARY`, restore.c:1335).
+    SendBinary(Dictionary),
     /// Stream the payload as a `FileData` chunk sequence terminated by
     /// `FileDataDone` (boot-object requests).
     FileData(Vec<u8>),
@@ -209,6 +219,9 @@ pub enum DispatchAction {
 #[derive(Clone, Debug)]
 pub enum DataResponse {
     Message(Dictionary),
+    /// Single response message sent as a binary plist frame instead of XML
+    /// (see `DispatchAction::SendBinary`).
+    BinaryMessage(Dictionary),
     FileData(Vec<u8>),
 }
 
@@ -394,6 +407,21 @@ mod tests {
         assert!(matches!(
             prepared.dispatch(&data_request("PersonalizedBootObjectV3", false)),
             Err(RestoreDispatchError::MissingData("boot object"))
+        ));
+    }
+
+    #[test]
+    fn url_asset_and_personalized_data_are_not_answered_from_static_data() {
+        // Live resolvers intercept these data types (like BasebandData); the
+        // static table must fail loudly instead of silently skipping them.
+        let prepared = PreparedRestoreData::default();
+        assert!(matches!(
+            prepared.dispatch(&data_request("URLAsset", false)),
+            Err(RestoreDispatchError::MissingData("URLAsset"))
+        ));
+        assert!(matches!(
+            prepared.dispatch(&data_request("PersonalizedData", false)),
+            Err(RestoreDispatchError::MissingData("PersonalizedData"))
         ));
     }
 }

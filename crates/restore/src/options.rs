@@ -8,6 +8,8 @@ pub struct RestoreOptions {
     system_partition_padding: Dictionary,
     baseband_updater_state: Option<Dictionary>,
     baseband_nonce: Option<Vec<u8>>,
+    supported_data_types: Option<Dictionary>,
+    supported_message_types: Option<Dictionary>,
 }
 
 impl RestoreOptions {
@@ -37,6 +39,8 @@ impl RestoreOptions {
             system_partition_padding,
             baseband_updater_state: None,
             baseband_nonce: None,
+            supported_data_types: None,
+            supported_message_types: None,
         }
     }
 
@@ -62,6 +66,27 @@ impl RestoreOptions {
     ) -> Self {
         self.baseband_updater_state = Some(updater_state);
         self.baseband_nonce = nonce;
+        self
+    }
+
+    /// Replace the declared `SupportedDataTypes` capability table. The
+    /// default table mirrors upstream idevicerestore's unconditional table
+    /// (`restore_supported_data_types`, "Extracted from ac2",
+    /// restore.c:5802), which declares every data type upstream implements;
+    /// use this to declare only the data types the caller actually answers,
+    /// so the device never requests data the host cannot provide.
+    pub fn with_supported_data_types(mut self, data_types: Dictionary) -> Self {
+        self.supported_data_types = Some(data_types);
+        self
+    }
+
+    /// Replace the declared `SupportedMessageTypes` capability table. As
+    /// with [`RestoreOptions::with_supported_data_types`], the default table
+    /// mirrors upstream idevicerestore's unconditional table
+    /// (`restore_supported_message_types`, "Extracted from ac2",
+    /// restore.c:5875).
+    pub fn with_supported_message_types(mut self, message_types: Dictionary) -> Self {
+        self.supported_message_types = Some(message_types);
         self
     }
 
@@ -94,10 +119,19 @@ impl RestoreOptions {
         );
         options.insert("UpdateBaseband".into(), self.update_baseband.into());
         options.insert("PersonalizedDuringPreflight".into(), true.into());
-        options.insert("SupportedDataTypes".into(), supported_data_types().into());
+        options.insert(
+            "SupportedDataTypes".into(),
+            self.supported_data_types
+                .clone()
+                .unwrap_or_else(supported_data_types)
+                .into(),
+        );
         options.insert(
             "SupportedMessageTypes".into(),
-            supported_message_types().into(),
+            self.supported_message_types
+                .clone()
+                .unwrap_or_else(supported_message_types)
+                .into(),
         );
         if let Some(boot_args) = &self.boot_args {
             options.insert("RestoreBootArgs".into(), boot_args.clone().into());
@@ -112,6 +146,9 @@ impl RestoreOptions {
     }
 }
 
+/// The default `SupportedDataTypes` table, mirroring upstream
+/// idevicerestore's unconditional capability table
+/// (`restore_supported_data_types`, "Extracted from ac2", restore.c:5802).
 fn supported_data_types() -> Dictionary {
     capability_dictionary(&[
         ("AuthInstallCACert", true),
@@ -186,6 +223,9 @@ fn supported_data_types() -> Dictionary {
     ])
 }
 
+/// The default `SupportedMessageTypes` table, mirroring upstream
+/// idevicerestore's unconditional capability table
+/// (`restore_supported_message_types`, "Extracted from ac2", restore.c:5875).
 fn supported_message_types() -> Dictionary {
     capability_dictionary(&[
         ("AsyncDataRequestMsg", true),
@@ -263,6 +303,33 @@ mod tests {
                 .get("DataRequestMsg")
                 .and_then(Value::as_boolean),
             Some(false)
+        );
+    }
+
+    #[test]
+    fn supported_type_overrides_replace_the_static_tables() {
+        let mut data_types = Dictionary::new();
+        data_types.insert("RootTicket".into(), false.into());
+        data_types.insert("SystemImageData".into(), false.into());
+        let mut message_types = Dictionary::new();
+        message_types.insert("StatusMsg".into(), false.into());
+
+        let options = RestoreOptions::erase()
+            .with_supported_data_types(data_types.clone())
+            .with_supported_message_types(message_types.clone())
+            .to_dictionary();
+
+        assert_eq!(
+            options
+                .get("SupportedDataTypes")
+                .and_then(Value::as_dictionary),
+            Some(&data_types)
+        );
+        assert_eq!(
+            options
+                .get("SupportedMessageTypes")
+                .and_then(Value::as_dictionary),
+            Some(&message_types)
         );
     }
 }

@@ -57,6 +57,9 @@ where
             async move {
                 match response {
                     DataResponse::Message(response) => data.send(port, &response).await?,
+                    DataResponse::BinaryMessage(response) => {
+                        data.send_binary(port, &response).await?;
+                    }
                     // Boot-object payloads stream over a single connection.
                     DataResponse::FileData(bytes) => data.send_file_data(port, &bytes).await?,
                 }
@@ -163,6 +166,13 @@ where
                             send_data_response(port, DataResponse::Message(response)).await?;
                         } else {
                             client.send(&response).await?;
+                        }
+                    }
+                    DispatchAction::SendBinary(response) => {
+                        if let Some(port) = data_port {
+                            send_data_response(port, DataResponse::BinaryMessage(response)).await?;
+                        } else {
+                            client.send_binary(&response).await?;
                         }
                     }
                     DispatchAction::FileData(data) => {
@@ -436,6 +446,144 @@ mod tests {
     fn adapts_legacy_progress_operations() {
         assert_eq!(adapt_operation(36, 13), 37);
         assert_eq!(adapt_operation(36, 14), 36);
+    }
+
+    async fn send_frame(stream: &mut tokio::io::DuplexStream, dictionary: &Dictionary) {
+        use tokio::io::AsyncWriteExt;
+
+        let mut payload = Vec::new();
+        Value::Dictionary(dictionary.clone())
+            .to_writer_xml(&mut payload)
+            .unwrap();
+        stream.write_u32(payload.len() as u32).await.unwrap();
+        stream.write_all(&payload).await.unwrap();
+        stream.flush().await.unwrap();
+    }
+
+    async fn receive_frame(stream: &mut tokio::io::DuplexStream) -> (Vec<u8>, Dictionary) {
+        use std::io::Cursor;
+
+        use tokio::io::AsyncReadExt;
+
+        let length = stream.read_u32().await.unwrap() as usize;
+        let mut payload = vec![0; length];
+        stream.read_exact(&mut payload).await.unwrap();
+        let dictionary = Value::from_reader(Cursor::new(payload.clone()))
+            .unwrap()
+            .into_dictionary()
+            .unwrap();
+        (payload, dictionary)
+    }
+
+    #[tokio::test]
+    async fn sends_binary_plist_frames_for_binary_dispatch_actions() {
+        let (client_stream, mut server_stream) = tokio::io::duplex(16 * 1024);
+        let mut client = RestoredClient::new(client_stream, "test");
+        let server = tokio::spawn(async move {
+            receive_frame(&mut server_stream).await; // StartRestore
+
+            let mut request = Dictionary::new();
+            request.insert("MsgType".into(), "DataRequestMsg".into());
+            request.insert("DataType".into(), "URLAsset".into());
+            send_frame(&mut server_stream, &request).await;
+
+            let (payload, response) = receive_frame(&mut server_stream).await;
+            assert!(
+                payload.starts_with(b"bplist00"),
+                "URLAsset responses are sent as binary plists"
+            );
+            assert_eq!(
+                response
+                    .get("ResponseStatus")
+                    .and_then(Value::as_unsigned_integer),
+                Some(200)
+            );
+
+            let mut status = Dictionary::new();
+            status.insert("MsgType".into(), "StatusMsg".into());
+            status.insert("Status".into(), 0_u64.into());
+            send_frame(&mut server_stream, &status).await;
+            receive_frame(&mut server_stream).await; // ReceivedFinalStatusMsg
+        });
+
+        let result = run_restored_with_dispatcher(
+            &mut client,
+            &RestoreOptions::erase(),
+            15,
+            |request| {
+                assert_eq!(request.data_type(), &DataType::UrlAsset);
+                let mut response = Dictionary::new();
+                response.insert("ResponseBody".into(), Value::Data(b"asset".to_vec()));
+                response.insert("ResponseBodyDone".into(), true.into());
+                response.insert("ResponseStatus".into(), 200_u64.into());
+                async move { Ok(DispatchAction::SendBinary(response)) }
+            },
+            |_| async { Ok(()) },
+            |_port, _response| async { Err(RestoreRunError::DataPortNotConfigured) },
+            |_| {},
+        )
+        .await;
+        server.await.unwrap();
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn routes_binary_responses_to_requested_data_port() {
+        let (client_stream, server_stream) = tokio::io::duplex(16 * 1024);
+        let mut client = RestoredClient::new(client_stream, "test");
+        let server = tokio::spawn(async move {
+            let mut framed = PlistFramed::new(server_stream);
+            framed.receive().await.unwrap();
+            let mut request = Dictionary::new();
+            request.insert("MsgType".into(), "DataRequestMsg".into());
+            request.insert("DataType".into(), "URLAsset".into());
+            request.insert("DataPort".into(), 2345_u64.into());
+            framed.send(&request).await.unwrap();
+
+            let mut status = Dictionary::new();
+            status.insert("MsgType".into(), "StatusMsg".into());
+            status.insert("Status".into(), 0_u64.into());
+            framed.send(&status).await.unwrap();
+            framed.receive().await.unwrap();
+        });
+        let responses = Arc::new(Mutex::new(Vec::new()));
+        let response_sink = responses.clone();
+
+        run_restored_with_dispatcher(
+            &mut client,
+            &RestoreOptions::erase(),
+            15,
+            |request| {
+                assert_eq!(request.data_type(), &DataType::UrlAsset);
+                let mut response = Dictionary::new();
+                response.insert("ResponseStatus".into(), 200_u64.into());
+                async move { Ok(DispatchAction::SendBinary(response)) }
+            },
+            |_| async { Ok(()) },
+            move |port, response| {
+                let response_sink = response_sink.clone();
+                async move {
+                    let DataResponse::BinaryMessage(response) = response else {
+                        panic!("expected a binary response message");
+                    };
+                    response_sink
+                        .lock()
+                        .expect("response mutex must remain available")
+                        .push((port, response));
+                    Ok(())
+                }
+            },
+            |_| {},
+        )
+        .await
+        .unwrap();
+        server.await.unwrap();
+
+        let responses = responses
+            .lock()
+            .expect("response mutex must remain available");
+        assert_eq!(responses[0].0, 2345);
+        assert!(responses[0].1.contains_key("ResponseStatus"));
     }
 
     #[tokio::test]

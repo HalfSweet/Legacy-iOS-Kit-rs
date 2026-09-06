@@ -82,6 +82,14 @@ where
         Ok(())
     }
 
+    /// Send a response dictionary as a binary plist frame instead of XML, as
+    /// upstream does for URLAsset responses (`_restore_service_send` with
+    /// `PLIST_FORMAT_BINARY`, restore.c:1335).
+    pub async fn send_binary(&mut self, message: &Dictionary) -> Result<(), RestoredError> {
+        self.framed.send_binary(message).await?;
+        Ok(())
+    }
+
     pub async fn next_message(&mut self) -> Result<RestoredMessage, RestoredError> {
         Ok(RestoredMessage::parse(self.framed.receive().await?))
     }
@@ -133,6 +141,8 @@ pub enum DataType {
     SourceBootObjectV4,
     PersonalizedBootObjectV3,
     BuildIdentityDict,
+    PersonalizedData,
+    UrlAsset,
     Unknown(String),
 }
 
@@ -155,6 +165,8 @@ impl DataType {
             "SourceBootObjectV4" => Self::SourceBootObjectV4,
             "PersonalizedBootObjectV3" => Self::PersonalizedBootObjectV3,
             "BuildIdentityDict" => Self::BuildIdentityDict,
+            "PersonalizedData" => Self::PersonalizedData,
+            "URLAsset" => Self::UrlAsset,
             value => Self::Unknown(value.to_owned()),
         }
     }
@@ -179,14 +191,21 @@ impl DataRequest {
         unsigned(&self.message, "DataPort").and_then(|port| u16::try_from(port).ok())
     }
 
+    /// The request's `Arguments` dictionary, when present. `URLAsset`
+    /// requests carry `RequestMethod` and `RequestURL` here (idevicerestore
+    /// `restore_send_url_asset`, restore.c:1261) and `PersonalizedData`
+    /// requests the `ImageType` of the image to personalize (dispatched to
+    /// `restore_send_image_data` at restore.c:5593).
+    pub fn arguments(&self) -> Option<&Dictionary> {
+        self.message.get("Arguments").and_then(Value::as_dictionary)
+    }
+
     /// Whether the request's `Arguments` carry the `FlashVersion1` flag, in
     /// which case the NOR response's `NorImageData` is a dictionary keyed by
     /// component name instead of an array (idevicerestore `restore_send_nor`,
     /// restore.c:1626 checks key presence, not the value).
     pub fn flash_version_1(&self) -> bool {
-        self.message
-            .get("Arguments")
-            .and_then(Value::as_dictionary)
+        self.arguments()
             .is_some_and(|arguments| arguments.contains_key("FlashVersion1"))
     }
 
@@ -196,9 +215,7 @@ impl DataRequest {
     /// `restore_send_personalized_boot_object_v3`).
     pub fn boot_object(&self) -> Result<BootObjectRequest, RestoredError> {
         let arguments = self
-            .message
-            .get("Arguments")
-            .and_then(Value::as_dictionary)
+            .arguments()
             .ok_or_else(|| RestoredError::MissingValue("Arguments".into()))?;
         let image_name = arguments
             .get("ImageName")
@@ -489,6 +506,51 @@ mod tests {
             };
             assert_eq!(request.data_type(), &expected);
         }
+    }
+
+    #[test]
+    fn parses_personalized_data_and_url_asset_types() {
+        for (name, expected) in [
+            ("PersonalizedData", DataType::PersonalizedData),
+            ("URLAsset", DataType::UrlAsset),
+        ] {
+            let mut message = Dictionary::new();
+            message.insert("MsgType".into(), "DataRequestMsg".into());
+            message.insert("DataType".into(), name.into());
+
+            let RestoredMessage::DataRequest(request) = RestoredMessage::parse(message) else {
+                panic!("expected data request");
+            };
+            assert_eq!(request.data_type(), &expected);
+        }
+    }
+
+    #[test]
+    fn exposes_request_arguments() {
+        let mut arguments = Dictionary::new();
+        arguments.insert("RequestMethod".into(), "GET".into());
+        arguments.insert("RequestURL".into(), "https://example.com/asset".into());
+        let mut message = Dictionary::new();
+        message.insert("MsgType".into(), "DataRequestMsg".into());
+        message.insert("DataType".into(), "URLAsset".into());
+        message.insert("Arguments".into(), arguments.into());
+
+        let RestoredMessage::DataRequest(request) = RestoredMessage::parse(message) else {
+            panic!("expected data request");
+        };
+        let arguments = request.arguments().expect("URLAsset carries Arguments");
+        assert_eq!(
+            arguments.get("RequestURL").and_then(Value::as_string),
+            Some("https://example.com/asset")
+        );
+
+        let mut message = Dictionary::new();
+        message.insert("MsgType".into(), "DataRequestMsg".into());
+        message.insert("DataType".into(), "RootTicket".into());
+        let RestoredMessage::DataRequest(request) = RestoredMessage::parse(message) else {
+            panic!("expected data request");
+        };
+        assert!(request.arguments().is_none());
     }
 
     #[test]

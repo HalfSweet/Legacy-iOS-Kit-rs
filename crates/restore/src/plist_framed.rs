@@ -26,6 +26,23 @@ where
     pub async fn send(&mut self, dictionary: &Dictionary) -> Result<(), PlistFrameError> {
         let mut payload = Vec::new();
         Value::Dictionary(dictionary.clone()).to_writer_xml(&mut payload)?;
+        self.send_payload(dictionary, &payload).await
+    }
+
+    /// Send a dictionary as a binary plist frame instead of XML
+    /// (idevicerestore `_restore_service_send` with `PLIST_FORMAT_BINARY`,
+    /// restore.c:690; the URLAsset response is sent this way, restore.c:1335).
+    pub async fn send_binary(&mut self, dictionary: &Dictionary) -> Result<(), PlistFrameError> {
+        let mut payload = Vec::new();
+        Value::Dictionary(dictionary.clone()).to_writer_binary(&mut payload)?;
+        self.send_payload(dictionary, &payload).await
+    }
+
+    async fn send_payload(
+        &mut self,
+        dictionary: &Dictionary,
+        payload: &[u8],
+    ) -> Result<(), PlistFrameError> {
         let length = u32::try_from(payload.len()).map_err(|_| PlistFrameError::FrameTooLarge {
             size: payload.len(),
             maximum: u32::MAX as usize,
@@ -36,7 +53,7 @@ where
             "sending plist frame"
         );
         self.stream.write_all(&length.to_be_bytes()).await?;
-        self.stream.write_all(&payload).await?;
+        self.stream.write_all(payload).await?;
         self.stream.flush().await?;
         Ok(())
     }
@@ -95,5 +112,27 @@ mod tests {
 
         sent.unwrap();
         assert_eq!(received.unwrap(), dictionary);
+    }
+
+    #[tokio::test]
+    async fn send_binary_writes_a_binary_plist_frame() {
+        let (left, mut right) = tokio::io::duplex(4096);
+        let mut writer = PlistFramed::new(left);
+        let mut dictionary = Dictionary::new();
+        dictionary.insert("ResponseStatus".into(), 200_u64.into());
+        let expected = dictionary.clone();
+
+        let send = tokio::spawn(async move { writer.send_binary(&dictionary).await });
+        let length = right.read_u32().await.unwrap() as usize;
+        let mut payload = vec![0; length];
+        right.read_exact(&mut payload).await.unwrap();
+        send.await.unwrap().unwrap();
+
+        assert!(
+            payload.starts_with(b"bplist00"),
+            "binary frames carry the binary plist magic"
+        );
+        let value = Value::from_reader(Cursor::new(payload)).unwrap();
+        assert_eq!(value.into_dictionary().unwrap(), expected);
     }
 }

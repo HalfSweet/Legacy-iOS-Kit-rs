@@ -139,6 +139,20 @@ impl RestoredDataConnector {
         Ok(())
     }
 
+    /// Send a single response dictionary as a binary plist frame over a data
+    /// port (URLAsset responses; idevicerestore `_restore_service_send` with
+    /// `PLIST_FORMAT_BINARY`, restore.c:1335).
+    pub async fn send_binary(
+        &self,
+        port: u16,
+        response: &Dictionary,
+    ) -> Result<(), RestoredConnectError> {
+        let stream = self.connect(port).await?;
+        let mut framed = PlistFramed::new(stream);
+        framed.send_binary(response).await?;
+        Ok(())
+    }
+
     /// Stream a boot-object payload as a `FileData` chunk sequence over a
     /// single data-port connection, terminated by `FileDataDone`
     /// (idevicerestore `_restore_send_file_data`).
