@@ -187,8 +187,7 @@ impl IbootClient {
         if self.uses_ios1_protocol() {
             self.upload_ios1(data).await?;
             let length = data.len();
-            let _ = self.device.reset().await;
-            drop(self);
+            self.reset().await?;
             let client = reconnect_legacy().await?;
             client
                 .send_command(&format!("setenv filesize {length}"))
@@ -202,7 +201,7 @@ impl IbootClient {
         self.upload(data, reenumerates).await?;
         if reenumerates {
             if self.mode != DeviceMode::Kis {
-                self.device.reset().await?;
+                self.reset().await?;
             }
             Ok(UploadResult::Reenumerating)
         } else {
@@ -211,7 +210,14 @@ impl IbootClient {
     }
 
     pub async fn reset(self) -> Result<(), RecoveryError> {
-        self.device.reset().await?;
+        // nusb rejects a reset while an interface is claimed. In particular,
+        // DFU manifestation must release interface 0 before re-enumerating.
+        // Keep the device alive, but never keep an interface across the reset.
+        let Self {
+            device, interface, ..
+        } = self;
+        drop(interface);
+        device.reset().await?;
         Ok(())
     }
 
@@ -898,6 +904,27 @@ pub enum RecoveryError {
     Usb(#[from] nusb::Error),
     #[error("USB control transfer failed: {0}")]
     Transfer(#[from] TransferError),
+}
+
+impl RecoveryError {
+    /// Stable, redacted diagnostic category for embedding applications.
+    pub fn diagnostic_code(&self) -> &'static str {
+        match self {
+            Self::Transfer(TransferError::Cancelled) | Self::TransferTimeout => {
+                "timeoutOrCancelled"
+            }
+            Self::Transfer(TransferError::Stall) => "stalled",
+            Self::NoDevice | Self::Transfer(TransferError::Disconnected) => "disconnected",
+            Self::Usb(error) if error.kind() == nusb::ErrorKind::Disconnected => "disconnected",
+            Self::Usb(_) => "access",
+            Self::UnexpectedDfuState(_)
+            | Self::MissingDfuState
+            | Self::MissingDfuStatus
+            | Self::DfuDownloadDidNotBecomeIdle
+            | Self::ShortTransfer { .. } => "unexpectedReply",
+            _ => "transport",
+        }
+    }
 }
 
 #[cfg(test)]

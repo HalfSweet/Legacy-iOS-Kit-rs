@@ -87,6 +87,7 @@ pub struct RamdiskBootOutcome;
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum RamdiskBootProgress {
     SendingComponent { name: &'static str, bytes: u64 },
+    SendingCommand { name: &'static str },
     WaitingForReconnect,
     Reconnected { mode: DeviceMode },
 }
@@ -122,7 +123,9 @@ pub async fn boot_ramdisk(
                 client = match client.upload_image(data).await? {
                     UploadResult::Connected(client) => *client,
                     UploadResult::Reenumerating => {
-                        tokio::time::sleep(Duration::from_millis(200)).await;
+                        // Match upstream's pause between bootloader stages;
+                        // re-enumeration may finish after reset returns.
+                        tokio::time::sleep(Duration::from_secs(1)).await;
                         progress(RamdiskBootProgress::WaitingForReconnect);
                         let client = wait_for_device(ecid, progress).await?;
                         progress(RamdiskBootProgress::Reconnected {
@@ -141,7 +144,10 @@ pub async fn boot_ramdisk(
                 client.upload_payload(data).await?;
             }
             RamdiskBootAction::Command(command) => {
-                debug!(%command, "sending iBoot command");
+                progress(RamdiskBootProgress::SendingCommand {
+                    name: command_stage(&command),
+                });
+                debug!(command = command_stage(&command), "sending iBoot command");
                 client.send_command(&command).await?;
             }
             RamdiskBootAction::Settle(duration) => tokio::time::sleep(duration).await,
@@ -158,6 +164,20 @@ pub async fn boot_ramdisk(
     }
     info!("ramdisk boot chain completed");
     Ok(RamdiskBootOutcome)
+}
+
+fn command_stage(command: &str) -> &'static str {
+    match command.split_whitespace().next() {
+        Some("go") => "runIbec",
+        Some("getenv") => "ramdiskDelay",
+        Some("ramdisk") => "activateRamdisk",
+        Some("devicetree") => "activateDeviceTree",
+        Some("setenv") => "bootArguments",
+        Some("bootx") => "bootKernel",
+        Some("ticket") => "ticket",
+        Some("firmware") => "trustCache",
+        _ => "bootCommand",
+    }
 }
 
 fn component<'a>(
@@ -327,6 +347,18 @@ pub enum RamdiskBootError {
     NotPwned,
     #[error(transparent)]
     Recovery(#[from] RecoveryError),
+}
+
+impl RamdiskBootError {
+    pub fn diagnostic_code(&self) -> &'static str {
+        match self {
+            Self::Recovery(error) => error.diagnostic_code(),
+            Self::ReconnectTimeout => "reconnectTimeout",
+            Self::NotPwned => "notPwned",
+            Self::MissingComponent(_) => "missingComponent",
+            _ => "unexpectedReply",
+        }
+    }
 }
 
 #[derive(Debug, Error)]

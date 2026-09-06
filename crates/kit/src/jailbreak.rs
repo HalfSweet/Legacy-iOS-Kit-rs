@@ -314,7 +314,7 @@ pub(crate) async fn install_jailbreak(
     if plan.remove_patcyh {
         run(
             ssh,
-            "cd /mnt1; rm Library/MobileSubstrate/DynamicLibraries/patcyh* \
+            "cd /mnt1 && rm -f Library/MobileSubstrate/DynamicLibraries/patcyh* \
              private/lib/dpkg/info/com.saurik.patcyh* usr/lib/libpatcyh.dylib",
         )
         .await?;
@@ -372,7 +372,7 @@ async fn upload_root(ssh: &RamdiskSsh, name: &str, data: &[u8]) -> Result<(), Ki
 async fn extract_root_tar(ssh: &RamdiskSsh, name: &str) -> Result<(), KitError> {
     run(
         ssh,
-        &format!("tar -xf /mnt1/{name} -C /mnt1; rm /mnt1/{name}"),
+        &format!("tar -xf /mnt1/{name} -C /mnt1 && rm -f /mnt1/{name}"),
     )
     .await
 }

@@ -70,7 +70,13 @@ impl RecoveryDevice {
     }
 
     pub async fn limera1n(self, payload: Vec<u8>) -> Result<Self, KitError> {
-        let client = Limera1n::new(payload)?.exploit(self.client).await?;
+        let client = if self.client.device_info().cpid() == Some(0x8930) {
+            legacy_ios_exploits::A4Limera1n::new(payload)?
+                .exploit(self.client)
+                .await?
+        } else {
+            Limera1n::new(payload)?.exploit(self.client).await?
+        };
         Ok(Self { client })
     }
 }

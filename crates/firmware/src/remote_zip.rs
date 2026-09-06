@@ -165,7 +165,12 @@ struct RemoteZipEntry {
 async fn discover_length(client: &reqwest::Client, url: &Url) -> Result<u64, RemoteFirmwareError> {
     if let Ok(response) = client.head(url.clone()).send().await
         && response.status().is_success()
-        && let Some(length) = response.content_length()
+        && let Some(length) = response
+            .headers()
+            .get(header::CONTENT_LENGTH)
+            .and_then(|value| value.to_str().ok())
+            .and_then(|value| value.parse::<u64>().ok())
+            .filter(|length| *length > 0)
     {
         return Ok(length);
     }
@@ -444,6 +449,37 @@ mod tests {
     use zip::{ZipWriter, write::SimpleFileOptions};
 
     use super::*;
+
+    #[tokio::test]
+    async fn head_uses_header_length_instead_of_the_empty_body_size() {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = tokio::spawn(async move {
+            let (mut stream, _) = listener.accept().await.unwrap();
+            let mut request = [0; 1024];
+            let count = stream.read(&mut request).await.unwrap();
+            assert!(
+                std::str::from_utf8(&request[..count])
+                    .unwrap()
+                    .starts_with("HEAD ")
+            );
+            stream
+                .write_all(
+                    b"HTTP/1.1 200 OK\r\nContent-Length: 888894104\r\nConnection: close\r\n\r\n",
+                )
+                .await
+                .unwrap();
+        });
+        let url = Url::parse(&format!("http://{address}/firmware.ipsw")).unwrap();
+        assert_eq!(
+            discover_length(&reqwest::Client::new(), &url)
+                .await
+                .unwrap(),
+            888894104
+        );
+        server.await.unwrap();
+    }
 
     #[test]
     fn parses_central_directory() {

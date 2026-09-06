@@ -522,7 +522,9 @@ impl HfsImage {
     pub fn untar(&mut self, archive: &[u8]) -> Result<(), HfsError> {
         let entries = parse_tar(archive)?;
         let mut updated = self.clone();
-        for entry in entries {
+        for mut entry in entries {
+            entry.path =
+                updated.tar_destination(&entry.path, entry.kind == TarEntryKind::Directory)?;
             let exists = updated.volume()?.exists(&entry.path)?;
             if exists {
                 let kind = updated.volume()?.stat(&entry.path)?.kind;
@@ -550,6 +552,56 @@ impl HfsImage {
         }
         *self = updated;
         Ok(())
+    }
+
+    /// Resolve directory links inside the image, never on the host. Preserve
+    /// a final file/link entry's replacement semantics while allowing stock
+    /// root links such as /etc -> private/etc to receive archive children.
+    fn tar_destination(&self, path: &str, follow_final: bool) -> Result<String, HfsError> {
+        let mut current = path.to_owned();
+        for _ in 0..16 {
+            let parts: Vec<_> = current.split('/').filter(|part| !part.is_empty()).collect();
+            let mut replaced = None;
+            for index in 0..parts.len() {
+                if index + 1 == parts.len() && !follow_final {
+                    break;
+                }
+                let prefix = format!("/{}", parts[..=index].join("/"));
+                if self
+                    .stat(&prefix)
+                    .is_ok_and(|stat| stat.kind() == HfsEntryKind::Symlink)
+                {
+                    let bytes = self.read(&prefix)?;
+                    let target =
+                        std::str::from_utf8(&bytes).map_err(|_| HfsError::InvalidTarPath)?;
+                    let mut resolved = if target.starts_with('/') {
+                        Vec::new()
+                    } else {
+                        parts[..index].to_vec()
+                    };
+                    for part in target.split('/') {
+                        match part {
+                            "" | "." => {}
+                            ".." => {
+                                resolved.pop().ok_or(HfsError::InvalidTarPath)?;
+                            }
+                            part => resolved.push(part),
+                        }
+                    }
+                    resolved.extend_from_slice(&parts[index + 1..]);
+                    if resolved.is_empty() {
+                        return Err(HfsError::InvalidTarPath);
+                    }
+                    replaced = Some(format!("/{}", resolved.join("/")));
+                    break;
+                }
+            }
+            match replaced {
+                Some(path) => current = path,
+                None => return Ok(current),
+            }
+        }
+        Err(HfsError::InvalidTarPath)
     }
 
     pub fn move_entry(&mut self, source: &str, destination: &str) -> Result<(), HfsError> {
@@ -968,6 +1020,15 @@ fn parse_tar(archive: &[u8]) -> Result<Vec<TarEntry>, HfsError> {
         } else {
             format!("{prefix}/{name}")
         };
+        // Many upstream archives include a ./ directory header. Keep the
+        // existing image root metadata and reject root entries with data.
+        if matches!(source_path.as_str(), "." | "./") && header[156] == b'5' {
+            if tar_number(&header[124..136])? != 0 {
+                return Err(HfsError::InvalidTarArchive);
+            }
+            offset += 512;
+            continue;
+        }
         let path = tar_path(&source_path)?;
         let mode = u16::try_from(tar_number(&header[100..108])?)
             .map_err(|_| HfsError::InvalidTarArchive)?;
@@ -1610,6 +1671,45 @@ mod tests {
         archive.extend_from_slice(&header);
         archive.extend_from_slice(data);
         archive.resize(archive.len().next_multiple_of(512), 0);
+    }
+
+    #[test]
+    fn imports_root_tar_header_and_etc_children_without_replacing_stock_link() {
+        let mut image = growable_image();
+        image.grow(32 * 4096).unwrap();
+        image.mkdir("/private").unwrap();
+        image.mkdir("/private/etc").unwrap();
+        image.add_symlink("/etc", "private/etc").unwrap();
+        let mut archive = Vec::new();
+        append_tar_entry(&mut archive, "./", b'5', &[], "", (0o755, 0, 0));
+        append_tar_entry(&mut archive, "./etc/", b'5', &[], "", (0o755, 0, 0));
+        append_tar_entry(
+            &mut archive,
+            "./etc/config",
+            b'0',
+            b"config",
+            "",
+            (0o644, 0, 0),
+        );
+        image.untar(&archive).unwrap();
+        assert_eq!(image.read("/etc").unwrap(), b"private/etc");
+        assert_eq!(image.read("/private/etc/config").unwrap(), b"config");
+    }
+
+    #[test]
+    fn tar_link_resolution_rejects_cycles_and_paths_above_image_root() {
+        let mut image = growable_image();
+        image.grow(32 * 4096).unwrap();
+        image.add_symlink("/loop", "loop").unwrap();
+        image.add_symlink("/escape", "../outside").unwrap();
+        for path in ["loop/file", "escape/file"] {
+            let mut archive = Vec::new();
+            append_tar_entry(&mut archive, path, b'0', b"x", "", (0o644, 0, 0));
+            assert!(matches!(
+                image.untar(&archive),
+                Err(HfsError::InvalidTarPath)
+            ));
+        }
     }
 
     #[test]

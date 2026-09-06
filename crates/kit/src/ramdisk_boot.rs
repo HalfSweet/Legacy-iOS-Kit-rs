@@ -136,6 +136,9 @@ async fn execute(
             RamdiskBootProgress::WaitingForReconnect => {
                 callback_emitter.try_emit(OperationEvent::DeviceDisconnected);
             }
+            RamdiskBootProgress::SendingCommand { name } => {
+                tracing::debug!(command = name, "sending ramdisk boot command");
+            }
             RamdiskBootProgress::Reconnected { mode } => {
                 callback_emitter.try_emit(OperationEvent::ModeChanged { mode });
             }
