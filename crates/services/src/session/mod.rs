@@ -145,11 +145,12 @@ impl DeviceSession {
             .filter(|port| *port != 0)
             .ok_or(ServiceError::UnexpectedValue("Port"))?;
         let mut connection = device.connect_port(port).await?;
-        if response
-            .get("EnableServiceSSL")
-            .and_then(Value::as_boolean)
-            .unwrap_or(false)
-        {
+        let secure = match response.get("EnableServiceSSL") {
+            None => false,
+            Some(Value::Boolean(secure)) => *secure,
+            Some(_) => return Err(ServiceError::UnexpectedValue("EnableServiceSSL")),
+        };
+        if secure {
             connection = upgrade(connection, &self.credentials.0, self.profile).await?;
         }
         Ok(connection)

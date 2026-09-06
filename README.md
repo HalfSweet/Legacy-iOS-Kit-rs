@@ -71,6 +71,8 @@ Use `kit.devices().session(&udid)` to batch `get_value` calls, then `close()` th
 cargo run -p legacy-ios-services --features legacy-tls --example read_legacy_device
 ```
 
+`kit.devices().inspect(&udid)` / `NormalDevice::inspect()` return a paired snapshot with protected metadata, battery, storage, SSH response status, and jailbreak evidence. Inspection only reads services: it never pairs, starts an SSH login, launches Cydia, or changes the device. Missing AFC2 does not imply a stock device. Cydia registered in SpringBoard together with a live SSH response is also positive evidence; optional fields stay unknown when unavailable. Transport failures abort the session instead of reusing a partially read protocol stream.
+
 ## Configuration
 
 Resolution order: CLI flags > `LIK_*` environment variables > user
@@ -101,6 +103,7 @@ Trust prompts, replugging) surface as step-by-step prompts.
 
 ```sh
 lik device list                 # all attached devices, every USB mode
+lik device inspect <udid>        # paired properties and jailbreak evidence
 lik device host-requirements    # diagnose udev / drivers / contention
 lik device pair <udid>
 lik device battery|activation|syslog|restart|shutdown <udid>

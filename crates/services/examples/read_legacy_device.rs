@@ -9,27 +9,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         if info.product_type().as_str() != "iPod4,1" {
             continue;
         }
-        let mut session = device.session().await?;
-        let battery = session
-            .get_value(
-                Some("BatteryCurrentCapacity"),
-                Some("com.apple.mobile.battery"),
-            )
-            .await?;
-        let serial = session.get_value(Some("SerialNumber"), None).await?;
-        session.close().await?;
-        let storage = device.files().await?.storage_info().await?;
+        let inspection = device.inspect().await?;
         println!(
-            "model={} os={} battery={} serial_readable={} storage_bytes={} free_bytes={}",
+            "model={} os={} battery={:?} serial_readable={} jailbreak={:?} ssh={:?} issues={:?}",
             info.product_type(),
             info.product_version(),
-            battery
-                .as_unsigned_integer()
-                .ok_or("battery value missing")?,
-            serial.as_string().is_some_and(|value| !value.is_empty()),
-            storage.total_bytes(),
-            storage.free_bytes()
+            inspection.battery_percent(),
+            inspection.serial_number().is_some(),
+            inspection.jailbreak(),
+            inspection.ssh_available(),
+            inspection.issues()
         );
+        if let Some(storage) = inspection.storage() {
+            println!(
+                "storage_bytes={} free_bytes={}",
+                storage.total_bytes(),
+                storage.free_bytes()
+            );
+        }
     }
     Ok(())
 }

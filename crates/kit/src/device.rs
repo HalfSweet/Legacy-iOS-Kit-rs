@@ -151,6 +151,14 @@ impl DeviceManager {
         Ok(())
     }
 
+    /// Read normal-mode device properties and positive jailbreak evidence.
+    pub async fn inspect(
+        &self,
+        udid: &Udid,
+    ) -> Result<legacy_ios_services::DeviceInspection, KitError> {
+        Ok(self.find_normal(udid).await?.inspect().await?)
+    }
+
     /// Batch protected device-property reads using an existing pairing.
     pub async fn session(
         &self,

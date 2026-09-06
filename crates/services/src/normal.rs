@@ -429,29 +429,7 @@ impl NormalDevice {
             }
             Err(error) => return Err(error),
         };
-        let hardware_model = get_string(&values, "HardwareModel")?;
-        let product_type = if hardware_model.eq_ignore_ascii_case("n81ap") {
-            "iPod4,1".into()
-        } else {
-            get_string(&values, "ProductType")?
-        };
-        let product_version = get_string(&values, "ProductVersion")?;
-        let build_version = get_string(&values, "BuildVersion")?;
-        let ecid = values
-            .get("UniqueChipID")
-            .and_then(Value::as_unsigned_integer)
-            .ok_or(ServiceError::UnexpectedValue("UniqueChipID"))?;
-        let device_name = get_string(&values, "DeviceName")?;
-
-        let info = NormalDeviceInfo {
-            udid: self.udid.clone(),
-            ecid: Ecid::new(ecid),
-            product_type: ProductType::new(product_type),
-            board_config: BoardConfig::new(normalize_board_config(&hardware_model)),
-            product_version,
-            build_version,
-            device_name,
-        };
+        let info = NormalDeviceInfo::from_values(self.udid.clone(), &values)?;
         info!(
             product_type = %info.product_type,
             version = %info.product_version,
@@ -639,6 +617,33 @@ pub struct NormalDeviceInfo {
 }
 
 impl NormalDeviceInfo {
+    pub(crate) fn from_values(udid: Udid, values: &Dictionary) -> Result<Self, ServiceError> {
+        let hardware_model = get_string(values, "HardwareModel")?;
+        let product_type = if hardware_model.eq_ignore_ascii_case("n81ap") {
+            "iPod4,1".into()
+        } else {
+            get_string(values, "ProductType")?
+        };
+        let product_version = get_string(values, "ProductVersion")?;
+        let build_version = get_string(values, "BuildVersion")?;
+        let ecid = values
+            .get("UniqueChipID")
+            .and_then(Value::as_unsigned_integer)
+            .ok_or(ServiceError::UnexpectedValue("UniqueChipID"))?;
+        let device_name = get_string(values, "DeviceName")?;
+
+        let info = NormalDeviceInfo {
+            udid,
+            ecid: Ecid::new(ecid),
+            product_type: ProductType::new(product_type),
+            board_config: BoardConfig::new(normalize_board_config(&hardware_model)),
+            product_version,
+            build_version,
+            device_name,
+        };
+        Ok(info)
+    }
+
     pub fn udid(&self) -> &Udid {
         &self.udid
     }

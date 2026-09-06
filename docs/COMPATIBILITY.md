@@ -6,7 +6,9 @@ feature baseline (upstream commit `1ff4be07ea2946ccaeff2db60c4426488b8f6e32`).
 Legend: ✅ implemented · 🟡 partial / bounded · ❌ not implemented ·
 ⚠️ implemented but not yet verified on hardware.
 
-**Everything below is ⚠️ until the hardware acceptance matrix has been run.**
+**Entries remain ⚠️ unless a specific hardware check is recorded.**
+
+Normal-mode paired information reads, battery, AFC storage, and jailbreak inspection were verified on macOS with an iPod4,1 running iOS 6.1.6, using `legacy-tls`. The device was jailbroken through the upstream default path: Cydia was identified through SpringBoard plus SSH while AFC2 was unavailable. This does not validate restore, jailbreak execution, writes, or other device/host combinations.
 
 ## Exploits / pwned DFU entry
 

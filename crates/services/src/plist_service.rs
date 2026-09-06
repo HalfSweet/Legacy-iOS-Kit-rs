@@ -30,15 +30,20 @@ where
     }
 
     pub(crate) async fn receive(&mut self) -> Result<Dictionary, ServiceError> {
+        self.receive_value()
+            .await?
+            .into_dictionary()
+            .ok_or(ServiceError::PlistNotDictionary)
+    }
+
+    pub(crate) async fn receive_value(&mut self) -> Result<Value, ServiceError> {
         let length = self.stream.read_u32().await? as usize;
         if length > MAX_FRAME_SIZE {
             return Err(ServiceError::FrameTooLarge);
         }
         let mut data = vec![0; length];
         self.stream.read_exact(&mut data).await?;
-        Value::from_reader(Cursor::new(data))?
-            .into_dictionary()
-            .ok_or(ServiceError::PlistNotDictionary)
+        Ok(Value::from_reader(Cursor::new(data))?)
     }
 
     /// Hand back the underlying stream, e.g. after a handshake that switches

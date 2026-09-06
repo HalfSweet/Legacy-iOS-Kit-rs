@@ -512,6 +512,8 @@ enum DeviceCommand {
     HostRequirements,
     /// Pair a normal-mode device through the configured backend.
     Pair { udid: Udid },
+    /// Inspect properties, paired services, and jailbreak evidence without device writes.
+    Inspect { udid: Udid },
     /// Read battery diagnostics from a paired normal-mode device.
     Battery { udid: Udid },
     /// Query the device activation state.
@@ -1995,6 +1997,47 @@ async fn main() -> Result<()> {
                 .await
                 .context("failed to pair device")?;
             write_message(output, "paired", &udid)?;
+        }
+        Command::Device {
+            command: DeviceCommand::Inspect { udid },
+        } => {
+            let inspection = kit
+                .devices()
+                .inspect(&udid)
+                .await
+                .context("failed to inspect device")?;
+            let stdout = io::stdout();
+            let mut writer = stdout.lock();
+            match output {
+                OutputFormat::Json => {
+                    serde_json::to_writer_pretty(&mut writer, &inspection)?;
+                    writeln!(writer)?;
+                }
+                OutputFormat::Human => {
+                    writeln!(
+                        writer,
+                        "{} iOS {}",
+                        inspection.info().product_type(),
+                        inspection.info().product_version()
+                    )?;
+                    writeln!(writer, "Jailbreak: {:?}", inspection.jailbreak())?;
+                    writeln!(writer, "SSH responding: {:?}", inspection.ssh_available())?;
+                    if let Some(battery) = inspection.battery_percent() {
+                        writeln!(writer, "Battery: {battery}%")?;
+                    }
+                    if let Some(storage) = inspection.storage() {
+                        writeln!(
+                            writer,
+                            "Storage: {} bytes free / {} bytes",
+                            storage.free_bytes(),
+                            storage.total_bytes()
+                        )?;
+                    }
+                    for issue in inspection.issues() {
+                        writeln!(writer, "Unconfirmed: {issue:?}")?;
+                    }
+                }
+            }
         }
         Command::Device {
             command: DeviceCommand::Battery { udid },

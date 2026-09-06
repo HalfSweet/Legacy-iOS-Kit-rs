@@ -7,6 +7,7 @@ mod app;
 mod backup;
 mod file_relay;
 mod files;
+mod inspection;
 mod mbdb;
 mod normal;
 mod plist_service;
@@ -22,6 +23,7 @@ pub use backup::{BackupError, BackupOptions, BackupOutcome, BackupPassword, Back
 pub use files::{
     AfcPath, AfcPathError, DeviceFileInfo, DeviceFileKind, DeviceFiles, DeviceStorageInfo,
 };
+pub use inspection::{DeviceInspection, InspectionIssue, JailbreakEvidence, JailbreakStatus};
 pub use mbdb::{Mbdb, MbdbError, MbdbRecord, mode};
 pub use normal::{
     DeviceSyslog, DirectMux, MuxDevice, NormalBackend, NormalDevice, NormalDeviceInfo, NormalMux,

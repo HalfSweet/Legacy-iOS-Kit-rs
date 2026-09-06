@@ -84,9 +84,10 @@ pub use legacy_ios_image::{
 pub use legacy_ios_services::{
     ActivationState, AfcPath, AfcPathError, AppFilter, BackupOptions, BackupOutcome,
     BackupPassword, BackupRestoreOptions, DeviceFileInfo, DeviceFileKind, DeviceFiles,
-    DeviceSession, DeviceStorageInfo, DeviceSyslog, HostKeyPolicy, InstalledApp, NormalBackend,
-    RamdiskSsh, ScpPath, ScpPathError, SshCommandOutput, SshPassword, SshTarget,
-    tar_contains_entry, tar_extract_entry,
+    DeviceInspection, DeviceSession, DeviceStorageInfo, DeviceSyslog, HostKeyPolicy,
+    InspectionIssue, InstalledApp, JailbreakEvidence, JailbreakStatus, NormalBackend, RamdiskSsh,
+    ScpPath, ScpPathError, SshCommandOutput, SshPassword, SshTarget, tar_contains_entry,
+    tar_extract_entry,
 };
 pub use legacy_ios_transport::{
     HostRequirement, HostRequirementCode, RecoveryDeviceInfo, UsbAccess, UsbHostDevice,
