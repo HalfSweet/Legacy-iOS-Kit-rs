@@ -95,11 +95,12 @@ pub use legacy_ios_transport::{
     UsbHostDiagnostics,
 };
 pub use legacy_ios_workflows::{
-    BasebandPolicy, BootComponentOverrides, CryptexPolicy, CryptexSource, DestructiveConsent,
-    ExploitPolicy, NoncePolicy, PlanId, RamdiskBootComponent, RamdiskBootPlan,
-    RamdiskBootPlanError, RamdiskBootPlanStep, RamdiskBootRequest, RamdiskBootStepKind,
-    RestoreComponent, RestorePlan, RestorePlanError, RestoreRequest, RestoreStep, RestoreStepKind,
-    RsepPolicy, SepPolicy, TicketPolicy,
+    AppleDbCatalog, AuxBasebandResolution, AuxCatalogFuture, AuxFirmwareCatalog, AuxFirmwareError,
+    AuxFirmwareResolution, AuxFirmwareSource, BasebandPolicy, BootComponentOverrides,
+    CryptexPolicy, CryptexSource, DestructiveConsent, ExploitPolicy, NoncePolicy, PlanId,
+    RamdiskBootComponent, RamdiskBootPlan, RamdiskBootPlanError, RamdiskBootPlanStep,
+    RamdiskBootRequest, RamdiskBootStepKind, RestoreComponent, RestorePlan, RestorePlanError,
+    RestoreRequest, RestoreStep, RestoreStepKind, RsepPolicy, SepPolicy, TicketPolicy,
 };
 pub use multipart::{
     MULTIPART_IBOOT_BOOT_ARGS, MULTIPART_IBOOT_BOOT_ARGS_VERBOSE, MULTIPART_NOR_BUILD,
@@ -332,8 +333,11 @@ impl LegacyIosKit {
         Ok(DeviceIdentity::new(product_type, profile.soc()).with_board_config(board_config))
     }
 
-    pub fn plan_restore(&self, request: RestoreRequest) -> Result<RestorePlan, KitError> {
-        Ok(RestorePlan::resolve(request)?)
+    /// Plan a restore. When the device tables select an auxiliary
+    /// (SEP/baseband) build different from the target build, this resolves
+    /// the aux BuildManifest through appledb at plan time.
+    pub async fn plan_restore(&self, request: RestoreRequest) -> Result<RestorePlan, KitError> {
+        Ok(RestorePlan::resolve(request).await?)
     }
 
     pub fn plan_ramdisk_boot(

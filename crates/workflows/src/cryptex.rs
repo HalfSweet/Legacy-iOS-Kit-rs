@@ -461,7 +461,7 @@ mod tests {
     #[tokio::test]
     async fn answers_boot_objects_from_the_target_ipsw() {
         let firmware = cryptex_firmware_fixture();
-        let resolver = resolver_fixture(&firmware, None);
+        let resolver = resolver_fixture(&firmware, None).await;
 
         let restore_version = boot_request("PersonalizedBootObjectV3", "__RestoreVersion__", None);
         let data = resolver.boot_object(&restore_version).await.unwrap();
@@ -514,16 +514,16 @@ mod tests {
         writer.write_all(b"source-sysos").unwrap();
         writer.finish().unwrap();
 
-        let resolver = resolver_fixture(&target, Some(source.path()));
+        let resolver = resolver_fixture(&target, Some(source.path())).await;
         let sysos = boot_request("SourceBootObjectV4", "Cryptex1,SystemOS", None);
         let data = resolver.boot_object(&sysos).await.unwrap();
         assert_eq!(data, b"source-sysos");
     }
 
-    #[test]
-    fn merges_cryptex_tss_parameters() {
+    #[tokio::test]
+    async fn merges_cryptex_tss_parameters() {
         let firmware = cryptex_firmware_fixture();
-        let resolver = resolver_fixture(&firmware, None);
+        let resolver = resolver_fixture(&firmware, None).await;
 
         let mut info = Dictionary::new();
         info.insert("Cryptex1,ChipID".into(), 0x8020_u64.into());
@@ -586,10 +586,10 @@ mod tests {
         );
     }
 
-    #[test]
-    fn cryptex_parameters_require_device_generated_request() {
+    #[tokio::test]
+    async fn cryptex_parameters_require_device_generated_request() {
         let firmware = cryptex_firmware_fixture();
-        let resolver = resolver_fixture(&firmware, None);
+        let resolver = resolver_fixture(&firmware, None).await;
 
         let mut arguments = Dictionary::new();
         arguments.insert("MessageArgInfo".into(), Dictionary::new().into());
@@ -640,7 +640,7 @@ mod tests {
         request
     }
 
-    fn resolver_fixture(firmware: &NamedTempFile, source: Option<&Path>) -> CryptexResolver {
+    async fn resolver_fixture(firmware: &NamedTempFile, source: Option<&Path>) -> CryptexResolver {
         let plan = RestorePlan::resolve(RestoreRequest {
             device: DeviceIdentity::new(ProductType::from("iPhone10,3"), Soc::A11)
                 .with_board_config(BoardConfig::from("d22"))
@@ -649,7 +649,9 @@ mod tests {
             behavior: RestoreBehavior::Erase,
             ticket: TicketPolicy::Skip,
             baseband: BasebandPolicy::None,
-            sep: SepPolicy::Auto,
+            // Cryptex handling is independent of the aux SEP firmware, and
+            // resolving one would require the network.
+            sep: SepPolicy::None,
             rsep: RsepPolicy::Auto,
             cryptex: CryptexPolicy::Auto,
             cryptex_source: source.map_or(CryptexSource::Target, |path| {
@@ -660,6 +662,7 @@ mod tests {
             rdsk: None,
             rkrn: None,
         })
+        .await
         .unwrap();
         CryptexResolver::new(&plan, Dictionary::new(), TssClient::new()).unwrap()
     }

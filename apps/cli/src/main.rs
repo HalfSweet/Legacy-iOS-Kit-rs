@@ -3471,6 +3471,7 @@ async fn main() -> Result<()> {
                     rdsk,
                     rkrn,
                 })
+                .await
                 .context("failed to resolve restore plan")?;
             write_restore_plan(output, &plan)?;
         }
@@ -3503,37 +3504,40 @@ async fn main() -> Result<()> {
                 },
         } => {
             let device = kit.resolve_device_identity(device, board)?.with_ecid(ecid);
-            let plan = kit.plan_restore(RestoreRequest {
-                device,
-                firmware,
-                behavior: behavior.into(),
-                ticket: if skip_blob {
-                    TicketPolicy::Skip
-                } else {
-                    ticket
-                        .clone()
-                        .map_or(TicketPolicy::Signed, TicketPolicy::Provided)
-                },
-                baseband: if no_baseband {
-                    BasebandPolicy::None
-                } else if let Some(baseband) = baseband {
-                    BasebandPolicy::Provided(baseband)
-                } else {
-                    BasebandPolicy::Auto
-                },
-                sep: if no_sep {
-                    SepPolicy::None
-                } else {
-                    sep.map_or(SepPolicy::Auto, SepPolicy::Provided)
-                },
-                rsep: rsep_policy(rsep, no_rsep),
-                cryptex: cryptex_policy(no_cryptex),
-                cryptex_source: cryptex_ipsw.map_or(CryptexSource::Target, CryptexSource::Provided),
-                exploit: exploit.into(),
-                nonce: nonce_policy(set_nonce),
-                rdsk,
-                rkrn,
-            })?;
+            let plan = kit
+                .plan_restore(RestoreRequest {
+                    device,
+                    firmware,
+                    behavior: behavior.into(),
+                    ticket: if skip_blob {
+                        TicketPolicy::Skip
+                    } else {
+                        ticket
+                            .clone()
+                            .map_or(TicketPolicy::Signed, TicketPolicy::Provided)
+                    },
+                    baseband: if no_baseband {
+                        BasebandPolicy::None
+                    } else if let Some(baseband) = baseband {
+                        BasebandPolicy::Provided(baseband)
+                    } else {
+                        BasebandPolicy::Auto
+                    },
+                    sep: if no_sep {
+                        SepPolicy::None
+                    } else {
+                        sep.map_or(SepPolicy::Auto, SepPolicy::Provided)
+                    },
+                    rsep: rsep_policy(rsep, no_rsep),
+                    cryptex: cryptex_policy(no_cryptex),
+                    cryptex_source: cryptex_ipsw
+                        .map_or(CryptexSource::Target, CryptexSource::Provided),
+                    exploit: exploit.into(),
+                    nonce: nonce_policy(set_nonce),
+                    rdsk,
+                    rkrn,
+                })
+                .await?;
             confirm(
                 &format!(
                     "erase/restore the selected device with plan {}",
@@ -3603,6 +3607,7 @@ async fn main() -> Result<()> {
                     rdsk: None,
                     rkrn: None,
                 })
+                .await
                 .context("failed to resolve the part 1 restore plan")?;
             let part2_plan = kit
                 .plan_restore(RestoreRequest {
@@ -3632,6 +3637,7 @@ async fn main() -> Result<()> {
                     rdsk: None,
                     rkrn: None,
                 })
+                .await
                 .context("failed to resolve the part 2 restore plan")?;
             confirm(
                 &format!(

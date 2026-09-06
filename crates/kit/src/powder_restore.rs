@@ -284,7 +284,8 @@ pub(crate) async fn plan(
         nonce: NoncePolicy::Manual,
         rdsk: None,
         rkrn: None,
-    })?;
+    })
+    .await?;
 
     Ok(PowderRestorePlan {
         inner,
@@ -435,7 +436,8 @@ mod tests {
 <key>SupportedProductTypes</key><array><string>{product}</string></array>
 <key>BuildIdentities</key><array><dict>
 <key>Info</key><dict><key>DeviceClass</key><string>{device_class}</string><key>RestoreBehavior</key><string>Erase</string></dict>
-<key>Manifest</key><dict><key>RestoreRamDisk</key><dict><key>Info</key><dict><key>Path</key><string>ramdisk.dmg</string></dict></dict></dict>
+<key>Manifest</key><dict><key>RestoreRamDisk</key><dict><key>Info</key><dict><key>Path</key><string>ramdisk.dmg</string></dict></dict>
+<key>BasebandFirmware</key><dict><key>Info</key><dict><key>Path</key><string>Firmware/baseband.bbfw</string></dict></dict></dict>
 </dict></array>
 </dict></plist>"#
                 )

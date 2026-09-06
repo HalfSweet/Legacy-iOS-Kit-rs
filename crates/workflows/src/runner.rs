@@ -15,7 +15,8 @@ use tracing::warn;
 
 use crate::{
     BasebandPolicy, BasebandRequestError, BasebandResolver, CryptexRequestError, CryptexResolver,
-    RestoreBootError, RestorePlan, RestorePreparation, boot_restore, is_cryptex_updater,
+    RestoreBootError, RestorePlan, RestorePreparation, SepError, boot_restore, boot_to_recovery,
+    is_cryptex_updater, sign_sep_payload,
 };
 
 pub async fn run_restore<P>(
@@ -33,7 +34,9 @@ where
         return Err(RestoreExecutionError::PreparationMismatch);
     }
     let baseband = match plan.baseband_policy() {
-        BasebandPolicy::Auto => Some(Arc::new(BasebandResolver::new(plan, tss.clone())?)),
+        BasebandPolicy::Auto => BasebandResolver::from_plan(plan, tss.clone())
+            .await?
+            .map(Arc::new),
         BasebandPolicy::None => None,
         BasebandPolicy::Provided(path) => Some(Arc::new(BasebandResolver::from_firmware(
             plan,
@@ -55,7 +58,12 @@ where
     FirmwareArchive::open(plan.firmware())?
         .extract_entry_to(preparation.filesystem_path(), &filesystem)
         .await?;
-    boot_restore(preparation, ecid).await?;
+    // Stage 1: boot to recovery. Then sign the SEP with an independent ticket
+    // fetched against the aux build identity and the device's fresh nonces,
+    // and finish the boot chain with it (futurerestore.cpp:1613-1621).
+    let client = boot_to_recovery(preparation, ecid).await?;
+    let sep = sign_sep_payload(plan, &client, tss).await?;
+    boot_restore(client, preparation, sep.as_ref()).await?;
     let mut restored = RestoredConnector::default()
         .connect_by_ecid(ecid, Duration::from_secs(60))
         .await?;
@@ -78,7 +86,13 @@ where
     let asr_progress = progress.clone();
     let restored_progress = progress.clone();
     let filesystem_for_asr = filesystem.clone();
-    let prepared_data = Arc::new(preparation.restored_data().clone());
+    // The restored-session NOR response carries the SEP images personalized
+    // with the independent SEP ticket (restore.c:1758-1813).
+    let mut restored_data = preparation.restored_data().clone();
+    if let Some(sep) = &sep {
+        restored_data = restored_data.extend_nor(sep.nor_images().iter().cloned());
+    }
+    let prepared_data = Arc::new(restored_data);
 
     let result = run_restored_session_with_dispatcher(
         &mut restored,
@@ -186,6 +200,8 @@ pub enum RestoreExecutionError {
     Baseband(#[from] BasebandRequestError),
     #[error(transparent)]
     Cryptex(#[from] CryptexRequestError),
+    #[error(transparent)]
+    Sep(#[from] SepError),
     #[error(transparent)]
     Boot(#[from] RestoreBootError),
     #[error(transparent)]

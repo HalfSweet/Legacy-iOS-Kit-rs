@@ -5,5 +5,7 @@
 mod device;
 mod resource;
 
-pub use device::{AssetError, DeviceDatabase, DeviceProfile};
+pub use device::{
+    AssetError, AuxBaseband, AuxBuild, AuxFirmwareInfo, DeviceDatabase, DeviceProfile,
+};
 pub use resource::{Redistribution, ResourceCatalog, ResourceId, ResourceRecord};

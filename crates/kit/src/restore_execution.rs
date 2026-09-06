@@ -215,10 +215,18 @@ pub(crate) async fn execute(
         legacy_ios_firmware::RestoreBehavior::Erase => RestoreOptions::erase(),
         legacy_ios_firmware::RestoreBehavior::Update => RestoreOptions::update(),
     };
-    let options = if matches!(plan.baseband_policy(), BasebandPolicy::None) {
-        options.without_baseband()
-    } else {
+    // Auto may resolve to no baseband at all (the bb2 rules disable the
+    // update for non-latest targets; WiFi-only devices have none): the plan's
+    // aux resolution decides whether the restore updates the baseband.
+    let has_baseband = match plan.baseband_policy() {
+        BasebandPolicy::None => false,
+        BasebandPolicy::Provided(_) => true,
+        BasebandPolicy::Auto => plan.aux_firmware().and_then(|aux| aux.baseband()).is_some(),
+    };
+    let options = if has_baseband {
         options
+    } else {
+        options.without_baseband()
     };
 
     run_restore(

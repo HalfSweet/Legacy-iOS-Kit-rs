@@ -13,6 +13,87 @@ pub struct DeviceProfile {
     board_configs: Vec<BoardConfig>,
     soc: Soc,
     has_baseband: bool,
+    aux: Option<AuxFirmwareInfo>,
+}
+
+/// An auxiliary iOS release a device's SEP/baseband firmware is sourced from,
+/// mirroring upstream's `device_use_vers`/`device_use_build` and
+/// `device_latest_vers`/`device_latest_build` pairs (restore.sh:1597-1656).
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AuxBuild {
+    version: String,
+    build: String,
+}
+
+impl AuxBuild {
+    pub fn version(&self) -> &str {
+        &self.version
+    }
+
+    pub fn build(&self) -> &str {
+        &self.build
+    }
+}
+
+/// A baseband firmware file inside the auxiliary IPSW, with the SHA-1 digest
+/// upstream verifies after download (`device_use_bb_sha1`/`device_latest_bb_sha1`).
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AuxBaseband {
+    file: String,
+    sha1: String,
+}
+
+impl AuxBaseband {
+    pub fn file(&self) -> &str {
+        &self.file
+    }
+
+    pub fn sha1(&self) -> &str {
+        &self.sha1
+    }
+}
+
+/// Auxiliary firmware table of a device: where the SEP and baseband used
+/// during a restore come from when they differ from the target IPSW
+/// (upstream `restore_download_bbsep`, restore.sh:6074-6150).
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AuxFirmwareInfo {
+    use_build: Option<AuxBuild>,
+    latest_build: Option<AuxBuild>,
+    use_baseband: Option<AuxBaseband>,
+    latest_baseband: Option<AuxBaseband>,
+    disable_baseband_for_non_latest: bool,
+}
+
+impl AuxFirmwareInfo {
+    /// The device's `use` build (upstream `device_use_vers`/`device_use_build`).
+    pub fn use_build(&self) -> Option<&AuxBuild> {
+        self.use_build.as_ref()
+    }
+
+    /// The device's `latest` build; falls back to the `use` build like
+    /// upstream does when the latest version is not set (restore.sh:1657-1661).
+    pub fn latest_build(&self) -> Option<&AuxBuild> {
+        self.latest_build.as_ref().or(self.use_build.as_ref())
+    }
+
+    /// The baseband firmware of the `use` build; falls back to the latest
+    /// baseband like upstream does when only the latter is set
+    /// (restore.sh:1697-1701).
+    pub fn use_baseband(&self) -> Option<&AuxBaseband> {
+        self.use_baseband.as_ref().or(self.latest_baseband.as_ref())
+    }
+
+    /// The baseband firmware of the `latest` build.
+    pub fn latest_baseband(&self) -> Option<&AuxBaseband> {
+        self.latest_baseband.as_ref()
+    }
+
+    /// Whether baseband updates are disabled for targets other than the
+    /// `use` version (upstream `device_use_bb2`, restore.sh:1692-1693).
+    pub const fn disable_baseband_for_non_latest(&self) -> bool {
+        self.disable_baseband_for_non_latest
+    }
 }
 
 impl DeviceProfile {
@@ -34,6 +115,12 @@ impl DeviceProfile {
 
     pub const fn has_baseband(&self) -> bool {
         self.has_baseband
+    }
+
+    /// Auxiliary firmware table of the device (upstream `device_use_*` /
+    /// `device_latest_*`), when the upstream tables cover the product.
+    pub fn aux_firmware(&self) -> Option<&AuxFirmwareInfo> {
+        self.aux.as_ref()
     }
 
     pub fn capabilities(&self) -> CapabilitySet {
@@ -149,6 +236,7 @@ impl DeviceDatabase {
                 board_configs: board_configs.clone(),
                 soc: raw_profile.soc,
                 has_baseband: raw_profile.has_baseband,
+                aux: raw_profile.aux.map(AuxFirmwareInfo::try_from).transpose()?,
             };
 
             if by_product.insert(product_type.clone(), profile).is_some() {
@@ -208,6 +296,8 @@ pub enum AssetError {
     DuplicateResource(crate::ResourceId),
     #[error("resource {0} has an invalid SHA-256 digest")]
     InvalidDigest(String),
+    #[error("auxiliary baseband {0} has an invalid SHA-1 digest")]
+    InvalidAuxBasebandDigest(String),
 }
 
 #[derive(Deserialize)]
@@ -224,6 +314,62 @@ struct RawDeviceProfile {
     board_configs: Vec<String>,
     soc: Soc,
     has_baseband: bool,
+    aux: Option<RawAuxFirmware>,
+}
+
+#[derive(Deserialize)]
+struct RawAuxFirmware {
+    #[serde(rename = "use")]
+    use_build: Option<RawAuxBuild>,
+    latest: Option<RawAuxBuild>,
+    use_baseband: Option<RawAuxBaseband>,
+    latest_baseband: Option<RawAuxBaseband>,
+    #[serde(default)]
+    disable_baseband_for_non_latest: bool,
+}
+
+#[derive(Deserialize)]
+struct RawAuxBuild {
+    version: String,
+    build: String,
+}
+
+#[derive(Deserialize)]
+struct RawAuxBaseband {
+    file: String,
+    sha1: String,
+}
+
+impl TryFrom<RawAuxFirmware> for AuxFirmwareInfo {
+    type Error = AssetError;
+
+    fn try_from(raw: RawAuxFirmware) -> Result<Self, Self::Error> {
+        let baseband = |raw: Option<RawAuxBaseband>| -> Result<Option<AuxBaseband>, AssetError> {
+            raw.map(|raw| {
+                if raw.sha1.len() != 40 || !raw.sha1.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+                    return Err(AssetError::InvalidAuxBasebandDigest(raw.file));
+                }
+                Ok(AuxBaseband {
+                    file: raw.file,
+                    sha1: raw.sha1,
+                })
+            })
+            .transpose()
+        };
+        Ok(Self {
+            use_build: raw.use_build.map(|raw| AuxBuild {
+                version: raw.version,
+                build: raw.build,
+            }),
+            latest_build: raw.latest.map(|raw| AuxBuild {
+                version: raw.version,
+                build: raw.build,
+            }),
+            use_baseband: baseband(raw.use_baseband)?,
+            latest_baseband: baseband(raw.latest_baseband)?,
+            disable_baseband_for_non_latest: raw.disable_baseband_for_non_latest,
+        })
+    }
 }
 
 #[cfg(test)]
@@ -258,5 +404,93 @@ mod tests {
             .find_product(&ProductType::from("iPhone10,6"))
             .unwrap();
         assert!(!a11.capabilities().contains(Capability::Jailbreak));
+    }
+
+    #[test]
+    fn aux_firmware_matches_the_upstream_device_tables() {
+        let database = DeviceDatabase::bundled();
+
+        // iPhone6,1 (restore.sh:1628-1630, 1646-1649, 1683-1685, 1694-1696).
+        let iphone5s = database
+            .find_product(&ProductType::from("iPhone6,1"))
+            .unwrap()
+            .aux_firmware()
+            .unwrap();
+        let use_build = iphone5s.use_build().unwrap();
+        assert_eq!(use_build.version(), "10.3.3");
+        assert_eq!(use_build.build(), "14G60");
+        let latest_build = iphone5s.latest_build().unwrap();
+        assert_eq!(latest_build.version(), "12.5.8");
+        assert_eq!(latest_build.build(), "16H88");
+        assert_eq!(
+            iphone5s.use_baseband().unwrap().file(),
+            "Mav7Mav8-7.60.00.Release.bbfw"
+        );
+        assert_eq!(
+            iphone5s.use_baseband().unwrap().sha1(),
+            "f397724367f6bed459cf8f3d523553c13e8ae12c"
+        );
+        assert_eq!(
+            iphone5s.latest_baseband().unwrap().file(),
+            "Mav7Mav8-10.80.02.Release.bbfw"
+        );
+        assert_eq!(
+            iphone5s.latest_baseband().unwrap().sha1(),
+            "f5db17f72a78d807a791138cd5ca87d2f5e859f0"
+        );
+
+        // iPhone8,1 has only a latest build upstream (restore.sh:1646-1652).
+        let iphone6s = database
+            .find_product(&ProductType::from("iPhone8,1"))
+            .unwrap()
+            .aux_firmware()
+            .unwrap();
+        assert!(iphone6s.use_build().is_none());
+        let latest_build = iphone6s.latest_build().unwrap();
+        assert_eq!(latest_build.version(), "15.8.8");
+        assert_eq!(latest_build.build(), "19H422");
+        assert!(iphone6s.use_baseband().is_none());
+
+        // iPhone4,1: `use` only, and the latest build falls back to it.
+        let iphone4s = database
+            .find_product(&ProductType::from("iPhone4,1"))
+            .unwrap()
+            .aux_firmware()
+            .unwrap();
+        assert_eq!(iphone4s.use_build().unwrap().build(), "13G37");
+        assert_eq!(iphone4s.latest_build().unwrap().version(), "9.3.6");
+        assert_eq!(
+            iphone4s.use_baseband().unwrap().file(),
+            "Trek-6.7.00.Release.bbfw"
+        );
+
+        // iPad4,8 has no `use` build upstream; the use baseband falls back to
+        // the latest one (restore.sh:1697-1701).
+        let ipadmini3 = database
+            .find_product(&ProductType::from("iPad4,8"))
+            .unwrap()
+            .aux_firmware()
+            .unwrap();
+        assert!(ipadmini3.use_build().is_none());
+        assert_eq!(
+            ipadmini3.use_baseband().unwrap().file(),
+            "Mav7Mav8-10.80.02.Release.bbfw"
+        );
+
+        // iPhone3,1 disables baseband updates for non-latest targets
+        // (device_use_bb2, restore.sh:1692).
+        let iphone4 = database
+            .find_product(&ProductType::from("iPhone3,1"))
+            .unwrap()
+            .aux_firmware()
+            .unwrap();
+        assert!(iphone4.disable_baseband_for_non_latest());
+        assert!(iphone4.use_baseband().is_none());
+        let iphone5 = database
+            .find_product(&ProductType::from("iPhone5,1"))
+            .unwrap()
+            .aux_firmware()
+            .unwrap();
+        assert!(!iphone5.disable_baseband_for_non_latest());
     }
 }

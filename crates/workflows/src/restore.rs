@@ -9,6 +9,8 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest as _, Sha256};
 use thiserror::Error;
 
+use crate::aux::{AppleDbCatalog, AuxFirmwareCatalog, AuxFirmwareError, AuxFirmwareResolution};
+
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct RestoreRequest {
     pub device: DeviceIdentity,
@@ -51,17 +53,27 @@ pub enum TicketPolicy {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case", tag = "policy", content = "value")]
 pub enum BasebandPolicy {
+    /// Resolve the baseband from the device tables (upstream
+    /// `restore_download_bbsep`): the aux `use`/`latest` build, or the target
+    /// IPSW when the builds match.
     Auto,
     None,
+    /// A user-provided IPSW whose BasebandFirmware is used instead (upstream
+    /// `-b` with a standalone baseband source).
     Provided(PathBuf),
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case", tag = "policy", content = "value")]
 pub enum SepPolicy {
+    /// Resolve the SEP from the device tables and sign it with an
+    /// independent SEP ticket fetched against the aux build identity after
+    /// the device boots to recovery (futurerestore.cpp:1613-1621).
     Auto,
     /// Do not send RestoreSEP during boot or SEP data in the NOR response.
     None,
+    /// A user-provided IPSW whose RestoreSEP is used instead, still signed
+    /// with an independent SEP ticket against its build identity.
     Provided(PathBuf),
 }
 
@@ -155,12 +167,25 @@ pub struct RestorePlan {
     exploit: ExploitPolicy,
     nonce: NoncePolicy,
     boot_overrides: Option<BootComponentOverrides>,
+    /// Resolved auxiliary (SEP/baseband) firmware source, when the device
+    /// tables select one for the auto policies.
+    aux: Option<AuxFirmwareResolution>,
     components: Vec<RestoreComponent>,
     steps: Vec<RestoreStep>,
 }
 
 impl RestorePlan {
-    pub fn resolve(request: RestoreRequest) -> Result<Self, RestorePlanError> {
+    pub async fn resolve(request: RestoreRequest) -> Result<Self, RestorePlanError> {
+        Self::resolve_with_catalog(request, &AppleDbCatalog::new()).await
+    }
+
+    /// Resolve with an explicit aux firmware catalog; the catalog is only
+    /// consulted when the selection rules pick an aux build different from
+    /// the target build.
+    pub async fn resolve_with_catalog(
+        request: RestoreRequest,
+        catalog: &dyn AuxFirmwareCatalog,
+    ) -> Result<Self, RestorePlanError> {
         let mut request = request;
         let selector = request
             .device
@@ -269,20 +294,46 @@ impl RestorePlan {
                 source,
             })?;
         }
+        // A provided SEP/baseband IPSW must actually carry the component it
+        // substitutes for (its content is used as the aux firmware source).
+        if let SepPolicy::Provided(path) = &request.sep {
+            let sep_archive = FirmwareArchive::open(path)?;
+            let sep_manifest = sep_archive.build_manifest()?;
+            let sep_identity = sep_manifest.select_identity(board_config, request.behavior)?;
+            if !sep_identity.manifest().contains_key("RestoreSEP") {
+                return Err(RestorePlanError::MissingProvidedSep);
+            }
+        }
+        let aux = crate::aux::resolve_aux(
+            &crate::aux::AuxTarget {
+                device: &request.device,
+                profile,
+                manifest: &manifest,
+                identity,
+                behavior: request.behavior,
+                exploit: request.exploit,
+            },
+            &request.sep,
+            &request.baseband,
+            catalog,
+        )
+        .await?;
         let rsep = match request.rsep {
             // The iPhone X flow (rdsk/rkrn overrides) always sends RestoreSEP:
             // upstream passes --rdsk/--rkrn without --no-rsep.
             RsepPolicy::Auto if boot_overrides.is_some() => RsepPolicy::Send,
-            RsepPolicy::Auto => match major_version(manifest.product_version().as_str()) {
-                Some(major) if major >= 16 => RsepPolicy::Send,
-                _ => RsepPolicy::Skip,
-            },
+            RsepPolicy::Auto => {
+                match crate::aux::major_version(manifest.product_version().as_str()) {
+                    Some(major) if major >= 16 => RsepPolicy::Send,
+                    _ => RsepPolicy::Skip,
+                }
+            }
             policy => policy,
         };
         let cryptex = match request.cryptex {
             CryptexPolicy::None => None,
             CryptexPolicy::Auto => {
-                let gated = major_version(manifest.product_version().as_str())
+                let gated = crate::aux::major_version(manifest.product_version().as_str())
                     .is_some_and(|major| major >= 16)
                     && identity.manifest().contains_key("Cryptex1,SystemOS");
                 gated.then(|| request.cryptex_source.clone())
@@ -298,11 +349,14 @@ impl RestorePlan {
         let steps = restore_steps(request.exploit);
         let id = plan_id(
             &request,
-            manifest.product_version().as_str(),
-            manifest.build_id().as_str(),
-            rsep,
-            cryptex.as_ref(),
-            boot_overrides.as_ref(),
+            ResolvedPlanExtras {
+                product_version: manifest.product_version().as_str(),
+                build_id: manifest.build_id().as_str(),
+                rsep,
+                cryptex: cryptex.as_ref(),
+                boot_overrides: boot_overrides.as_ref(),
+                aux: aux.as_ref(),
+            },
             &inputs,
         );
 
@@ -323,6 +377,7 @@ impl RestorePlan {
             exploit: request.exploit,
             nonce: request.nonce,
             boot_overrides,
+            aux,
             components,
             steps,
         })
@@ -399,6 +454,12 @@ impl RestorePlan {
     /// when set.
     pub const fn boot_overrides(&self) -> Option<&BootComponentOverrides> {
         self.boot_overrides.as_ref()
+    }
+
+    /// The resolved auxiliary (SEP/baseband) firmware source for the auto
+    /// policies, when the device tables select one.
+    pub const fn aux_firmware(&self) -> Option<&AuxFirmwareResolution> {
+        self.aux.as_ref()
     }
 
     pub fn steps(&self) -> &[RestoreStep] {
@@ -527,13 +588,19 @@ fn pin_path(
     Ok(())
 }
 
+/// The resolved plan extras participating in the plan identity.
+struct ResolvedPlanExtras<'a> {
+    product_version: &'a str,
+    build_id: &'a str,
+    rsep: RsepPolicy,
+    cryptex: Option<&'a CryptexSource>,
+    boot_overrides: Option<&'a BootComponentOverrides>,
+    aux: Option<&'a AuxFirmwareResolution>,
+}
+
 fn plan_id(
     request: &RestoreRequest,
-    product_version: &str,
-    build_id: &str,
-    rsep: RsepPolicy,
-    cryptex: Option<&CryptexSource>,
-    boot_overrides: Option<&BootComponentOverrides>,
+    extras: ResolvedPlanExtras<'_>,
     inputs: &[crate::input::PinnedInput],
 ) -> PlanId {
     // Only content identities are encoded, never temporary snapshot paths.
@@ -554,29 +621,25 @@ fn plan_id(
         SepPolicy::Provided(_) => "provided",
     };
     let material = serde_json::to_vec(&(
-        2_u32,
+        3_u32,
         "restore",
         &request.device,
         request.behavior,
-        product_version,
-        build_id,
+        extras.product_version,
+        extras.build_id,
         ticket,
         baseband,
         sep,
-        rsep,
-        cryptex.is_some(),
+        extras.rsep,
+        extras.cryptex.is_some(),
         request.exploit,
         request.nonce,
-        boot_overrides.is_some(),
+        extras.boot_overrides.is_some(),
+        extras.aux,
         inputs,
     ))
     .expect("plan identity contains only serializable values");
     PlanId(hex::encode(Sha256::digest(&material)))
-}
-
-/// Numeric major version of a dotted product version ("16.0.1" -> 16).
-fn major_version(version: &str) -> Option<u64> {
-    version.split('.').next()?.parse().ok()
 }
 
 #[derive(Debug, Error)]
@@ -603,6 +666,8 @@ pub enum RestorePlanError {
     BasebandNotFound(PathBuf),
     #[error("provided SEP firmware does not exist: {}", .0.display())]
     SepNotFound(PathBuf),
+    #[error("provided SEP firmware has no RestoreSEP component")]
+    MissingProvidedSep,
     #[error("provided cryptex source IPSW does not exist: {}", .0.display())]
     CryptexSourceNotFound(PathBuf),
     #[error("--rdsk and --rkrn boot overrides must be given together")]
@@ -611,6 +676,8 @@ pub enum RestorePlanError {
     BootOverrideNotFound(PathBuf),
     #[error("skipping the signing ticket requires a pwned boot chain")]
     SkipTicketRequiresExploit,
+    #[error(transparent)]
+    AuxFirmware(#[from] AuxFirmwareError),
     #[error(transparent)]
     Firmware(#[from] FirmwareError),
 }
@@ -624,9 +691,10 @@ mod tests {
     use zip::{ZipWriter, write::SimpleFileOptions};
 
     use super::*;
+    use crate::aux::{AuxCatalogFuture, AuxFirmwareSource};
 
-    #[test]
-    fn resolves_plan_and_binds_consent() {
+    #[tokio::test]
+    async fn resolves_plan_and_binds_consent() {
         let file = firmware_fixture();
         let request = RestoreRequest {
             device: DeviceIdentity::new(ProductType::from("iPhone3,1"), Soc::A4)
@@ -646,20 +714,22 @@ mod tests {
             rkrn: None,
         };
 
-        let plan = RestorePlan::resolve(request.clone()).unwrap();
+        let plan = RestorePlan::resolve(request.clone()).await.unwrap();
         let consent = plan.confirm_destructive();
-        let same = RestorePlan::resolve(request.clone()).unwrap();
+        let same = RestorePlan::resolve(request.clone()).await.unwrap();
         assert_eq!(plan.id(), same.id());
         let mut other_device = request.clone();
         other_device.device = other_device.device.with_ecid(Ecid::new(43));
-        let other = RestorePlan::resolve(other_device).unwrap();
+        let other = RestorePlan::resolve(other_device).await.unwrap();
         assert!(!other.accepts(&consent));
         let replacement = firmware_fixture_with_components(
             "7.1.2",
-            "<key>OS</key><dict><key>Info</key><dict><key>Path</key><string>other.dmg</string></dict></dict>",
+            &format!(
+                "<key>OS</key><dict><key>Info</key><dict><key>Path</key><string>other.dmg</string></dict></dict>{BASEBAND_MANIFEST}"
+            ),
         );
         std::fs::copy(replacement.path(), file.path()).unwrap();
-        let changed = RestorePlan::resolve(request).unwrap();
+        let changed = RestorePlan::resolve(request).await.unwrap();
         assert!(!changed.accepts(&consent));
         assert_eq!(
             FirmwareArchive::open(plan.firmware())
@@ -678,8 +748,8 @@ mod tests {
         assert_eq!(plan.components()[0].name, "RestoreRamDisk");
     }
 
-    #[test]
-    fn rsep_auto_follows_the_target_major_version() {
+    #[tokio::test]
+    async fn rsep_auto_follows_the_target_major_version() {
         let legacy = firmware_fixture();
         let modern = firmware_fixture_with_version("16.7.10");
         let request = |firmware: &NamedTempFile, rsep| RestoreRequest {
@@ -700,19 +770,27 @@ mod tests {
             rkrn: None,
         };
 
-        let plan = RestorePlan::resolve(request(&legacy, RsepPolicy::Auto)).unwrap();
+        let plan = RestorePlan::resolve(request(&legacy, RsepPolicy::Auto))
+            .await
+            .unwrap();
         assert_eq!(plan.rsep_policy(), RsepPolicy::Skip);
-        let plan = RestorePlan::resolve(request(&modern, RsepPolicy::Auto)).unwrap();
+        let plan = RestorePlan::resolve(request(&modern, RsepPolicy::Auto))
+            .await
+            .unwrap();
         assert_eq!(plan.rsep_policy(), RsepPolicy::Send);
         // Explicit policies are preserved regardless of the target version.
-        let plan = RestorePlan::resolve(request(&legacy, RsepPolicy::Send)).unwrap();
+        let plan = RestorePlan::resolve(request(&legacy, RsepPolicy::Send))
+            .await
+            .unwrap();
         assert_eq!(plan.rsep_policy(), RsepPolicy::Send);
-        let plan = RestorePlan::resolve(request(&modern, RsepPolicy::Skip)).unwrap();
+        let plan = RestorePlan::resolve(request(&modern, RsepPolicy::Skip))
+            .await
+            .unwrap();
         assert_eq!(plan.rsep_policy(), RsepPolicy::Skip);
     }
 
-    #[test]
-    fn cryptex_auto_gates_on_version_and_manifest() {
+    #[tokio::test]
+    async fn cryptex_auto_gates_on_version_and_manifest() {
         const CRYPTEX_MANIFEST: &str = concat!(
             "<key>RestoreRamDisk</key><dict><key>Info</key><dict><key>Path</key>",
             "<string>ramdisk.dmg</string></dict></dict>",
@@ -741,19 +819,27 @@ mod tests {
         };
 
         // iOS 16+ with a Cryptex1,SystemOS manifest entry enables handling.
-        let plan = RestorePlan::resolve(request(&modern, CryptexPolicy::Auto)).unwrap();
+        let plan = RestorePlan::resolve(request(&modern, CryptexPolicy::Auto))
+            .await
+            .unwrap();
         assert_eq!(plan.cryptex_source(), Some(&CryptexSource::Target));
         // iOS 15.x and identities without Cryptex1,SystemOS stay disabled.
-        let plan = RestorePlan::resolve(request(&modern_without, CryptexPolicy::Auto)).unwrap();
+        let plan = RestorePlan::resolve(request(&modern_without, CryptexPolicy::Auto))
+            .await
+            .unwrap();
         assert_eq!(plan.cryptex_source(), None);
-        let plan = RestorePlan::resolve(request(&legacy, CryptexPolicy::Auto)).unwrap();
+        let plan = RestorePlan::resolve(request(&legacy, CryptexPolicy::Auto))
+            .await
+            .unwrap();
         assert_eq!(plan.cryptex_source(), None);
-        let plan = RestorePlan::resolve(request(&modern, CryptexPolicy::None)).unwrap();
+        let plan = RestorePlan::resolve(request(&modern, CryptexPolicy::None))
+            .await
+            .unwrap();
         assert_eq!(plan.cryptex_source(), None);
     }
 
-    #[test]
-    fn cryptex_provided_source_must_exist() {
+    #[tokio::test]
+    async fn cryptex_provided_source_must_exist() {
         let firmware = firmware_fixture_with_version("16.7.10");
         let request = RestoreRequest {
             device: DeviceIdentity::new(ProductType::from("iPhone3,1"), Soc::A4)
@@ -774,13 +860,13 @@ mod tests {
         };
 
         assert!(matches!(
-            RestorePlan::resolve(request),
+            RestorePlan::resolve(request).await,
             Err(RestorePlanError::CryptexSourceNotFound(_))
         ));
     }
 
-    #[test]
-    fn skip_ticket_requires_pwned_boot_chain() {
+    #[tokio::test]
+    async fn skip_ticket_requires_pwned_boot_chain() {
         let file = firmware_fixture();
         let request = |exploit| RestoreRequest {
             device: DeviceIdentity::new(ProductType::from("iPhone3,1"), Soc::A4)
@@ -800,13 +886,17 @@ mod tests {
             rkrn: None,
         };
 
-        let error = RestorePlan::resolve(request(ExploitPolicy::None)).unwrap_err();
+        let error = RestorePlan::resolve(request(ExploitPolicy::None))
+            .await
+            .unwrap_err();
         assert!(matches!(error, RestorePlanError::SkipTicketRequiresExploit));
-        RestorePlan::resolve(request(ExploitPolicy::AlreadyPwned)).unwrap();
+        RestorePlan::resolve(request(ExploitPolicy::AlreadyPwned))
+            .await
+            .unwrap();
     }
 
-    #[test]
-    fn boot_overrides_must_be_paired_and_exist() {
+    #[tokio::test]
+    async fn boot_overrides_must_be_paired_and_exist() {
         let firmware = firmware_fixture();
         let rdsk = NamedTempFile::new().unwrap();
         let base = |rdsk, rkrn| RestoreRequest {
@@ -828,19 +918,22 @@ mod tests {
         };
 
         // Only one of the pair is rejected.
-        let error = RestorePlan::resolve(base(Some(rdsk.path().to_owned()), None)).unwrap_err();
+        let error = RestorePlan::resolve(base(Some(rdsk.path().to_owned()), None))
+            .await
+            .unwrap_err();
         assert!(matches!(error, RestorePlanError::BootOverridePair));
         // A missing file is rejected.
         let error = RestorePlan::resolve(base(
             Some(rdsk.path().to_owned()),
             Some(PathBuf::from("/nonexistent-kcache.im4p")),
         ))
+        .await
         .unwrap_err();
         assert!(matches!(error, RestorePlanError::BootOverrideNotFound(_)));
     }
 
-    #[test]
-    fn boot_overrides_force_rsep_send() {
+    #[tokio::test]
+    async fn boot_overrides_force_rsep_send() {
         let firmware = firmware_fixture();
         let rdsk = NamedTempFile::new().unwrap();
         let rkrn = NamedTempFile::new().unwrap();
@@ -863,26 +956,369 @@ mod tests {
         };
 
         // The iPhone X flow always sends RestoreSEP, even for a pre-16 target.
-        let plan = RestorePlan::resolve(request(RsepPolicy::Auto)).unwrap();
+        let plan = RestorePlan::resolve(request(RsepPolicy::Auto))
+            .await
+            .unwrap();
         assert_eq!(plan.rsep_policy(), RsepPolicy::Send);
         assert!(plan.boot_overrides().is_some());
         // Explicit policies still win.
-        let plan = RestorePlan::resolve(request(RsepPolicy::Skip)).unwrap();
+        let plan = RestorePlan::resolve(request(RsepPolicy::Skip))
+            .await
+            .unwrap();
         assert_eq!(plan.rsep_policy(), RsepPolicy::Skip);
     }
+
+    #[tokio::test]
+    async fn bb2_devices_disable_baseband_for_non_latest_targets() {
+        // iPhone3,1 restoring 6.1.3: the baseband update is disabled (upstream
+        // device_use_bb2), no aux firmware is fetched.
+        let firmware =
+            firmware_fixture_for("iPhone3,1", "n90ap", "6.1.3", "10B329", RAMDISK_MANIFEST);
+        let plan = RestorePlan::resolve_with_catalog(
+            base_request("iPhone3,1", "n90", Soc::A4, firmware.path()),
+            &PanicCatalog,
+        )
+        .await
+        .unwrap();
+        assert_eq!(plan.aux_firmware(), None);
+
+        // Restoring the `use` version keeps the baseband, taken from the
+        // target IPSW's own BasebandFirmware entry.
+        let firmware = firmware_fixture();
+        let plan = RestorePlan::resolve_with_catalog(
+            base_request("iPhone3,1", "n90", Soc::A4, firmware.path()),
+            &PanicCatalog,
+        )
+        .await
+        .unwrap();
+        let aux = plan.aux_firmware().unwrap();
+        assert_eq!(aux.version(), "7.1.2");
+        assert_eq!(aux.build(), "11D257");
+        assert_eq!(aux.source(), &AuxFirmwareSource::Target);
+        assert!(!aux.sep(), "32-bit devices have no SEP");
+        let baseband = aux.baseband().unwrap();
+        assert_eq!(baseband.path(), "Firmware/baseband.bbfw");
+        assert_eq!(baseband.sha1(), None);
+    }
+
+    #[tokio::test]
+    async fn a7_ios10_targets_use_the_target_ipsw_locally() {
+        // iPhone6,1 restoring 10.3.3: aux == target, so nothing is fetched;
+        // SEP and the table baseband come from the target IPSW.
+        let firmware = a7_firmware_fixture("10.3.3", "14G60");
+        let plan = RestorePlan::resolve_with_catalog(
+            base_request("iPhone6,1", "n51", Soc::A7, firmware.path()),
+            &PanicCatalog,
+        )
+        .await
+        .unwrap();
+
+        let aux = plan.aux_firmware().unwrap();
+        assert_eq!(aux.version(), "10.3.3");
+        assert_eq!(aux.build(), "14G60");
+        assert_eq!(aux.source(), &AuxFirmwareSource::Target);
+        assert!(aux.sep());
+        let baseband = aux.baseband().unwrap();
+        assert_eq!(baseband.path(), "Firmware/Mav7Mav8-7.60.00.Release.bbfw");
+        assert_eq!(
+            baseband.sha1(),
+            Some("f397724367f6bed459cf8f3d523553c13e8ae12c")
+        );
+
+        // The plan serializes for CLI plan output.
+        let json = serde_json::to_value(&plan).unwrap();
+        assert_eq!(json["aux"]["source"]["kind"], "target");
+    }
+
+    #[tokio::test]
+    async fn a7_other_targets_fetch_the_remote_aux_manifest() {
+        // iPhone6,1 restoring 12.0.1: aux is the latest 12.5.8 build, resolved
+        // through the catalog and pinned by manifest SHA-256.
+        let aux_manifest = aux_manifest_fixture("12.5.8", "16H88");
+        let aux_sha256 = hex::encode(Sha256::digest(&aux_manifest));
+        let catalog = StubCatalog {
+            url: "https://example.com/iPhone_4.0_64bit_12.5.8_16H88_Restore.ipsw".to_owned(),
+            manifest: aux_manifest,
+        };
+        let firmware = a7_firmware_fixture("12.0.1", "16A404");
+        let plan = RestorePlan::resolve_with_catalog(
+            base_request("iPhone6,1", "n51", Soc::A7, firmware.path()),
+            &catalog,
+        )
+        .await
+        .unwrap();
+
+        let aux = plan.aux_firmware().unwrap();
+        assert_eq!(aux.version(), "12.5.8");
+        assert_eq!(aux.build(), "16H88");
+        assert_eq!(
+            aux.source(),
+            &AuxFirmwareSource::Remote {
+                url: catalog.url.clone(),
+                manifest_sha256: aux_sha256,
+            }
+        );
+        assert!(aux.sep());
+        let baseband = aux.baseband().unwrap();
+        assert_eq!(baseband.path(), "Firmware/Mav7Mav8-10.80.02.Release.bbfw");
+        assert_eq!(
+            baseband.sha1(),
+            Some("f5db17f72a78d807a791138cd5ca87d2f5e859f0")
+        );
+    }
+
+    #[tokio::test]
+    async fn a8_baseband_path_comes_from_the_aux_manifest() {
+        // iPhone7,2 (A8) restoring 14.8: aux is the latest 12.5.8 build; the
+        // device table records no baseband file, so the plan records the
+        // BasebandFirmware path of the fetched aux manifest.
+        let catalog = StubCatalog {
+            url: "https://example.com/iPhone_4.0_64bit_12.5.8_16H88_Restore.ipsw".to_owned(),
+            manifest: aux_manifest_fixture("12.5.8", "16H88"),
+        };
+        let firmware = firmware_fixture_for("iPhone7,2", "n61ap", "14.8", "18H17", MODERN_MANIFEST);
+        let plan = RestorePlan::resolve_with_catalog(
+            base_request("iPhone7,2", "n61", Soc::A8, firmware.path()),
+            &catalog,
+        )
+        .await
+        .unwrap();
+
+        let aux = plan.aux_firmware().unwrap();
+        assert_eq!(aux.build(), "16H88");
+        assert!(aux.sep());
+        let baseband = aux.baseband().unwrap();
+        assert_eq!(baseband.path(), "Firmware/Mav7Mav8-10.80.02.Release.bbfw");
+        assert_eq!(baseband.sha1(), None);
+    }
+
+    #[tokio::test]
+    async fn plan_id_reflects_the_aux_resolution() {
+        let firmware = a7_firmware_fixture("12.0.1", "16A404");
+        let request = |sep: SepPolicy| {
+            let mut request = base_request("iPhone6,1", "n51", Soc::A7, firmware.path());
+            request.sep = sep;
+            // Isolate the SEP variable of the aux resolution.
+            request.baseband = BasebandPolicy::None;
+            request
+        };
+        let catalog = StubCatalog {
+            url: "https://example.com/iPhone_4.0_64bit_12.5.8_16H88_Restore.ipsw".to_owned(),
+            manifest: aux_manifest_fixture("12.5.8", "16H88"),
+        };
+
+        let with_aux = RestorePlan::resolve_with_catalog(request(SepPolicy::Auto), &catalog)
+            .await
+            .unwrap();
+        let again = RestorePlan::resolve_with_catalog(request(SepPolicy::Auto), &catalog)
+            .await
+            .unwrap();
+        assert_eq!(with_aux.id(), again.id());
+        // A plan without SEP handling and a plan whose remote manifest content
+        // differs both produce different plan ids.
+        let without_aux =
+            RestorePlan::resolve_with_catalog(request(SepPolicy::None), &PanicCatalog)
+                .await
+                .unwrap();
+        assert_ne!(with_aux.id(), without_aux.id());
+        let tampered = StubCatalog {
+            manifest: aux_manifest_fixture("12.5.8 ", "16H88"),
+            ..catalog
+        };
+        let other = RestorePlan::resolve_with_catalog(request(SepPolicy::Auto), &tampered)
+            .await
+            .unwrap();
+        assert_ne!(with_aux.id(), other.id());
+    }
+
+    #[tokio::test]
+    async fn aux_resolution_failures_fail_planning() {
+        let firmware = a7_firmware_fixture("12.0.1", "16A404");
+        let request = || base_request("iPhone6,1", "n51", Soc::A7, firmware.path());
+
+        // The catalog cannot resolve the aux build.
+        let error = RestorePlan::resolve_with_catalog(
+            request(),
+            &StubCatalog {
+                url: String::new(),
+                manifest: Vec::new(),
+            },
+        )
+        .await
+        .unwrap_err();
+        assert!(matches!(error, RestorePlanError::AuxFirmware(_)));
+
+        // The fetched manifest belongs to another build.
+        let error = RestorePlan::resolve_with_catalog(
+            request(),
+            &StubCatalog {
+                url: "https://example.com/16H88_Restore.ipsw".to_owned(),
+                manifest: aux_manifest_fixture("12.5.7", "16H81"),
+            },
+        )
+        .await
+        .unwrap_err();
+        assert!(
+            matches!(
+                error,
+                RestorePlanError::AuxFirmware(AuxFirmwareError::BuildMismatch { .. })
+            ),
+            "{error}"
+        );
+    }
+
+    #[tokio::test]
+    async fn provided_policies_keep_their_local_sources() {
+        // Provided SEP/baseband IPSWs never consult the aux catalog.
+        let firmware = a7_firmware_fixture("12.0.1", "16A404");
+        let sep_ipsw = a7_firmware_fixture("12.5.8", "16H88");
+        let mut request = base_request("iPhone6,1", "n51", Soc::A7, firmware.path());
+        request.sep = SepPolicy::Provided(sep_ipsw.path().to_owned());
+        request.baseband = BasebandPolicy::Provided(sep_ipsw.path().to_owned());
+
+        let plan = RestorePlan::resolve_with_catalog(request, &PanicCatalog)
+            .await
+            .unwrap();
+        assert_eq!(plan.aux_firmware(), None);
+
+        // A provided SEP IPSW without a RestoreSEP component is rejected.
+        let bad_sep =
+            firmware_fixture_for("iPhone6,1", "n51ap", "12.5.8", "16H88", RAMDISK_MANIFEST);
+        let mut request = base_request("iPhone6,1", "n51", Soc::A7, firmware.path());
+        request.sep = SepPolicy::Provided(bad_sep.path().to_owned());
+        request.baseband = BasebandPolicy::None;
+        let error = RestorePlan::resolve_with_catalog(request, &PanicCatalog)
+            .await
+            .unwrap_err();
+        assert!(matches!(error, RestorePlanError::MissingProvidedSep));
+    }
+
+    #[derive(Debug)]
+    struct PanicCatalog;
+
+    impl AuxFirmwareCatalog for PanicCatalog {
+        fn resolve_ipsw_url<'a>(
+            &'a self,
+            _product_type: &'a ProductType,
+            _build: &'a str,
+        ) -> AuxCatalogFuture<'a, String> {
+            panic!("tests must not resolve aux firmware URLs")
+        }
+
+        fn fetch_build_manifest<'a>(&'a self, _url: &'a str) -> AuxCatalogFuture<'a, Vec<u8>> {
+            panic!("tests must not fetch aux firmware manifests")
+        }
+    }
+
+    /// A catalog serving canned data; `url`/`manifest` are empty to simulate
+    /// an appledb lookup failure.
+    #[derive(Debug)]
+    struct StubCatalog {
+        url: String,
+        manifest: Vec<u8>,
+    }
+
+    impl AuxFirmwareCatalog for StubCatalog {
+        fn resolve_ipsw_url<'a>(
+            &'a self,
+            product_type: &'a ProductType,
+            build: &'a str,
+        ) -> AuxCatalogFuture<'a, String> {
+            Box::pin(async move {
+                if self.url.is_empty() {
+                    return Err(AuxFirmwareError::NoIpswSource {
+                        product: product_type.clone(),
+                        build: build.to_owned(),
+                    });
+                }
+                Ok(self.url.clone())
+            })
+        }
+
+        fn fetch_build_manifest<'a>(&'a self, _url: &'a str) -> AuxCatalogFuture<'a, Vec<u8>> {
+            Box::pin(async move { Ok(self.manifest.clone()) })
+        }
+    }
+
+    fn base_request(
+        product: &str,
+        board: &str,
+        soc: Soc,
+        firmware: &std::path::Path,
+    ) -> RestoreRequest {
+        RestoreRequest {
+            device: DeviceIdentity::new(ProductType::from(product), soc)
+                .with_board_config(BoardConfig::from(board))
+                .with_ecid(Ecid::new(42)),
+            firmware: firmware.to_owned(),
+            behavior: RestoreBehavior::Erase,
+            ticket: TicketPolicy::Signed,
+            baseband: BasebandPolicy::Auto,
+            sep: SepPolicy::Auto,
+            rsep: RsepPolicy::Auto,
+            cryptex: CryptexPolicy::Auto,
+            cryptex_source: CryptexSource::Target,
+            exploit: ExploitPolicy::Auto,
+            nonce: NoncePolicy::Manual,
+            rdsk: None,
+            rkrn: None,
+        }
+    }
+
+    const RAMDISK_MANIFEST: &str = "<key>RestoreRamDisk</key><dict><key>Info</key><dict><key>Path</key><string>ramdisk.dmg</string></dict></dict>";
+    const BASEBAND_MANIFEST: &str = "<key>BasebandFirmware</key><dict><key>Info</key><dict><key>Path</key><string>Firmware/baseband.bbfw</string></dict></dict>";
+    /// The SEP and baseband entries of a 64-bit firmware fixture.
+    const MODERN_MANIFEST: &str = concat!(
+        "<key>RestoreRamDisk</key><dict><key>Info</key><dict><key>Path</key><string>ramdisk.dmg</string></dict></dict>",
+        "<key>RestoreSEP</key><dict><key>Info</key><dict><key>Path</key>",
+        "<string>Firmware/all_flash/sep-firmware.n51ap.RELEASE.im4p</string></dict></dict>",
+        "<key>BasebandFirmware</key><dict><key>Info</key><dict><key>Path</key>",
+        "<string>Firmware/Mav7Mav8-10.80.02.Release.bbfw</string></dict></dict>",
+    );
 
     fn firmware_fixture() -> NamedTempFile {
         firmware_fixture_with_version("7.1.2")
     }
 
     fn firmware_fixture_with_version(version: &str) -> NamedTempFile {
-        firmware_fixture_with_components(
-            version,
-            "<key>RestoreRamDisk</key><dict><key>Info</key><dict><key>Path</key><string>ramdisk.dmg</string></dict></dict>",
-        )
+        firmware_fixture_with_components(version, &format!("{RAMDISK_MANIFEST}{BASEBAND_MANIFEST}"))
     }
 
     fn firmware_fixture_with_components(version: &str, manifest: &str) -> NamedTempFile {
+        firmware_fixture_for("iPhone3,1", "n90ap", version, "11D257", manifest)
+    }
+
+    fn a7_firmware_fixture(version: &str, build: &str) -> NamedTempFile {
+        firmware_fixture_for("iPhone6,1", "n51ap", version, build, MODERN_MANIFEST)
+    }
+
+    /// A synthetic aux (latest-build) BuildManifest for the stub catalog.
+    fn aux_manifest_fixture(version: &str, build: &str) -> Vec<u8> {
+        format!(
+            r#"<?xml version="1.0" encoding="UTF-8"?>
+<plist version="1.0"><dict>
+<key>ProductVersion</key><string>{version}</string>
+<key>ProductBuildVersion</key><string>{build}</string>
+<key>SupportedProductTypes</key><array><string>iPhone6,1</string><string>iPhone7,2</string></array>
+<key>BuildIdentities</key><array><dict>
+<key>Info</key><dict><key>DeviceClass</key><string>n51ap</string><key>RestoreBehavior</key><string>Erase</string></dict>
+<key>Manifest</key><dict>{MODERN_MANIFEST}</dict>
+</dict><dict>
+<key>Info</key><dict><key>DeviceClass</key><string>n61ap</string><key>RestoreBehavior</key><string>Erase</string></dict>
+<key>Manifest</key><dict>{MODERN_MANIFEST}</dict>
+</dict></array>
+</dict></plist>"#
+        )
+        .into_bytes()
+    }
+
+    fn firmware_fixture_for(
+        product: &str,
+        device_class: &str,
+        version: &str,
+        build: &str,
+        manifest: &str,
+    ) -> NamedTempFile {
         let file = NamedTempFile::new().unwrap();
         let mut writer = ZipWriter::new(file.reopen().unwrap());
         writer
@@ -894,10 +1330,10 @@ mod tests {
                     r#"<?xml version="1.0" encoding="UTF-8"?>
 <plist version="1.0"><dict>
 <key>ProductVersion</key><string>{version}</string>
-<key>ProductBuildVersion</key><string>11D257</string>
-<key>SupportedProductTypes</key><array><string>iPhone3,1</string></array>
+<key>ProductBuildVersion</key><string>{build}</string>
+<key>SupportedProductTypes</key><array><string>{product}</string></array>
 <key>BuildIdentities</key><array><dict>
-<key>Info</key><dict><key>DeviceClass</key><string>n90ap</string><key>RestoreBehavior</key><string>Erase</string></dict>
+<key>Info</key><dict><key>DeviceClass</key><string>{device_class}</string><key>RestoreBehavior</key><string>Erase</string></dict>
 <key>Manifest</key><dict>{manifest}</dict>
 </dict></array>
 </dict></plist>"#

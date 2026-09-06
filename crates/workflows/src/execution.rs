@@ -5,9 +5,7 @@ use legacy_ios_restore::PreparedRestoreData;
 use plist::{Dictionary, Value};
 use thiserror::Error;
 
-use crate::{
-    ComponentPersonalizer, DestructiveConsent, PersonalizationError, PlanId, RestorePlan, SepPolicy,
-};
+use crate::{ComponentPersonalizer, DestructiveConsent, PersonalizationError, PlanId, RestorePlan};
 
 const BOOT_COMPONENTS: &[&str] = &[
     "iBSS",
@@ -15,7 +13,6 @@ const BOOT_COMPONENTS: &[&str] = &[
     "RestoreLogo",
     "RestoreRamDisk",
     "RestoreDeviceTree",
-    "RestoreSEP",
     "RestoreKernelCache",
 ];
 
@@ -137,43 +134,15 @@ impl RestorePreparation {
                 ))
             })
             .transpose()?;
-        let include_sep = !matches!(plan.sep_policy(), SepPolicy::None);
-        let sep = match plan.sep_policy() {
-            SepPolicy::Auto | SepPolicy::None => None,
-            SepPolicy::Provided(path) => {
-                let archive = FirmwareArchive::open(path)?;
-                let manifest = archive.build_manifest()?;
-                let identity = manifest.select_identity(board, plan.behavior())?.clone();
-                if !identity.manifest().contains_key("RestoreSEP") {
-                    return Err(RestorePreparationError::MissingProvidedSep);
-                }
-                Some((
-                    ComponentPersonalizer::new(
-                        archive,
-                        identity.clone(),
-                        ticket_dictionary.clone(),
-                    ),
-                    identity,
-                ))
-            }
-        };
+        // RestoreSEP is deliberately not personalized here: the runner signs
+        // it after the device boots to recovery, with an independent ticket
+        // fetched against the aux build identity and the device's fresh
+        // SepNonce (futurerestore.cpp:1613-1621).
         let boot_components = BOOT_COMPONENTS
             .iter()
             .copied()
-            .filter(|name| {
-                if name == &"RestoreSEP" {
-                    include_sep && (identity.manifest().contains_key(name) || sep.is_some())
-                } else {
-                    identity.manifest().contains_key(name)
-                }
-            })
+            .filter(|name| identity.manifest().contains_key(name))
             .map(|name| {
-                let source = if name == "RestoreSEP" {
-                    sep.as_ref().map(|(personalizer, _)| personalizer)
-                } else {
-                    None
-                }
-                .unwrap_or(&personalizer);
                 let override_data = match (name, &overrides) {
                     ("RestoreRamDisk", Some((rdsk, _))) => Some(rdsk.clone()),
                     ("RestoreKernelCache", Some((_, rkrn))) => Some(rkrn.clone()),
@@ -181,7 +150,7 @@ impl RestorePreparation {
                 };
                 let data = match override_data {
                     Some(data) => personalizer.personalize_data(name, data)?,
-                    None => source.personalize(name)?,
+                    None => personalizer.personalize(name)?,
                 };
                 Ok(PreparedBootComponent {
                     name: name.to_owned(),
@@ -189,20 +158,10 @@ impl RestorePreparation {
                 })
             })
             .collect::<Result<Vec<_>, RestorePreparationError>>()?;
-        let mut restored_data = personalizer.prepare_restore_data(flash_version_1, include_sep)?;
-        if let Some((sep, sep_identity)) = &sep {
-            let mut nor = personalizer.nor_response(flash_version_1, include_sep)?;
-            for (component, key) in [
-                ("RestoreSEP", "RestoreSEPImageData"),
-                ("SEP", "SEPImageData"),
-                ("SepStage1", "SEPPatchImageData"),
-            ] {
-                if sep_identity.manifest().contains_key(component) {
-                    nor.insert(key.into(), Value::Data(sep.personalize(component)?));
-                }
-            }
-            restored_data = restored_data.with_nor(nor);
-        }
+        // The NOR SEP entries (RestoreSEPImageData/SEPImageData/
+        // SEPPatchImageData) are personalized with the SEP ticket by the
+        // runner (restore.c:1758-1813), never with the target ticket.
+        let mut restored_data = personalizer.prepare_restore_data(flash_version_1, false)?;
         // Answer BuildIdentityDict requests with the target identity, rewritten
         // against the provided cryptex source when the plan calls for it
         // (idevicerestore restore_send_buildidentity, restore.c:5129-5207).
@@ -332,8 +291,6 @@ pub enum RestorePreparationError {
     MissingGenerator,
     #[error("ticket generator is not a valid boot nonce: {0}")]
     InvalidGenerator(String),
-    #[error("provided SEP firmware has no RestoreSEP component")]
-    MissingProvidedSep,
     #[error("boot component override read failed: {0}")]
     Io(#[from] std::io::Error),
     #[error(transparent)]
@@ -350,14 +307,15 @@ mod tests {
 
     use legacy_ios_core::{BoardConfig, DeviceIdentity, Ecid, ProductType, Soc};
     use legacy_ios_firmware::{RestoreBehavior, SigningTicket};
+    use legacy_ios_restore::{DispatchAction, RestoredMessage};
     use tempfile::NamedTempFile;
     use zip::{ZipWriter, write::SimpleFileOptions};
 
     use super::*;
     use crate::{BasebandPolicy, ExploitPolicy, RestoreRequest, SepPolicy, TicketPolicy};
 
-    #[test]
-    fn binds_ticket_and_prepares_boot_components() {
+    #[tokio::test]
+    async fn binds_ticket_and_prepares_boot_components() {
         let firmware = firmware_fixture();
         let plan = RestorePlan::resolve(RestoreRequest {
             device: DeviceIdentity::new(ProductType::from("iPhone3,1"), Soc::A4)
@@ -376,6 +334,7 @@ mod tests {
             rdsk: None,
             rkrn: None,
         })
+        .await
         .unwrap();
         let consent = plan.confirm_destructive();
         let mut dictionary = Dictionary::new();
@@ -415,8 +374,8 @@ mod tests {
         file
     }
 
-    #[test]
-    fn prepares_without_ticket_using_raw_components() {
+    #[tokio::test]
+    async fn prepares_without_ticket_using_raw_components() {
         let firmware = firmware_fixture();
         let plan = RestorePlan::resolve(RestoreRequest {
             device: DeviceIdentity::new(ProductType::from("iPhone3,1"), Soc::A4)
@@ -435,6 +394,7 @@ mod tests {
             rdsk: None,
             rkrn: None,
         })
+        .await
         .unwrap();
         let consent = plan.confirm_destructive();
 
@@ -446,8 +406,8 @@ mod tests {
         assert_eq!(prepared.boot_components()[0].data(), b"ibss.img3");
     }
 
-    #[test]
-    fn boot_overrides_replace_archive_bytes() {
+    #[tokio::test]
+    async fn boot_overrides_replace_archive_bytes() {
         let firmware = firmware_fixture();
         let mut rdsk = NamedTempFile::new().unwrap();
         rdsk.write_all(b"patched rdsk.im4p").unwrap();
@@ -470,6 +430,7 @@ mod tests {
             rdsk: Some(rdsk.path().to_owned()),
             rkrn: Some(rkrn.path().to_owned()),
         })
+        .await
         .unwrap();
         // The ipx mode always sends RestoreSEP.
         assert_eq!(plan.rsep_policy(), crate::RsepPolicy::Send);
@@ -492,8 +453,10 @@ mod tests {
         assert_eq!(ibss.data(), b"ibss.img3");
     }
 
-    #[test]
-    fn sep_policy_none_omits_restore_sep_boot_component() {
+    #[tokio::test]
+    async fn sep_is_never_pre_personalized_with_the_target_ticket() {
+        // RestoreSEP is not a prepared boot component anymore: the runner
+        // signs and sends it after the device boots to recovery.
         let firmware = firmware_fixture_with(
             MANIFEST_WITH_SEP,
             &["filesystem.dmg", "ibss.img3", "kernel.img3", "sep.img3"],
@@ -515,17 +478,11 @@ mod tests {
             rdsk: None,
             rkrn: None,
         };
-        let plan = RestorePlan::resolve(request(SepPolicy::Auto)).unwrap();
-        let prepared =
-            RestorePreparation::without_ticket(&plan, &plan.confirm_destructive(), false).unwrap();
-        assert!(
-            prepared
-                .boot_components()
-                .iter()
-                .any(|component| component.name() == "RestoreSEP")
-        );
-
-        let plan = RestorePlan::resolve(request(SepPolicy::None)).unwrap();
+        // 32-bit targets resolve no aux SEP source even with SepPolicy::Auto.
+        let plan = RestorePlan::resolve(request(SepPolicy::Auto))
+            .await
+            .unwrap();
+        assert_eq!(plan.aux_firmware(), None);
         let prepared =
             RestorePreparation::without_ticket(&plan, &plan.confirm_destructive(), false).unwrap();
         assert!(
@@ -534,6 +491,83 @@ mod tests {
                 .iter()
                 .all(|component| component.name() != "RestoreSEP")
         );
+
+        let plan = RestorePlan::resolve(request(SepPolicy::None))
+            .await
+            .unwrap();
+        let prepared =
+            RestorePreparation::without_ticket(&plan, &plan.confirm_destructive(), false).unwrap();
+        assert!(
+            prepared
+                .boot_components()
+                .iter()
+                .all(|component| component.name() != "RestoreSEP")
+        );
+    }
+
+    #[tokio::test]
+    async fn nor_response_carries_no_sep_images_before_sep_signing() {
+        let file = NamedTempFile::new().unwrap();
+        let mut writer = ZipWriter::new(file.reopen().unwrap());
+        writer
+            .start_file("BuildManifest.plist", SimpleFileOptions::default())
+            .unwrap();
+        writer
+            .write_all(MANIFEST_WITH_NOR_AND_SEP.as_bytes())
+            .unwrap();
+        for (path, data) in [
+            ("filesystem.dmg", b"filesystem".as_slice()),
+            (
+                "Firmware/all_flash/manifest",
+                b"LLB.n90\niBoot.n90\n".as_slice(),
+            ),
+            ("Firmware/all_flash/LLB.n90", b"llb".as_slice()),
+            ("Firmware/all_flash/iBoot.n90", b"iboot".as_slice()),
+        ] {
+            writer
+                .start_file(path, SimpleFileOptions::default())
+                .unwrap();
+            writer.write_all(data).unwrap();
+        }
+        writer.finish().unwrap();
+        let firmware = file;
+        let plan = RestorePlan::resolve(RestoreRequest {
+            device: DeviceIdentity::new(ProductType::from("iPhone3,1"), Soc::A4)
+                .with_board_config(BoardConfig::from("n90"))
+                .with_ecid(Ecid::new(42)),
+            firmware: firmware.path().to_owned(),
+            behavior: RestoreBehavior::Erase,
+            ticket: TicketPolicy::Skip,
+            baseband: BasebandPolicy::None,
+            sep: SepPolicy::Auto,
+            rsep: crate::RsepPolicy::Auto,
+            cryptex: crate::CryptexPolicy::Auto,
+            cryptex_source: crate::CryptexSource::Target,
+            exploit: ExploitPolicy::AlreadyPwned,
+            nonce: crate::NoncePolicy::Manual,
+            rdsk: None,
+            rkrn: None,
+        })
+        .await
+        .unwrap();
+
+        let prepared =
+            RestorePreparation::without_ticket(&plan, &plan.confirm_destructive(), false).unwrap();
+
+        let mut message = Dictionary::new();
+        message.insert("MsgType".into(), "DataRequestMsg".into());
+        message.insert("DataType".into(), "NORData".into());
+        let RestoredMessage::DataRequest(request) = RestoredMessage::parse(message) else {
+            panic!("expected data request");
+        };
+        let DispatchAction::Send(response) = prepared.restored_data().dispatch(&request).unwrap()
+        else {
+            panic!("expected plist response");
+        };
+        assert!(response.contains_key("LlbImageData"));
+        assert!(!response.contains_key("RestoreSEPImageData"));
+        assert!(!response.contains_key("SEPImageData"));
+        assert!(!response.contains_key("SEPPatchImageData"));
     }
 
     const MANIFEST: &str = r#"<?xml version="1.0"?><plist version="1.0"><dict>
@@ -555,5 +589,17 @@ mod tests {
 <key>iBSS</key><dict><key>Info</key><dict><key>Path</key><string>ibss.img3</string></dict></dict>
 <key>RestoreSEP</key><dict><key>Info</key><dict><key>Path</key><string>sep.img3</string></dict></dict>
 <key>RestoreKernelCache</key><dict><key>Info</key><dict><key>Path</key><string>kernel.img3</string></dict></dict>
+</dict></dict></array></dict></plist>"#;
+
+    const MANIFEST_WITH_NOR_AND_SEP: &str = r#"<?xml version="1.0"?><plist version="1.0"><dict>
+<key>ProductVersion</key><string>7.1.2</string><key>ProductBuildVersion</key><string>11D257</string>
+<key>SupportedProductTypes</key><array><string>iPhone3,1</string></array>
+<key>BuildIdentities</key><array><dict><key>Info</key><dict><key>DeviceClass</key><string>n90ap</string>
+<key>RestoreBehavior</key><string>Erase</string></dict><key>Manifest</key><dict>
+<key>OS</key><dict><key>Info</key><dict><key>Path</key><string>filesystem.dmg</string></dict></dict>
+<key>LLB</key><dict><key>Info</key><dict><key>Path</key><string>Firmware/all_flash/LLB.n90</string></dict></dict>
+<key>RestoreSEP</key><dict><key>Info</key><dict><key>Path</key><string>Firmware/all_flash/sep-firmware.n90.RELEASE.im4p</string></dict></dict>
+<key>SEP</key><dict><key>Info</key><dict><key>Path</key><string>Firmware/all_flash/sep-firmware.n90.RELEASE.im4p</string></dict></dict>
+<key>SepStage1</key><dict><key>Info</key><dict><key>Path</key><string>Firmware/all_flash/sep-stage1.n90.RELEASE.im4p</string></dict></dict>
 </dict></dict></array></dict></plist>"#;
 }

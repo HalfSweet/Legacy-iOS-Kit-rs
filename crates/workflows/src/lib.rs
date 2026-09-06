@@ -2,6 +2,7 @@
 
 //! High-level Legacy iOS Kit operations.
 
+mod aux;
 mod baseband;
 mod boot;
 mod cryptex;
@@ -12,9 +13,14 @@ mod ramdisk;
 mod ramdisk_boot;
 mod restore;
 mod runner;
+mod sep;
 
+pub use aux::{
+    AppleDbCatalog, AuxBasebandResolution, AuxCatalogFuture, AuxFirmwareCatalog, AuxFirmwareError,
+    AuxFirmwareResolution, AuxFirmwareSource,
+};
 pub use baseband::{BasebandError, BasebandFirmware, BasebandRequestError, BasebandResolver};
-pub use boot::{RestoreBootError, RestoreBootOutcome, boot_restore};
+pub use boot::{RestoreBootError, RestoreBootOutcome, boot_restore, boot_to_recovery};
 pub use cryptex::{
     CryptexRequestError, CryptexResolver, is_cryptex_component, is_cryptex_updater,
     rewrite_build_identity,
@@ -38,3 +44,4 @@ pub use restore::{
 pub use runner::{
     RestoreExecutionError, RestoreExecutionOutcome, RestoreExecutionProgress, run_restore,
 };
+pub use sep::{SepError, SepPayload, sign_sep_payload};

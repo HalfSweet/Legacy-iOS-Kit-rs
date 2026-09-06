@@ -70,6 +70,19 @@ impl PreparedRestoreData {
         self
     }
 
+    /// Merge extra entries into the prepared NOR response — the SEP images
+    /// personalized with the independent SEP ticket, which only exists after
+    /// the device boots to recovery (futurerestore.cpp:1616-1621;
+    /// restore.c:1758-1813).
+    pub fn extend_nor(mut self, entries: impl IntoIterator<Item = (String, Vec<u8>)>) -> Self {
+        let mut nor = self.nor.unwrap_or_default();
+        for (key, data) in entries {
+            nor.insert(key, Value::Data(data));
+        }
+        self.nor = Some(nor);
+        self
+    }
+
     /// Alternative NOR response for requests whose `Arguments` carry the
     /// `FlashVersion1` flag (old devices): `NorImageData` is a dictionary
     /// keyed by component name instead of an array.

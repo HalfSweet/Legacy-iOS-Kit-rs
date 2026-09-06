@@ -231,7 +231,7 @@ fn component_name(filename: &str) -> Option<&'static str> {
     .find_map(|(prefix, component)| filename.starts_with(prefix).then_some(component))
 }
 
-fn personalize_data(
+pub(crate) fn personalize_data(
     component: &str,
     data: Vec<u8>,
     tss: &Dictionary,

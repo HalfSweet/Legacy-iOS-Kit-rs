@@ -6,14 +6,18 @@ use thiserror::Error;
 use tokio::time::Instant;
 use tracing::info;
 
-use crate::{ExploitPolicy, PreparedBootComponent, RestorePreparation};
+use crate::{ExploitPolicy, PreparedBootComponent, RestorePreparation, SepPayload};
 
 const RECONNECT_TIMEOUT: Duration = Duration::from_secs(30);
 
-pub async fn boot_restore(
+/// Restore boot stage 1: bring the device from DFU/pwned state through
+/// iBSS/iBEC into verified Recovery mode and write the boot nonce. Returns
+/// the live client so the runner can read the fresh device nonces for the
+/// independent SEP signing (futurerestore.cpp:1613-1614) before stage 2.
+pub async fn boot_to_recovery(
     preparation: &RestorePreparation,
     ecid: Ecid,
-) -> Result<RestoreBootOutcome, RestoreBootError> {
+) -> Result<IbootClient, RestoreBootError> {
     let mut client = wait_for_device(ecid).await?;
     if matches!(
         preparation.exploit_policy(),
@@ -49,7 +53,18 @@ pub async fn boot_restore(
             .await?;
         client.send_command("saveenv").await?;
     }
+    Ok(client)
+}
 
+/// Restore boot stage 2: on the recovery-mode client returned by
+/// [`boot_to_recovery`], send the recovery ticket, logo, ramdisk, device
+/// tree, the independently signed RestoreSEP payload (`rsepfirmware`), the
+/// kernel, and `bootx`.
+pub async fn boot_restore(
+    mut client: IbootClient,
+    preparation: &RestorePreparation,
+    sep: Option<&SepPayload>,
+) -> Result<RestoreBootOutcome, RestoreBootError> {
     if preparation.build_major() > 8
         && let Some(ticket) = preparation.recovery_ticket()
     {
@@ -77,9 +92,9 @@ pub async fn boot_restore(
         client.send_command("devicetree").await?;
     }
     if preparation.send_rsep()
-        && let Some(image) = find_component(preparation, "RestoreSEP")
+        && let Some(payload) = sep
     {
-        client.upload_payload(image.data()).await?;
+        client.upload_payload(payload.restore_sep()).await?;
         client.send_command("rsepfirmware").await?;
     }
     let kernel = component(preparation, "RestoreKernelCache")?;

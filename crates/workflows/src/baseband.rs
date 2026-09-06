@@ -7,10 +7,11 @@ use legacy_ios_firmware::{
 use legacy_ios_image::{FlsError, FlsFile, MbnError, MbnFile};
 use legacy_ios_restore::DataRequest;
 use plist::{Dictionary, Value};
+use sha1::{Digest as _, Sha1};
 use thiserror::Error;
 use zip::{ZipArchive, ZipWriter, write::SimpleFileOptions};
 
-use crate::RestorePlan;
+use crate::{RestorePlan, aux::AuxContext};
 
 const MAX_ENTRY_SIZE: u64 = 256 * 1024 * 1024;
 
@@ -105,16 +106,44 @@ impl BasebandFirmware {
 #[derive(Clone, Debug)]
 pub struct BasebandResolver {
     _inputs: Vec<crate::input::PinnedInput>,
-    archive: FirmwareArchive,
+    archive: crate::aux::AuxArchive,
     identity: BuildIdentity,
     firmware_path: String,
+    firmware_sha1: Option<String>,
     tss: TssClient,
     ecid: legacy_ios_core::Ecid,
 }
 
 impl BasebandResolver {
-    pub fn new(plan: &RestorePlan, tss: TssClient) -> Result<Self, BasebandRequestError> {
-        Self::from_firmware(plan, plan.firmware(), tss)
+    /// Resolve against the plan's aux firmware source: the target archive
+    /// when the aux build equals the target build, otherwise a remote archive
+    /// over the plan-recorded URL (upstream `restore_download_bbsep`). No
+    /// resolver is built when the plan disabled the baseband update (bb2
+    /// rules) or the device has none.
+    pub async fn from_plan(
+        plan: &RestorePlan,
+        tss: TssClient,
+    ) -> Result<Option<Self>, BasebandRequestError> {
+        let Some(aux) = plan.aux_firmware() else {
+            return Ok(None);
+        };
+        let Some(baseband) = aux.baseband() else {
+            return Ok(None);
+        };
+        let context = AuxContext::open(plan, aux).await?;
+        let ecid = plan
+            .device()
+            .ecid()
+            .ok_or(BasebandRequestError::MissingEcid)?;
+        Ok(Some(Self {
+            _inputs: plan.retained_inputs(),
+            archive: context.archive().clone(),
+            identity: context.identity().clone(),
+            firmware_path: baseband.path().to_owned(),
+            firmware_sha1: baseband.sha1().map(str::to_owned),
+            tss,
+            ecid,
+        }))
     }
 
     /// Resolve against an already-opened archive and build identity (used by
@@ -128,9 +157,10 @@ impl BasebandResolver {
         let firmware_path = identity.component_path("BasebandFirmware")?.to_owned();
         Ok(Self {
             _inputs: Vec::new(),
-            archive,
+            archive: crate::aux::AuxArchive::Local(archive),
             identity,
             firmware_path,
+            firmware_sha1: None,
             tss,
             ecid,
         })
@@ -164,13 +194,33 @@ impl BasebandResolver {
             .and_then(Value::as_dictionary)
             .ok_or(BasebandRequestError::MissingArgument("Arguments"))?;
         let (parameters, nonce, chip_id) = baseband_parameters(arguments, self.ecid)?;
+        let data = match &self.archive {
+            crate::aux::AuxArchive::Local(archive) => {
+                let archive = archive.clone();
+                let path = self.firmware_path.clone();
+                tokio::task::spawn_blocking(move || archive.read_entry(&path))
+                    .await
+                    .map_err(|error| BasebandRequestError::Task(error.to_string()))??
+            }
+            crate::aux::AuxArchive::Remote(archive) => archive
+                .read_entry(&self.firmware_path)
+                .await
+                .map_err(crate::aux::AuxFirmwareError::from)?,
+        };
+        // The plan-recorded table SHA-1 pins the aux baseband content
+        // (upstream verifies the download the same way, restore.sh:6116-6126).
+        if let Some(expected) = &self.firmware_sha1 {
+            let actual = hex::encode(Sha1::digest(&data));
+            if actual != *expected {
+                return Err(BasebandRequestError::FirmwareDigestMismatch {
+                    expected: expected.clone(),
+                    actual,
+                });
+            }
+        }
         let request = TssRequest::for_baseband(&self.identity, &parameters)?;
-        let response = self.tss.send(&request).await?;
-        let archive = self.archive.clone();
-        let path = self.firmware_path.clone();
-        let response = response.into_dictionary();
+        let response = self.tss.send(&request).await?.into_dictionary();
         let signed = tokio::task::spawn_blocking(move || {
-            let data = archive.read_entry(&path)?;
             Ok::<_, BasebandRequestError>(BasebandFirmware::sign(
                 &data,
                 &response,
@@ -231,8 +281,12 @@ pub enum BasebandRequestError {
     MissingEcid,
     #[error("baseband request is missing {0}")]
     MissingArgument(&'static str),
+    #[error("baseband firmware SHA-1 mismatch: expected {expected}, got {actual}")]
+    FirmwareDigestMismatch { expected: String, actual: String },
     #[error("baseband worker task failed: {0}")]
     Task(String),
+    #[error(transparent)]
+    Aux(#[from] crate::aux::AuxFirmwareError),
     #[error(transparent)]
     Firmware(#[from] FirmwareError),
     #[error(transparent)]
@@ -340,6 +394,8 @@ pub enum BasebandError {
 #[cfg(test)]
 mod tests {
     use legacy_ios_core::Ecid;
+    use legacy_ios_restore::RestoredMessage;
+    use tempfile::NamedTempFile;
 
     use super::*;
 
@@ -411,5 +467,68 @@ mod tests {
             .unwrap();
         assert_eq!(ticket, [5, 6]);
         assert!(archive.by_name("metadata.plist").is_err());
+    }
+
+    #[tokio::test]
+    async fn aux_baseband_sha1_mismatch_fails_before_the_tss_request() {
+        // A resolver over a local archive whose recorded SHA-1 does not match
+        // the entry content fails loudly without contacting TSS.
+        let file = NamedTempFile::new().unwrap();
+        let mut writer = ZipWriter::new(file.reopen().unwrap());
+        writer
+            .start_file("Firmware/baseband.bbfw", SimpleFileOptions::default())
+            .unwrap();
+        writer.write_all(b"baseband bytes").unwrap();
+        writer.finish().unwrap();
+
+        let archive = FirmwareArchive::open(file.path()).unwrap();
+        let manifest = legacy_ios_firmware::BuildManifest::from_reader(Cursor::new(
+            br#"<?xml version="1.0" encoding="UTF-8"?>
+<plist version="1.0"><dict>
+<key>ProductVersion</key><string>9.3.6</string><key>ProductBuildVersion</key><string>13G37</string>
+<key>SupportedProductTypes</key><array><string>iPhone4,1</string></array>
+<key>BuildIdentities</key><array><dict>
+<key>Info</key><dict><key>DeviceClass</key><string>n94ap</string><key>RestoreBehavior</key><string>Erase</string></dict>
+<key>Manifest</key><dict>
+<key>BasebandFirmware</key><dict><key>Info</key><dict><key>Path</key><string>Firmware/baseband.bbfw</string></dict></dict>
+</dict>
+</dict></array>
+</dict></plist>"#,
+        ))
+        .unwrap();
+        let identity = manifest
+            .select_identity(
+                &legacy_ios_core::BoardConfig::from("n94"),
+                legacy_ios_firmware::RestoreBehavior::Erase,
+            )
+            .unwrap()
+            .clone();
+        let resolver = BasebandResolver {
+            _inputs: Vec::new(),
+            archive: crate::aux::AuxArchive::Local(archive),
+            identity,
+            firmware_path: "Firmware/baseband.bbfw".to_owned(),
+            firmware_sha1: Some(hex::encode(Sha1::digest(b"different bytes"))),
+            tss: TssClient::new(),
+            ecid: Ecid::new(42),
+        };
+
+        let mut arguments = Dictionary::new();
+        arguments.insert("ChipID".into(), 0x5a00e1_u64.into());
+        arguments.insert("CertID".into(), 257_u64.into());
+        arguments.insert("ChipSerialNo".into(), Value::Data(vec![1, 2, 3, 4]));
+        let mut message = Dictionary::new();
+        message.insert("MsgType".into(), "DataRequestMsg".into());
+        message.insert("DataType".into(), "BasebandData".into());
+        message.insert("Arguments".into(), arguments.into());
+        let RestoredMessage::DataRequest(request) = RestoredMessage::parse(message) else {
+            panic!("expected data request");
+        };
+
+        let error = resolver.resolve(&request).await.unwrap_err();
+        assert!(
+            matches!(error, BasebandRequestError::FirmwareDigestMismatch { .. }),
+            "{error}"
+        );
     }
 }
