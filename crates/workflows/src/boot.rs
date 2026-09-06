@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use legacy_ios_core::{DeviceMode, Ecid};
-use legacy_ios_transport::{IbootClient, RecoveryError, UploadResult};
+use legacy_ios_transport::{IbootClient, PwnState, RecoveryError, UploadResult};
 use thiserror::Error;
 use tokio::time::Instant;
 use tracing::info;
@@ -18,11 +18,13 @@ pub async fn boot_restore(
     if matches!(
         preparation.exploit_policy(),
         ExploitPolicy::Auto | ExploitPolicy::AlreadyPwned
-    ) && client.device_info().pwned().is_none()
+    ) && client.device_info().pwn_state(client.mode()) == PwnState::Stock
     {
         return Err(RestoreBootError::NotPwned);
     }
-    if client.mode() == DeviceMode::Dfu {
+    if client.mode() == DeviceMode::Dfu
+        && client.device_info().pwn_state(client.mode()) != PwnState::PatchedIbss
+    {
         client = upload_dfu(client, component(preparation, "iBSS")?, ecid).await?;
     }
 

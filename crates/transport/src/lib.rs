@@ -20,6 +20,6 @@ pub use locator::{
     TransportError, UsbDeviceEvent, UsbDeviceId, classify_apple_mode,
 };
 pub use nusb::transfer::{ControlType, Recipient};
-pub use recovery::{RecoveryDeviceInfo, parse_iboot_serial};
+pub use recovery::{PwnState, RecoveryDeviceInfo, parse_iboot_serial};
 
 pub use platform::{SystemMuxSocket, connect_system_mux};

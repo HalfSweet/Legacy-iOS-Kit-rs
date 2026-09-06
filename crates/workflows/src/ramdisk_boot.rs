@@ -3,7 +3,7 @@ use std::time::Duration;
 
 use legacy_ios_core::{DeviceMode, Ecid};
 use legacy_ios_firmware::SigningTicket;
-use legacy_ios_transport::{IbootClient, RecoveryError, UploadResult};
+use legacy_ios_transport::{IbootClient, PwnState, RecoveryError, UploadResult};
 use sha2::Digest as _;
 use thiserror::Error;
 use tokio::time::Instant;
@@ -109,9 +109,12 @@ pub async fn boot_ramdisk(
     if matches!(
         preparation.exploit_policy(),
         ExploitPolicy::Auto | ExploitPolicy::AlreadyPwned
-    ) && client.device_info().pwned().is_none()
+    ) && client.device_info().pwn_state(client.mode()) == PwnState::Stock
     {
         return Err(RamdiskBootError::NotPwned);
+    }
+    if client.device_info().pwn_state(client.mode()) == PwnState::PatchedIbss {
+        chain.state = ChainState::SentIbssDfu;
     }
     loop {
         match chain.next(client.mode())? {
@@ -386,6 +389,15 @@ pub enum RamdiskPreparationError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn patched_ibss_entry_starts_with_ibec() {
+        let mut chain = RamdiskBootChain::new(0x8930, true, true, false, false, "rd=md0".into());
+        chain.state = ChainState::SentIbssDfu;
+        let actions = drive(&mut chain, &[DeviceMode::Dfu, DeviceMode::Recovery]).unwrap();
+        assert_eq!(actions[0], RamdiskBootAction::UploadDfu(IBEC));
+        assert!(!actions.contains(&RamdiskBootAction::UploadDfu(IBSS)));
+    }
 
     fn drive(
         chain: &mut RamdiskBootChain,

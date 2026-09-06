@@ -1,4 +1,4 @@
-use legacy_ios_core::Ecid;
+use legacy_ios_core::{DeviceMode, Ecid};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -17,6 +17,13 @@ pub struct RecoveryDeviceInfo {
     pwned: Option<String>,
     ap_nonce: Option<Vec<u8>>,
     sep_nonce: Option<Vec<u8>>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum PwnState {
+    Stock,
+    Bootrom,
+    PatchedIbss,
 }
 
 impl RecoveryDeviceInfo {
@@ -70,6 +77,29 @@ impl RecoveryDeviceInfo {
 
     pub fn pwned(&self) -> Option<&str> {
         self.pwned.as_deref()
+    }
+
+    /// Match the baseline's pwned iBSS entry as well as bootrom PWND markers.
+    /// An absent SRTG is accepted only on known 32-bit chips in DFU mode.
+    pub fn pwn_state(&self, mode: DeviceMode) -> PwnState {
+        if !matches!(mode, DeviceMode::Dfu | DeviceMode::Recovery) {
+            return PwnState::Stock;
+        }
+        if self.pwned().is_some() {
+            return PwnState::Bootrom;
+        }
+        if mode == DeviceMode::Dfu
+            && matches!(
+                self.cpid,
+                Some(
+                    0x8920 | 0x8922 | 0x8930 | 0x8940 | 0x8942 | 0x8945 | 0x8947 | 0x8950 | 0x8955
+                )
+            )
+            && self.srtg().is_none_or(|value| !value.starts_with("iBoot"))
+        {
+            return PwnState::PatchedIbss;
+        }
+        PwnState::Stock
     }
 
     pub fn ap_nonce(&self) -> Option<&[u8]> {
@@ -142,6 +172,34 @@ fn hex_bytes(source: &str, tag: &str) -> Option<Vec<u8>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn pwn_state_distinguishes_rom_ibss_and_incomplete_descriptors() {
+        assert_eq!(
+            parse_iboot_serial("CPID:8950 SRTG:[iBoot-1145.3]").pwn_state(DeviceMode::Dfu),
+            PwnState::Stock
+        );
+        assert_eq!(
+            parse_iboot_serial("CPID:8950 PWND:[checkm8]").pwn_state(DeviceMode::Dfu),
+            PwnState::Bootrom
+        );
+        assert_eq!(
+            parse_iboot_serial("CPID:8950").pwn_state(DeviceMode::Dfu),
+            PwnState::PatchedIbss
+        );
+        assert_eq!(
+            parse_iboot_serial("CPID:8950").pwn_state(DeviceMode::Recovery),
+            PwnState::Stock
+        );
+        assert_eq!(
+            parse_iboot_serial("").pwn_state(DeviceMode::Dfu),
+            PwnState::Stock
+        );
+        assert_eq!(
+            parse_iboot_serial("CPID:8015").pwn_state(DeviceMode::Dfu),
+            PwnState::Stock
+        );
+    }
 
     #[test]
     fn parses_recovery_serial_metadata() {
