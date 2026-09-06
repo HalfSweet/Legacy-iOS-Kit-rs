@@ -64,3 +64,31 @@ Full workspace format, lint, tests, and Rust 1.88 checks are required before com
 Hardware validation of the complete boot, install, and reboot flow remains
 separate from these checks; existing DFU state 8 from a failed attempt is not
 silently treated as a fresh DFU session.
+
+## IMG3 boot-image parity regression
+
+A later hardware attempt successfully uploaded iBSS and reset USB, but the device
+did not re-enumerate. An offline comparison against the local Legacy iOS Kit
+`xpwntool` and `iBoot32Patcher` identified two image bugs:
+
+- `decrypt_img3_payload` kept KBAG elements next to decrypted DATA. The reference
+  removes both keybags, so the device must not decrypt the plaintext again. The
+  library now removes all KBAGs, preserves the other element bodies and padding,
+  and updates sizes and the SHSH offset.
+- The iBoot32 debug patch used the wrong byte order for Thumb `MOVS R0, #1`.
+  It now writes the same two instructions as the reference patcher.
+
+For the iPod4,1 / 10B500 inputs, decrypted containers, raw payloads, patched
+payloads, and final containers for both iBSS and iBEC now match the reference
+byte-for-byte. Reference binaries were used only for offline development checks;
+no executable or subprocess fallback was added to the library. Regression tests
+use synthetic containers and instructions rather than distributing Apple images.
+
+The same hardware investigation verified that ABORT moves this A4 device from
+DFU WAIT_RESET (8) to idle (2). Before a new explicit upload, the library now
+aborts that old transfer and checks GETSTATE again. It proceeds only on confirmed
+idle and preserves abort failures; it never boots the old buffered image. The
+legacy iOS 2 upload path's existing WAIT_RESET behavior is unchanged. Transcript
+tests cover successful recovery, a rejected ABORT, a device that stays non-idle,
+and legacy/error-state handling. Full hardware boot and SSH validation remain
+separate from image parity and these automated checks.

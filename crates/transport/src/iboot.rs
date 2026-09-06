@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{future::Future, time::Duration};
 
 use legacy_ios_core::{DeviceMode, Ecid};
 use nusb::{
@@ -570,23 +570,7 @@ impl IbootClient {
     }
 
     async fn prepare_dfu_download(&self, allow_wait_reset: bool) -> Result<(), RecoveryError> {
-        let state = self.get_dfu_state().await?;
-        match state {
-            2 => Ok(()),
-            8 if allow_wait_reset => Ok(()),
-            8 => {
-                self.dfu_abort().await?;
-                Err(RecoveryError::UnexpectedDfuState(state))
-            }
-            10 => {
-                self.dfu_clear_status().await?;
-                Err(RecoveryError::UnexpectedDfuState(state))
-            }
-            _ => {
-                self.dfu_abort().await?;
-                Err(RecoveryError::UnexpectedDfuState(state))
-            }
-        }
+        prepare_dfu_state(self, allow_wait_reset).await
     }
 
     fn uses_ios2_upload(&self) -> bool {
@@ -695,6 +679,56 @@ impl IbootClient {
             )
             .await?;
         Ok(())
+    }
+}
+
+/// Control-only DFU boundary for download preparation and transcript tests.
+trait DfuStateIo: Sync {
+    fn state(&self) -> impl Future<Output = Result<u8, RecoveryError>> + Send;
+    fn abort(&self) -> impl Future<Output = Result<(), RecoveryError>> + Send;
+    fn clear_status(&self) -> impl Future<Output = Result<(), RecoveryError>> + Send;
+}
+
+impl DfuStateIo for IbootClient {
+    async fn state(&self) -> Result<u8, RecoveryError> {
+        self.get_dfu_state().await
+    }
+    async fn abort(&self) -> Result<(), RecoveryError> {
+        self.dfu_abort().await
+    }
+    async fn clear_status(&self) -> Result<(), RecoveryError> {
+        self.dfu_clear_status().await
+    }
+}
+
+async fn prepare_dfu_state(
+    io: &impl DfuStateIo,
+    allow_wait_reset: bool,
+) -> Result<(), RecoveryError> {
+    let state = io.state().await?;
+    match state {
+        2 => Ok(()),
+        8 if allow_wait_reset => Ok(()),
+        8 => {
+            // A previously finalized A4 transfer can remain in WAIT_RESET.
+            // Discard it before a new explicit upload; never boot old bytes.
+            debug!("aborting the previous DFU transfer before uploading a new image");
+            io.abort().await?;
+            let state = io.state().await?;
+            if state == 2 {
+                Ok(())
+            } else {
+                Err(RecoveryError::UnexpectedDfuState(state))
+            }
+        }
+        10 => {
+            io.clear_status().await?;
+            Err(RecoveryError::UnexpectedDfuState(state))
+        }
+        _ => {
+            io.abort().await?;
+            Err(RecoveryError::UnexpectedDfuState(state))
+        }
     }
 }
 
@@ -930,6 +964,76 @@ impl RecoveryError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    struct StateTranscript {
+        states: std::sync::Mutex<std::collections::VecDeque<u8>>,
+        calls: std::sync::Mutex<Vec<&'static str>>,
+        reject_abort: bool,
+    }
+    impl StateTranscript {
+        fn new(states: &[u8]) -> Self {
+            Self {
+                states: std::sync::Mutex::new(states.iter().copied().collect()),
+                calls: Default::default(),
+                reject_abort: false,
+            }
+        }
+    }
+    impl DfuStateIo for StateTranscript {
+        async fn state(&self) -> Result<u8, RecoveryError> {
+            self.calls.lock().unwrap().push("GETSTATE");
+            Ok(self
+                .states
+                .lock()
+                .unwrap()
+                .pop_front()
+                .expect("expected state request"))
+        }
+        async fn abort(&self) -> Result<(), RecoveryError> {
+            self.calls.lock().unwrap().push("ABORT");
+            if self.reject_abort {
+                Err(RecoveryError::Transfer(TransferError::Stall))
+            } else {
+                Ok(())
+            }
+        }
+        async fn clear_status(&self) -> Result<(), RecoveryError> {
+            self.calls.lock().unwrap().push("CLRSTATUS");
+            Ok(())
+        }
+    }
+
+    #[tokio::test]
+    async fn wait_reset_must_be_aborted_and_verified_idle_before_new_upload() {
+        let io = StateTranscript::new(&[8, 2]);
+        prepare_dfu_state(&io, false).await.unwrap();
+        assert_eq!(*io.calls.lock().unwrap(), ["GETSTATE", "ABORT", "GETSTATE"]);
+        let io = StateTranscript::new(&[8, 8]);
+        assert!(matches!(
+            prepare_dfu_state(&io, false).await,
+            Err(RecoveryError::UnexpectedDfuState(8))
+        ));
+        let mut io = StateTranscript::new(&[8]);
+        io.reject_abort = true;
+        assert!(matches!(
+            prepare_dfu_state(&io, false).await,
+            Err(RecoveryError::Transfer(TransferError::Stall))
+        ));
+        assert_eq!(*io.calls.lock().unwrap(), ["GETSTATE", "ABORT"]);
+    }
+
+    #[tokio::test]
+    async fn legacy_wait_reset_and_error_state_keep_their_existing_behavior() {
+        let io = StateTranscript::new(&[8]);
+        prepare_dfu_state(&io, true).await.unwrap();
+        assert_eq!(*io.calls.lock().unwrap(), ["GETSTATE"]);
+        let io = StateTranscript::new(&[10]);
+        assert!(matches!(
+            prepare_dfu_state(&io, false).await,
+            Err(RecoveryError::UnexpectedDfuState(10))
+        ));
+        assert_eq!(*io.calls.lock().unwrap(), ["GETSTATE", "CLRSTATUS"]);
+    }
 
     #[test]
     fn boot_commands_use_request_one() {

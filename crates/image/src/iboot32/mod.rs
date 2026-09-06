@@ -351,6 +351,33 @@ mod tests {
     }
 
     #[test]
+    fn debug_patch_emits_thumb_movs_r0_one_in_little_endian_order() {
+        let mut buf = fixture();
+        buf[0x4000..0x4000 + KERNELCACHE_PREP_STRING.len()]
+            .copy_from_slice(KERNELCACHE_PREP_STRING);
+        buf[0x5000..0x500d].copy_from_slice(b"debug-enabled");
+        write32(&mut buf, 0x2000, BASE + 0x5000);
+        write16(&mut buf, 0x1fc0, 0x480f); // LDR R0, [PC, #60] -> 0x2000.
+        for call in [0x1fc2, 0x1fca] {
+            write16(&mut buf, call, 0xf000);
+            write16(&mut buf, call + 2, 0xf800);
+        }
+        let patched = patch_iboot32_with_options(
+            &buf,
+            &Iboot32PatchOptions {
+                debug: true,
+                skip_rsa: true,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        // Upstream's replacement is two Thumb MOVS R0, #1 instructions (0x2001).
+        assert_eq!(&patched[0x1fca..0x1fce], &[0x01, 0x20, 0x01, 0x20]);
+        assert_eq!(&patched[..0x1fca], &buf[..0x1fca]);
+        assert_eq!(&patched[0x1fce..], &buf[0x1fce..]);
+    }
+
+    #[test]
     fn rsa_patch_fails_on_patched_image() {
         let mut buf = fixture();
         let mut iboot = IBoot32::new(&mut buf).unwrap();

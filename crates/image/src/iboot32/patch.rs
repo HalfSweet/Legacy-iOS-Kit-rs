@@ -37,7 +37,7 @@ const MOVS_R0_0_TWICE: u32 = 0x2000_2000;
 /// MOVS R0, #0; STR R0, [R3].
 const RSA_PATCH: u32 = 0x6018_2000;
 /// MOVS R0, #1; MOVS R0, #1.
-const DEBUG_PATCH: u32 = 0x0120_0120;
+const DEBUG_PATCH: u32 = 0x2001_2001;
 /// NOP; NOP.
 const NOP_TWICE: u32 = 0xbf00_bf00;
 /// MOVW R0, #0 / MOVW R1, #0 / MOVW R0, #-1 (little-endian words).

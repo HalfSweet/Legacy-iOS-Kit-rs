@@ -43,11 +43,10 @@ pub fn extract_image_payload(
     Ok(payload)
 }
 
-/// Decrypt the DATA payload of an IMG3 container in place, preserving the
-/// container layout byte-for-byte: every header, tag, and padding byte stays
-/// where it is and only the cipher blocks of the DATA body are decrypted.
-/// This mirrors xpwntool's `-decrypt` output, which is the format the
-/// upstream bsdiff patches are authored against.
+/// Decrypt the DATA body and remove every KBAG element, matching xpwntool's
+/// `-decrypt` output. Keeping encryption metadata beside plaintext makes the
+/// bootloader decrypt it again. Other elements and DATA padding are preserved;
+/// container sizes and the SHSH offset are updated after removing keybags.
 pub fn decrypt_img3_payload(
     container: &[u8],
     key: &[u8],
@@ -60,7 +59,14 @@ pub fn decrypt_img3_payload(
     let body = img3_data_body_range(&output)?;
     let decrypted = decrypt_cbc(&output[body.clone()], key, iv)?;
     output[body].copy_from_slice(&decrypted);
-    Ok(output)
+    let image = Img3::parse(&output)?;
+    let elements = image
+        .elements()
+        .iter()
+        .filter(|element| element.tag() != Img3Tag::KBAG)
+        .cloned()
+        .collect();
+    Ok(Img3::new(image.image_type(), elements).to_bytes())
 }
 
 /// Byte range of the DATA element body (including padding) in a serialized
@@ -218,6 +224,39 @@ mod tests {
         // The data size region holds the plaintext again.
         assert_eq!(&decrypted[body.start..body.start + payload.len()], payload);
         assert_eq!(Img3::parse(&decrypted).unwrap().payload().unwrap(), payload);
+    }
+
+    #[test]
+    fn decrypted_img3_removes_all_keybags_and_relocates_the_signature() {
+        let payload = b"unaligned plaintext";
+        let encrypted = Img3::parse(&padded_container(payload)).unwrap();
+        let mut elements = encrypted.elements().to_vec();
+        elements.insert(1, Img3Element::new(Img3Tag::KBAG, vec![0xaa; 56]));
+        elements.push(Img3Element::new(Img3Tag::KBAG, vec![0xbb; 56]));
+        elements.push(Img3Element::new(Img3Tag::SHSH, vec![0xcc; 128]));
+        elements.push(Img3Element::new(Img3Tag::CERT, vec![0xdd; 64]));
+        let container = Img3::new(encrypted.image_type(), elements).to_bytes();
+        let decrypted = decrypt_img3_payload(&container, &KEY, &IV).unwrap();
+        let parsed = Img3::parse(&decrypted).unwrap();
+        assert_eq!(parsed.payload().unwrap(), payload);
+        assert_eq!(decrypted.len(), container.len() - 2 * (12 + 56));
+        assert_eq!(
+            parsed
+                .elements()
+                .iter()
+                .map(Img3Element::tag)
+                .collect::<Vec<_>>(),
+            [Img3Tag::TYPE, Img3Tag::DATA, Img3Tag::SHSH, Img3Tag::CERT]
+        );
+        assert!(parsed.elements()[1].padding().iter().all(|byte| *byte == 0));
+        assert_eq!(parsed.elements()[2].data(), &[0xcc; 128]);
+        assert_eq!(parsed.elements()[3].data(), &[0xdd; 64]);
+        let shsh_offset = u32::from_le_bytes(decrypted[12..16].try_into().unwrap()) as usize;
+        assert_eq!(&decrypted[20 + shsh_offset..24 + shsh_offset], b"HSHS");
+        assert_eq!(
+            u32::from_le_bytes(decrypted[4..8].try_into().unwrap()) as usize,
+            decrypted.len()
+        );
     }
 
     #[test]
