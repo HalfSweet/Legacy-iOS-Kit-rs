@@ -10,10 +10,11 @@ use zeroize::Zeroizing;
 
 use crate::{ServiceError, SystemMux};
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum SshTarget {
     OnlyUsbDevice,
     DeviceId(u32),
+    Udid(legacy_ios_core::Udid),
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -108,6 +109,11 @@ impl RamdiskSsh {
                 [] => return Err(SshError::NoDevice),
                 devices => return Err(SshError::AmbiguousDevices(devices.len())),
             },
+            SshTarget::Udid(udid) => devices
+                .iter()
+                .find(|device| device.udid() == &udid)
+                .map(|device| device.id())
+                .ok_or(SshError::NoDevice)?,
             SshTarget::DeviceId(device_id) => devices
                 .iter()
                 .find(|device| device.id() == device_id)

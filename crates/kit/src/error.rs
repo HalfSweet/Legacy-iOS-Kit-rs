@@ -217,6 +217,10 @@ pub enum KitError {
     MissingHacktivationPatch,
     #[error("no original lockdownd on the device; provide one with a file")]
     MissingOriginalLockdownd,
+    #[error("original lockdownd is not a supported ARM executable")]
+    InvalidOriginalLockdownd,
+    #[error("original firmware does not match the selected device version and build")]
+    OriginalFirmwareMismatch,
     #[error("FourThree step 1 (restore to iOS 6.1.3) is not complete on the device")]
     FourThreeRestoreIncomplete,
     #[error("FourThree step 2 (partitioning) is not complete on the device")]
@@ -365,6 +369,8 @@ impl KitError {
             | Self::MissingJailbreakPackage(_)
             | Self::AlreadyHacktivated
             | Self::MissingHacktivationPatch
+            | Self::InvalidOriginalLockdownd
+            | Self::OriginalFirmwareMismatch
             | Self::MissingOriginalLockdownd
             | Self::FourThreeRestoreIncomplete
             | Self::FourThreePartitionIncomplete
@@ -558,6 +564,8 @@ impl KitError {
             | Self::MissingJailbreakPackage(_)
             | Self::AlreadyHacktivated
             | Self::MissingHacktivationPatch
+            | Self::InvalidOriginalLockdownd
+            | Self::OriginalFirmwareMismatch
             | Self::MissingOriginalLockdownd
             | Self::FourThreeRestoreIncomplete
             | Self::FourThreePartitionIncomplete

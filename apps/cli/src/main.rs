@@ -652,6 +652,11 @@ enum DeviceCommand {
         /// Use this lockdownd binary instead of the on-device backup.
         #[arg(long)]
         lockdownd: Option<PathBuf>,
+        /// Matching stock IPSW used when restoring the original daemon.
+        #[arg(long, conflicts_with = "lockdownd", requires = "rootfs_key")]
+        firmware: Option<PathBuf>,
+        #[arg(long, requires = "firmware")]
+        rootfs_key: Option<String>,
         #[arg(long, default_value = "root")]
         username: String,
         #[arg(long)]
@@ -2351,20 +2356,61 @@ async fn main() -> Result<()> {
         Command::Device {
             command:
                 DeviceCommand::RevertHacktivate {
-                    udid: _,
+                    udid,
                     lockdownd,
+                    firmware,
+                    rootfs_key,
                     username,
                     host_key,
                     yes,
                 },
         } => {
-            confirm("revert hacktivation on the device", yes)?;
-            let original = match lockdownd {
-                Some(path) => Some(tokio::fs::read(&path).await?),
-                None => None,
+            let summaries = kit.devices().list_normal().await?;
+            let device = summaries
+                .iter()
+                .find(|device| device.udid() == Some(&udid))
+                .ok_or_else(|| anyhow!("selected normal-mode device was not found"))?;
+            let product = device
+                .product_type()
+                .ok_or_else(|| anyhow!("device product is unknown"))?
+                .clone();
+            let version = device
+                .product_version()
+                .ok_or_else(|| anyhow!("device version is unknown"))?;
+            let build = device
+                .build_version()
+                .ok_or_else(|| anyhow!("device build is unknown"))?;
+            let method = legacy_ios_kit::hacktivate_method(product.as_str(), version, build)
+                .ok_or_else(|| anyhow!("no hacktivation method for the device and version"))?;
+            let original = if matches!(method, legacy_ios_kit::HacktivateMethod::DataArk) {
+                None
+            } else if let Some(path) = lockdownd {
+                Some(tokio::fs::read(path).await?)
+            } else if let Some(path) = firmware {
+                let board = device
+                    .board_config()
+                    .ok_or_else(|| anyhow!("device board is unknown"))?
+                    .clone();
+                let key = legacy_ios_kit::DmgFirmwareKey::from_hex(
+                    rootfs_key.as_deref().expect("clap requires rootfs key"),
+                )?;
+                Some(
+                    legacy_ios_kit::extract_original_lockdownd(
+                        path,
+                        product,
+                        board,
+                        version.into(),
+                        build.into(),
+                        key,
+                    )
+                    .await?,
+                )
+            } else {
+                None
             };
-            let ssh = connect_ramdisk_ssh(&kit, None, &username, host_key).await?;
-            kit.revert_hacktivate(&ssh, original.as_deref())
+            confirm("revert hacktivation on the selected device", yes)?;
+            let ssh = connect_ssh_target(&kit, SshTarget::Udid(udid), &username, host_key).await?;
+            kit.revert_hacktivate(&ssh, &method, original.as_deref())
                 .await
                 .context("reverting hacktivation failed")?;
             write_status(output, "reverted-hacktivation")?;
@@ -4325,10 +4371,24 @@ async fn connect_ramdisk_ssh(
     username: &str,
     host_key: Option<String>,
 ) -> Result<RamdiskSsh> {
+    connect_ssh_target(
+        kit,
+        device_id.map_or(SshTarget::OnlyUsbDevice, SshTarget::DeviceId),
+        username,
+        host_key,
+    )
+    .await
+}
+
+async fn connect_ssh_target(
+    kit: &LegacyIosKit,
+    target: SshTarget,
+    username: &str,
+    host_key: Option<String>,
+) -> Result<RamdiskSsh> {
     let password = SshPassword::new(
         rpassword::prompt_password("SSH password: ").context("failed to read SSH password")?,
     );
-    let target = device_id.map_or(SshTarget::OnlyUsbDevice, SshTarget::DeviceId);
     let host_key = host_key.map_or_else(
         || {
             warn!("accepting ephemeral ramdisk SSH host key");

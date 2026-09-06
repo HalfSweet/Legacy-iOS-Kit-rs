@@ -108,19 +108,114 @@ pub(crate) async fn hacktivate(
 /// Restore the original lockdownd, reverting hacktivation.
 pub(crate) async fn revert_hacktivate(
     ssh: &RamdiskSsh,
+    method: &HacktivateMethod,
     original: Option<&[u8]>,
 ) -> Result<(), KitError> {
-    let lockdownd = match original {
-        Some(bytes) => bytes.to_vec(),
-        None => ssh
-            .download(&scp_path(&format!("{LOCKDOWND}.orig"))?, 16 * 1024 * 1024)
+    revert_device(ssh, method, original).await
+}
+
+trait RevertDevice {
+    fn read_original(&self) -> impl std::future::Future<Output = Result<Vec<u8>, KitError>> + Send;
+    fn replace(
+        &self,
+        data: &[u8],
+    ) -> impl std::future::Future<Output = Result<(), KitError>> + Send;
+    fn cleanup(&self) -> impl std::future::Future<Output = Result<(), KitError>> + Send;
+    fn reboot(&self) -> impl std::future::Future<Output = ()> + Send;
+}
+
+impl RevertDevice for RamdiskSsh {
+    async fn read_original(&self) -> Result<Vec<u8>, KitError> {
+        self.download(&scp_path(&format!("{LOCKDOWND}.orig"))?, 16 * 1024 * 1024)
             .await
-            .map_err(|_| KitError::MissingOriginalLockdownd)?,
-    };
-    ssh.upload(&scp_path(LOCKDOWND)?, &lockdownd).await?;
-    run(ssh, &format!("chmod +x {LOCKDOWND}")).await?;
-    let _ = ssh.execute("reboot").await;
+            .map_err(|_| KitError::MissingOriginalLockdownd)
+    }
+    async fn replace(&self, data: &[u8]) -> Result<(), KitError> {
+        // Stage a complete executable before replacing the active daemon.
+        self.upload(&scp_path("/usr/libexec/lockdownd.lik-restore")?, data)
+            .await?;
+        run(self, "chmod 755 /usr/libexec/lockdownd.lik-restore && mv /usr/libexec/lockdownd.lik-restore /usr/libexec/lockdownd").await
+    }
+    async fn cleanup(&self) -> Result<(), KitError> {
+        run(
+            self,
+            "rm -f /usr/libexec/lockdownd.orig /var/root/Library/Lockdown/data_ark.plist",
+        )
+        .await
+    }
+    async fn reboot(&self) {
+        let _ = self.execute("reboot").await;
+    }
+}
+
+async fn revert_device(
+    device: &impl RevertDevice,
+    method: &HacktivateMethod,
+    original: Option<&[u8]>,
+) -> Result<(), KitError> {
+    if matches!(method, HacktivateMethod::LockdowndPatch(_)) {
+        let data = match original {
+            Some(bytes) => bytes.to_vec(),
+            None => device.read_original().await?,
+        };
+        validate_lockdownd(&data)?;
+        device.replace(&data).await?;
+    }
+    device.cleanup().await?;
+    device.reboot().await;
     Ok(())
+}
+
+fn validate_lockdownd(data: &[u8]) -> Result<(), KitError> {
+    // The supported iOS 3-6 daemon is a 32-bit ARM Mach-O executable.
+    if data.len() < 28
+        || data[..4] != [0xce, 0xfa, 0xed, 0xfe]
+        || data[4..8] != 12_u32.to_le_bytes()
+        || data[12..16] != 2_u32.to_le_bytes()
+    {
+        return Err(KitError::InvalidOriginalLockdownd);
+    }
+    Ok(())
+}
+
+/// Extract a stock daemon from the exact device/version/build IPSW. All input
+/// validation and decryption happens before the caller starts device writes.
+pub async fn extract_original_lockdownd(
+    firmware: std::path::PathBuf,
+    product: legacy_ios_core::ProductType,
+    board: legacy_ios_core::BoardConfig,
+    version: legacy_ios_core::IosVersion,
+    build: legacy_ios_core::BuildId,
+    key: legacy_ios_image::DmgFirmwareKey,
+) -> Result<Vec<u8>, KitError> {
+    tokio::task::spawn_blocking(move || {
+        let archive = legacy_ios_firmware::FirmwareArchive::open(firmware)?;
+        let manifest = archive.build_manifest()?;
+        if !manifest.supported_product_types().contains(&product)
+            || manifest.product_version() != &version
+            || manifest.build_id() != &build
+        {
+            return Err(KitError::OriginalFirmwareMismatch);
+        }
+        let identity =
+            manifest.select_identity(&board, legacy_ios_firmware::RestoreBehavior::Erase)?;
+        let root = identity.component_path("OS")?;
+        let encrypted = archive.read_entry(root)?;
+        let decrypted = legacy_ios_image::decrypt_firmware_image(&encrypted, &key)?;
+        let image = legacy_ios_image::DmgImage::parse(decrypted)?;
+        let index = image
+            .partitions()
+            .iter()
+            .position(|part| part.name().contains("Apple_HFS"))
+            .or_else(|| (image.partitions().len() == 1).then_some(0))
+            .ok_or(KitError::MissingHfsPartition)?;
+        let hfs = legacy_ios_image::HfsImage::parse(image.extract(index)?)?;
+        let data = hfs.read("/usr/libexec/lockdownd")?;
+        validate_lockdownd(&data)?;
+        Ok(data)
+    })
+    .await
+    .map_err(|error| KitError::Task(error.to_string()))?
 }
 
 async fn run(ssh: &RamdiskSsh, command: &str) -> Result<(), KitError> {
@@ -138,6 +233,105 @@ fn scp_path(path: &str) -> Result<ScpPath, KitError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    struct Device {
+        calls: std::sync::Mutex<Vec<&'static str>>,
+        backup: Option<Vec<u8>>,
+        fail_replace: bool,
+    }
+    impl RevertDevice for Device {
+        async fn read_original(&self) -> Result<Vec<u8>, KitError> {
+            self.calls.lock().unwrap().push("read");
+            self.backup
+                .clone()
+                .ok_or(KitError::MissingOriginalLockdownd)
+        }
+        async fn replace(&self, _: &[u8]) -> Result<(), KitError> {
+            self.calls.lock().unwrap().push("replace");
+            if self.fail_replace {
+                return Err(KitError::InvalidOriginalLockdownd);
+            }
+            Ok(())
+        }
+        async fn cleanup(&self) -> Result<(), KitError> {
+            self.calls.lock().unwrap().push("cleanup");
+            Ok(())
+        }
+        async fn reboot(&self) {
+            self.calls.lock().unwrap().push("reboot");
+        }
+    }
+    fn device(backup: Option<Vec<u8>>) -> Device {
+        Device {
+            calls: Default::default(),
+            backup,
+            fail_replace: false,
+        }
+    }
+    fn executable() -> Vec<u8> {
+        let mut data = vec![0; 28];
+        data[..4].copy_from_slice(&[0xce, 0xfa, 0xed, 0xfe]);
+        data[4..8].copy_from_slice(&12_u32.to_le_bytes());
+        data[12..16].copy_from_slice(&2_u32.to_le_bytes());
+        data
+    }
+
+    #[tokio::test]
+    async fn data_ark_revert_never_requires_or_replaces_lockdownd() {
+        let device = device(None);
+        revert_device(&device, &HacktivateMethod::DataArk, None)
+            .await
+            .unwrap();
+        assert_eq!(*device.calls.lock().unwrap(), ["cleanup", "reboot"]);
+    }
+
+    #[tokio::test]
+    async fn patch_revert_cleans_backup_only_after_replacement() {
+        let method = HacktivateMethod::LockdowndPatch(ResourceId::new("test"));
+        let device = device(Some(executable()));
+        revert_device(&device, &method, None).await.unwrap();
+        assert_eq!(
+            *device.calls.lock().unwrap(),
+            ["read", "replace", "cleanup", "reboot"]
+        );
+    }
+
+    #[tokio::test]
+    async fn missing_or_invalid_original_never_changes_device() {
+        let method = HacktivateMethod::LockdowndPatch(ResourceId::new("test"));
+        let missing = device(None);
+        assert!(revert_device(&missing, &method, None).await.is_err());
+        assert_eq!(*missing.calls.lock().unwrap(), ["read"]);
+        let invalid = device(None);
+        assert!(
+            revert_device(&invalid, &method, Some(b"invalid"))
+                .await
+                .is_err()
+        );
+        assert!(invalid.calls.lock().unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn caller_original_bypasses_missing_backup_and_write_failure_preserves_state() {
+        let method = HacktivateMethod::LockdowndPatch(ResourceId::new("test"));
+        let original = executable();
+        let success = device(None);
+        revert_device(&success, &method, Some(&original))
+            .await
+            .unwrap();
+        assert_eq!(
+            *success.calls.lock().unwrap(),
+            ["replace", "cleanup", "reboot"]
+        );
+        let mut failed = device(None);
+        failed.fail_replace = true;
+        assert!(
+            revert_device(&failed, &method, Some(&original))
+                .await
+                .is_err()
+        );
+        assert_eq!(*failed.calls.lock().unwrap(), ["replace"]);
+    }
 
     #[test]
     fn selects_data_ark_fast_path() {

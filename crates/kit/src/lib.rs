@@ -64,7 +64,7 @@ pub use fourthree::{
     fourthree_lockdownd_patch_id, fourthree_patch_id, point_restore_device_tree_at_downgrade,
 };
 pub use gilbertjb::{GilbertJbConsent, GilbertJbPlan, gilbertjb_support};
-pub use hacktivate::{HacktivateMethod, hacktivate_method};
+pub use hacktivate::{HacktivateMethod, extract_original_lockdownd, hacktivate_method};
 pub use hfs::{HfsEntrySummary, HfsKind, HfsMutation, HfsStatSummary};
 pub use image_payload::{ImageCipher, ImageCipherError};
 pub use ipx::{IpxPrepareOutcome, IpxPrepareRequest};
@@ -490,9 +490,10 @@ impl LegacyIosKit {
     pub async fn revert_hacktivate(
         &self,
         ssh: &RamdiskSsh,
+        method: &HacktivateMethod,
         original: Option<&[u8]>,
     ) -> Result<(), KitError> {
-        hacktivate::revert_hacktivate(ssh, original).await
+        hacktivate::revert_hacktivate(ssh, method, original).await
     }
 
     /// Query the highest completed FourThree step on the device.
