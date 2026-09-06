@@ -66,6 +66,12 @@ impl RestorePreparation {
         {
             ticket.verify_ecid(ecid)?;
         }
+        if let crate::TicketPolicy::Provided(path) = plan.ticket_policy() {
+            let approved = SigningTicket::open(path)?;
+            if ticket.as_ref().map(SigningTicket::dictionary) != Some(approved.dictionary()) {
+                return Err(RestorePreparationError::TicketChanged);
+            }
+        }
         let archive = FirmwareArchive::open(plan.firmware())?;
         let manifest = archive.build_manifest()?;
         if manifest.product_version().as_str() != plan.product_version()
@@ -308,6 +314,8 @@ impl fmt::Debug for PreparedBootComponent {
 pub enum RestorePreparationError {
     #[error("destructive consent does not match the restore plan")]
     ConsentMismatch,
+    #[error("execution ticket differs from the approved ticket snapshot")]
+    TicketChanged,
     #[error("restore plan device has no board config")]
     MissingBoardConfig,
     #[error("firmware changed after restore planning")]

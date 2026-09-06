@@ -36,8 +36,10 @@ pub struct RamdiskBootRequest {
     pub exploit: ExploitPolicy,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct RamdiskBootComponent {
+    #[serde(skip)]
+    input: crate::input::PinnedInput,
     name: String,
     path: PathBuf,
     size: u64,
@@ -50,7 +52,7 @@ impl RamdiskBootComponent {
     }
 
     pub fn path(&self) -> &Path {
-        &self.path
+        self.input.path()
     }
 
     pub const fn size(&self) -> u64 {
@@ -78,7 +80,7 @@ pub enum RamdiskBootStepKind {
     BootRamdisk,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct RamdiskBootPlan {
     id: PlanId,
     device: DeviceIdentity,
@@ -234,16 +236,19 @@ fn pin_component(
     name: &'static str,
     path: &Path,
 ) -> Result<RamdiskBootComponent, RamdiskBootPlanError> {
-    let data = std::fs::read(path).map_err(|source| RamdiskBootPlanError::ComponentRead {
-        name,
-        path: path.to_owned(),
-        source,
+    let input = crate::input::PinnedInput::copy(name, path).map_err(|source| {
+        RamdiskBootPlanError::ComponentRead {
+            name,
+            path: path.to_owned(),
+            source,
+        }
     })?;
     Ok(RamdiskBootComponent {
         name: name.to_owned(),
         path: path.to_owned(),
-        size: data.len() as u64,
-        sha256: hex::encode(Sha256::digest(&data)),
+        size: input.size(),
+        sha256: input.sha256().to_owned(),
+        input,
     })
 }
 
@@ -293,26 +298,21 @@ fn plan_id(
     ticket: Option<&RamdiskBootComponent>,
     boot_args: &str,
 ) -> PlanId {
-    let mut material = format!(
-        "{}|{}|{:?}|{}",
-        request.device.product_type(),
-        request
-            .device
-            .board_config()
-            .expect("resolved requests have a board config"),
+    let identity = components
+        .iter()
+        .chain(ticket)
+        .map(|component| (&component.name, component.size, &component.sha256))
+        .collect::<Vec<_>>();
+    let material = serde_json::to_vec(&(
+        2_u32,
+        "ramdisk",
+        &request.device,
         request.exploit,
         boot_args,
-    );
-    for component in components.iter().chain(ticket) {
-        material.push_str(&format!(
-            "|{}|{}|{}|{}",
-            component.name,
-            component.path.display(),
-            component.size,
-            component.sha256
-        ));
-    }
-    PlanId(hex::encode(Sha256::digest(material.as_bytes())))
+        identity,
+    ))
+    .expect("ramdisk plan identity contains only serializable values");
+    PlanId(hex::encode(Sha256::digest(&material)))
 }
 
 #[derive(Debug, Error)]
@@ -356,8 +356,19 @@ mod tests {
         let components = ComponentFixture::new();
         let request = components.request(ExploitPolicy::AlreadyPwned);
 
-        let plan = RamdiskBootPlan::resolve(request).unwrap();
+        let plan = RamdiskBootPlan::resolve(request.clone()).unwrap();
         let consent = plan.confirm_destructive();
+        let mut other_request = request.clone();
+        other_request.device = other_request.device.with_ecid(Ecid::new(43));
+        let other = RamdiskBootPlan::resolve(other_request).unwrap();
+        assert!(!other.accepts(&consent));
+        std::fs::write(&request.ibss, b"changed").unwrap();
+        let changed = RamdiskBootPlan::resolve(request).unwrap();
+        assert!(!changed.accepts(&consent));
+        assert_eq!(
+            std::fs::read(plan.components()[0].path()).unwrap(),
+            b"ibss.img3"
+        );
 
         assert!(plan.accepts(&consent));
         assert_eq!(plan.boot_args(), DEFAULT_BOOT_ARGS);

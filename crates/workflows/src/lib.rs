@@ -6,6 +6,7 @@ mod baseband;
 mod boot;
 mod cryptex;
 mod execution;
+mod input;
 mod personalization;
 mod ramdisk;
 mod ramdisk_boot;

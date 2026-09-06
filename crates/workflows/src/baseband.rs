@@ -104,6 +104,7 @@ impl BasebandFirmware {
 
 #[derive(Clone, Debug)]
 pub struct BasebandResolver {
+    _inputs: Vec<crate::input::PinnedInput>,
     archive: FirmwareArchive,
     identity: BuildIdentity,
     firmware_path: String,
@@ -126,6 +127,7 @@ impl BasebandResolver {
     ) -> Result<Self, BasebandRequestError> {
         let firmware_path = identity.component_path("BasebandFirmware")?.to_owned();
         Ok(Self {
+            _inputs: Vec::new(),
             archive,
             identity,
             firmware_path,
@@ -150,7 +152,9 @@ impl BasebandResolver {
             .device()
             .ecid()
             .ok_or(BasebandRequestError::MissingEcid)?;
-        Self::from_identity(archive, identity, tss, ecid)
+        let mut resolver = Self::from_identity(archive, identity, tss, ecid)?;
+        resolver._inputs = plan.retained_inputs();
+        Ok(resolver)
     }
 
     pub async fn resolve(&self, request: &DataRequest) -> Result<Dictionary, BasebandRequestError> {

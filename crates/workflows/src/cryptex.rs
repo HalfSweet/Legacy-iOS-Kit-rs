@@ -104,6 +104,7 @@ pub fn rewrite_build_identity(target: &Dictionary, source: &Dictionary) -> Dicti
 
 #[derive(Clone, Debug)]
 pub struct CryptexResolver {
+    _inputs: Vec<crate::input::PinnedInput>,
     archive: FirmwareArchive,
     identity: BuildIdentity,
     ticket: Dictionary,
@@ -136,6 +137,7 @@ impl CryptexResolver {
             Some(CryptexSource::Target) | None => None,
         };
         Ok(Self {
+            _inputs: plan.retained_inputs(),
             archive,
             identity,
             ticket,

@@ -17,6 +17,8 @@ legacy-ios-transport = { path = "../transport" }
 plist = "=1.10.0"
 hex = "=0.4.3"
 serde.workspace = true
+serde_json = "=1.0.140"
+tempfile = "3.20.0"
 sha2 = "=0.10.9"
 thiserror.workspace = true
 tokio.workspace = true

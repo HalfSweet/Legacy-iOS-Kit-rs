@@ -136,8 +136,9 @@ impl PlanId {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct RestorePlan {
+    inputs: Vec<crate::input::PinnedInput>,
     id: PlanId,
     device: DeviceIdentity,
     selector: DeviceSelector,
@@ -180,21 +181,6 @@ impl RestorePlan {
         if !profile.board_configs().contains(board_config) {
             return Err(RestorePlanError::BoardConfigMismatch);
         }
-        if let TicketPolicy::Provided(path) = &request.ticket {
-            let ticket =
-                SigningTicket::open(path).map_err(|source| RestorePlanError::InvalidTicket {
-                    path: path.clone(),
-                    source,
-                })?;
-            if let Some(ecid) = request.device.ecid() {
-                ticket
-                    .verify_ecid(ecid)
-                    .map_err(|source| RestorePlanError::InvalidTicket {
-                        path: path.clone(),
-                        source,
-                    })?;
-            }
-        }
         if matches!(request.ticket, TicketPolicy::Skip) && request.exploit == ExploitPolicy::None {
             return Err(RestorePlanError::SkipTicketRequiresExploit);
         }
@@ -213,7 +199,7 @@ impl RestorePlan {
         {
             return Err(RestorePlanError::CryptexSourceNotFound(path.clone()));
         }
-        let boot_overrides = match (request.rdsk.take(), request.rkrn.take()) {
+        let mut boot_overrides = match (request.rdsk.take(), request.rkrn.take()) {
             (Some(rdsk), Some(rkrn)) => {
                 if !rdsk.is_file() {
                     return Err(RestorePlanError::BootOverrideNotFound(rdsk));
@@ -227,6 +213,39 @@ impl RestorePlan {
             _ => return Err(RestorePlanError::BootOverridePair),
         };
 
+        let mut inputs = Vec::new();
+        pin_path("firmware", &mut request.firmware, &mut inputs)?;
+        if let TicketPolicy::Provided(path) = &mut request.ticket {
+            pin_path("ticket", path, &mut inputs)?;
+        }
+        if let BasebandPolicy::Provided(path) = &mut request.baseband {
+            pin_path("baseband", path, &mut inputs)?;
+        }
+        if let SepPolicy::Provided(path) = &mut request.sep {
+            pin_path("sep", path, &mut inputs)?;
+        }
+        if let CryptexSource::Provided(path) = &mut request.cryptex_source {
+            pin_path("cryptex", path, &mut inputs)?;
+        }
+        if let Some(overrides) = &mut boot_overrides {
+            pin_path("rdsk", &mut overrides.rdsk, &mut inputs)?;
+            pin_path("rkrn", &mut overrides.rkrn, &mut inputs)?;
+        }
+        if let TicketPolicy::Provided(path) = &request.ticket {
+            let ticket =
+                SigningTicket::open(path).map_err(|source| RestorePlanError::InvalidTicket {
+                    path: path.clone(),
+                    source,
+                })?;
+            if let Some(ecid) = request.device.ecid() {
+                ticket
+                    .verify_ecid(ecid)
+                    .map_err(|source| RestorePlanError::InvalidTicket {
+                        path: path.clone(),
+                        source,
+                    })?;
+            }
+        }
         let archive = FirmwareArchive::open(&request.firmware)?;
         let manifest = archive.build_manifest()?;
         if !manifest
@@ -270,9 +289,11 @@ impl RestorePlan {
             rsep,
             cryptex.as_ref(),
             boot_overrides.as_ref(),
+            &inputs,
         );
 
         Ok(Self {
+            inputs,
             id,
             device: request.device,
             selector,
@@ -291,6 +312,10 @@ impl RestorePlan {
             components,
             steps,
         })
+    }
+
+    pub(crate) fn retained_inputs(&self) -> Vec<crate::input::PinnedInput> {
+        self.inputs.clone()
     }
 
     pub fn id(&self) -> &PlanId {
@@ -476,6 +501,18 @@ const fn step(
     }
 }
 
+fn pin_path(
+    role: &str,
+    path: &mut PathBuf,
+    inputs: &mut Vec<crate::input::PinnedInput>,
+) -> Result<(), RestorePlanError> {
+    let input =
+        crate::input::PinnedInput::copy(role, path).map_err(RestorePlanError::InputSnapshot)?;
+    *path = input.path().to_owned();
+    inputs.push(input);
+    Ok(())
+}
+
 fn plan_id(
     request: &RestoreRequest,
     product_version: &str,
@@ -483,28 +520,44 @@ fn plan_id(
     rsep: RsepPolicy,
     cryptex: Option<&CryptexSource>,
     boot_overrides: Option<&BootComponentOverrides>,
+    inputs: &[crate::input::PinnedInput],
 ) -> PlanId {
-    let material = format!(
-        "{}|{}|{}|{}|{}|{:?}|{:?}|{:?}|{:?}|{:?}|{:?}|{:?}|{:?}|{:?}",
-        request.device.product_type(),
-        request
-            .device
-            .board_config()
-            .expect("resolved requests have a board config"),
-        request.firmware.display(),
+    // Only content identities are encoded, never temporary snapshot paths.
+    let ticket = match request.ticket {
+        TicketPolicy::Signed => "signed",
+        TicketPolicy::Provided(_) => "provided",
+        TicketPolicy::Onboard => "onboard",
+        TicketPolicy::Skip => "skip",
+    };
+    let baseband = match request.baseband {
+        BasebandPolicy::Auto => "auto",
+        BasebandPolicy::None => "none",
+        BasebandPolicy::Provided(_) => "provided",
+    };
+    let sep = match request.sep {
+        SepPolicy::Auto => "auto",
+        SepPolicy::None => "none",
+        SepPolicy::Provided(_) => "provided",
+    };
+    let material = serde_json::to_vec(&(
+        2_u32,
+        "restore",
+        &request.device,
+        request.behavior,
         product_version,
         build_id,
-        request.behavior,
-        request.ticket,
-        request.baseband,
-        request.sep,
+        ticket,
+        baseband,
+        sep,
         rsep,
-        cryptex,
+        cryptex.is_some(),
         request.exploit,
         request.nonce,
-        boot_overrides,
-    );
-    PlanId(hex::encode(Sha256::digest(material.as_bytes())))
+        boot_overrides.is_some(),
+        inputs,
+    ))
+    .expect("plan identity contains only serializable values");
+    PlanId(hex::encode(Sha256::digest(&material)))
 }
 
 /// Numeric major version of a dotted product version ("16.0.1" -> 16).
@@ -514,6 +567,8 @@ fn major_version(version: &str) -> Option<u64> {
 
 #[derive(Debug, Error)]
 pub enum RestorePlanError {
+    #[error("could not retain the approved restore input: {0}")]
+    InputSnapshot(#[source] std::io::Error),
     #[error("device identity has no ECID or UDID")]
     MissingDeviceSelector,
     #[error("device identity has no board config")]
@@ -577,8 +632,32 @@ mod tests {
             rkrn: None,
         };
 
-        let plan = RestorePlan::resolve(request).unwrap();
+        let plan = RestorePlan::resolve(request.clone()).unwrap();
         let consent = plan.confirm_destructive();
+        let same = RestorePlan::resolve(request.clone()).unwrap();
+        assert_eq!(plan.id(), same.id());
+        let mut other_device = request.clone();
+        other_device.device = other_device.device.with_ecid(Ecid::new(43));
+        let other = RestorePlan::resolve(other_device).unwrap();
+        assert!(!other.accepts(&consent));
+        let replacement = firmware_fixture_with_components(
+            "7.1.2",
+            "<key>OS</key><dict><key>Info</key><dict><key>Path</key><string>other.dmg</string></dict></dict>",
+        );
+        std::fs::copy(replacement.path(), file.path()).unwrap();
+        let changed = RestorePlan::resolve(request).unwrap();
+        assert!(!changed.accepts(&consent));
+        assert_eq!(
+            FirmwareArchive::open(plan.firmware())
+                .unwrap()
+                .build_manifest()
+                .unwrap()
+                .select_identity(&BoardConfig::from("n90"), RestoreBehavior::Erase)
+                .unwrap()
+                .component_path("RestoreRamDisk")
+                .unwrap(),
+            "ramdisk.dmg"
+        );
 
         assert!(plan.accepts(&consent));
         assert_eq!(plan.product_version(), "7.1.2");
