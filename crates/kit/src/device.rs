@@ -76,15 +76,12 @@ impl DeviceManager {
     }
 
     pub async fn list(&self) -> Result<DeviceInventory, KitError> {
-        let (bootloader, normal) = tokio::join!(self.list_bootloader(), self.list_normal());
+        let (bootloader, normal) = tokio::join!(self.list_usb(), self.list_normal());
         match (bootloader, normal) {
-            (Ok(mut bootloader), Ok(normal)) => {
-                bootloader.extend(normal);
-                Ok(DeviceInventory {
-                    devices: bootloader,
-                    failures: Vec::new(),
-                })
-            }
+            (Ok(bootloader), Ok(normal)) => Ok(DeviceInventory {
+                devices: merge_discovery(bootloader, normal),
+                failures: Vec::new(),
+            }),
             (Ok(devices), Err(error)) => {
                 warn!(%error, "normal-mode discovery unavailable");
                 Ok(DeviceInventory {
@@ -112,6 +109,15 @@ impl DeviceManager {
 
     pub async fn list_bootloader(&self) -> Result<Vec<DeviceSummary>, KitError> {
         Ok(self
+            .list_usb()
+            .await?
+            .into_iter()
+            .filter(|device| device.mode != DeviceMode::Normal)
+            .collect())
+    }
+
+    async fn list_usb(&self) -> Result<Vec<DeviceSummary>, KitError> {
+        Ok(self
             .bootloader
             .list()
             .await?
@@ -123,6 +129,7 @@ impl DeviceManager {
     pub async fn list_normal(&self) -> Result<Vec<DeviceSummary>, KitError> {
         let mut summaries = Vec::new();
         for device in self.normal.list_devices().await? {
+            self.load_pairing(device.udid()).await?;
             let info = device.query_info().await?;
             let profile = DeviceDatabase::bundled().find_product(info.product_type());
             summaries.push(DeviceSummary {
@@ -333,6 +340,11 @@ impl DeviceManager {
 
     pub(crate) async fn find_normal(&self, udid: &Udid) -> Result<NormalDevice, KitError> {
         let device = self.normal.find_device(udid).await?;
+        self.load_pairing(udid).await?;
+        Ok(device)
+    }
+
+    async fn load_pairing(&self, udid: &Udid) -> Result<(), KitError> {
         if let Some(store) = &self.pairing_store
             && self.normal.pairing_record(udid).await.is_none()
             && let Some(record) = store.load(udid).await?
@@ -341,7 +353,7 @@ impl DeviceManager {
                 .import_pairing_record(udid.clone(), record)
                 .await;
         }
-        Ok(device)
+        Ok(())
     }
 }
 
@@ -417,7 +429,11 @@ impl DeviceSummary {
             mode: device.mode(),
             connection_id: device.connection_id().clone(),
             ecid: info.ecid(),
-            udid: None,
+            udid: if device.mode() == DeviceMode::Normal {
+                device.serial_number().map(Udid::new)
+            } else {
+                None
+            },
             product_type: None,
             board_config: None,
             soc: info.cpid().map(soc_from_cpid),
@@ -492,6 +508,22 @@ impl DeviceSummary {
     }
 }
 
+fn merge_discovery(mut usb: Vec<DeviceSummary>, normal: Vec<DeviceSummary>) -> Vec<DeviceSummary> {
+    // Prefer enriched lockdown metadata only when both sources identify the
+    // same normal-mode device. Keep unidentified USB and bootloader entries.
+    usb.retain(|device| {
+        device.mode != DeviceMode::Normal
+            || !normal.iter().any(|other| {
+                device
+                    .udid
+                    .as_ref()
+                    .is_some_and(|udid| other.udid.as_ref() == Some(udid))
+            })
+    });
+    usb.extend(normal);
+    usb
+}
+
 fn soc_from_cpid(cpid: u32) -> Soc {
     match cpid {
         0x8900 => Soc::S5l8900,
@@ -518,6 +550,59 @@ fn soc_from_cpid(cpid: u32) -> Soc {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn summary(mode: DeviceMode, udid: Option<&str>, name: &str) -> DeviceSummary {
+        DeviceSummary {
+            mode,
+            connection_id: ConnectionId::from("test-port"),
+            ecid: None,
+            udid: udid.map(Udid::new),
+            product_type: None,
+            board_config: None,
+            soc: None,
+            name: Some(name.into()),
+            product_version: None,
+            build_version: None,
+        }
+    }
+
+    #[test]
+    fn discovery_prefers_paired_metadata_without_losing_other_usb_devices() {
+        let records = merge_discovery(
+            vec![
+                summary(DeviceMode::Normal, Some("paired"), "raw"),
+                summary(DeviceMode::Normal, Some("unpaired"), "unpaired"),
+                summary(DeviceMode::Dfu, None, "dfu"),
+            ],
+            vec![summary(DeviceMode::Normal, Some("paired"), "enriched")],
+        );
+        assert_eq!(records.len(), 3);
+        assert_eq!(
+            records
+                .iter()
+                .filter(|record| record
+                    .udid
+                    .as_ref()
+                    .is_some_and(|id| id.as_str() == "paired"))
+                .count(),
+            1
+        );
+        assert!(
+            records
+                .iter()
+                .any(|record| record.name() == Some("enriched"))
+        );
+        assert!(records.iter().any(|record| record.mode == DeviceMode::Dfu));
+    }
+
+    #[test]
+    fn unidentified_normal_devices_are_not_silently_merged() {
+        let records = merge_discovery(
+            vec![summary(DeviceMode::Normal, None, "unknown")],
+            vec![summary(DeviceMode::Normal, Some("known"), "known")],
+        );
+        assert_eq!(records.len(), 2);
+    }
 
     #[test]
     fn maps_chip_ids_to_soc_families() {
