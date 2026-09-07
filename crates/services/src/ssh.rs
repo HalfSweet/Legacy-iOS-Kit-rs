@@ -1,4 +1,10 @@
-use std::{borrow::Cow, fmt, str::FromStr, sync::Arc, time::Duration};
+use std::{
+    borrow::Cow,
+    fmt,
+    str::FromStr,
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 
 use russh::{
     ChannelMsg, Disconnect, client,
@@ -122,7 +128,10 @@ impl RamdiskSsh {
         };
         let stream = mux.connect_device_port(device_id, 22).await?;
         let config = Arc::new(legacy_config());
-        let handler = ClientHandler { host_key };
+        let handler = ClientHandler {
+            host_key,
+            observed: None,
+        };
         let mut session = client::connect_stream(config, stream, handler).await?;
         let authentication = session
             .authenticate_password(username.to_owned(), password.expose().to_owned())
@@ -131,6 +140,36 @@ impl RamdiskSsh {
             return Err(SshError::AuthenticationRejected);
         }
         Ok(Self { session })
+    }
+
+    /// Observe the SSH host key on an explicitly selected USB-mux device without
+    /// authenticating. Pin the returned fingerprint when subsequently connecting.
+    pub async fn host_key_fingerprint(
+        mux: &SystemMux,
+        udid: &legacy_ios_core::Udid,
+    ) -> Result<String, SshError> {
+        let device = mux
+            .list_mux_devices()
+            .await?
+            .into_iter()
+            .find(|device| device.udid() == udid)
+            .ok_or(SshError::NoDevice)?;
+        let stream = mux.connect_device_port(device.id(), 22).await?;
+        let observed = Arc::new(Mutex::new(None));
+        let handler = ClientHandler {
+            host_key: HostKeyPolicy::AcceptEphemeral,
+            observed: Some(observed.clone()),
+        };
+        let session = client::connect_stream(Arc::new(legacy_config()), stream, handler).await?;
+        session
+            .disconnect(Disconnect::ByApplication, "host key observed", "en")
+            .await?;
+        let fingerprint = observed
+            .lock()
+            .map_err(|_| SshError::HostKeyUnavailable)?
+            .take()
+            .ok_or(SshError::HostKeyUnavailable)?;
+        Ok(fingerprint)
     }
 
     pub async fn execute(&self, command: &str) -> Result<SshCommandOutput, SshError> {
@@ -512,6 +551,7 @@ impl SshCommandOutput {
 #[derive(Clone)]
 struct ClientHandler {
     host_key: HostKeyPolicy,
+    observed: Option<Arc<Mutex<Option<String>>>>,
 }
 
 impl client::Handler for ClientHandler {
@@ -521,11 +561,15 @@ impl client::Handler for ClientHandler {
         &mut self,
         key: &PublicKeyOrCertificate,
     ) -> Result<bool, Self::Error> {
+        let fingerprint = key.public_key().fingerprint(HashAlg::Sha256).to_string();
+        if let Some(observed) = &self.observed
+            && let Ok(mut value) = observed.lock()
+        {
+            *value = Some(fingerprint.clone());
+        }
         Ok(match &self.host_key {
             HostKeyPolicy::AcceptEphemeral => true,
-            HostKeyPolicy::Sha256(expected) => {
-                key.public_key().fingerprint(HashAlg::Sha256).to_string() == *expected
-            }
+            HostKeyPolicy::Sha256(expected) => fingerprint == *expected,
         })
     }
 }
@@ -609,6 +653,8 @@ fn invalid_scp_header() -> SshError {
 
 #[derive(Debug, Error)]
 pub enum SshError {
+    #[error("SSH host key could not be observed")]
+    HostKeyUnavailable,
     #[error("no USB mux device is available for SSH")]
     NoDevice,
     #[error("multiple USB mux devices are available for SSH ({0})")]
@@ -636,6 +682,42 @@ pub enum SshError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn observed_host_key_can_be_pinned_and_a_changed_key_is_rejected() {
+        let key = russh::keys::PublicKey::from_openssh(
+            "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEB",
+        )
+        .unwrap();
+        let expected = key.fingerprint(HashAlg::Sha256).to_string();
+        let key = PublicKeyOrCertificate::from(key);
+        let observed = Arc::new(Mutex::new(None));
+        let mut probe = ClientHandler {
+            host_key: HostKeyPolicy::AcceptEphemeral,
+            observed: Some(observed.clone()),
+        };
+        assert!(
+            client::Handler::check_server_key(&mut probe, &key)
+                .await
+                .unwrap()
+        );
+        assert_eq!(observed.lock().unwrap().as_deref(), Some(expected.as_str()));
+        let mut pinned = ClientHandler {
+            host_key: HostKeyPolicy::Sha256(expected),
+            observed: None,
+        };
+        assert!(
+            client::Handler::check_server_key(&mut pinned, &key)
+                .await
+                .unwrap()
+        );
+        pinned.host_key = HostKeyPolicy::Sha256("a different host key".into());
+        assert!(
+            !client::Handler::check_server_key(&mut pinned, &key)
+                .await
+                .unwrap()
+        );
+    }
 
     #[test]
     fn enables_dropbear_legacy_algorithms() {
