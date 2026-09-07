@@ -18,7 +18,11 @@ mod ssh;
 mod system_mux;
 
 pub use activation::ActivationState;
-pub use app::{AppFilter, InstalledApp};
+pub use app::{
+    AppCancelError, AppFailure, AppFilter, AppIdentifier, AppInstallMode, AppInstallOutcome,
+    AppOperationControl, AppOperationObserver, AppOperationTimeouts, AppPhase, AppProgress,
+    AppRejection, InstalledApp, IpaMetadata, IpaPackage,
+};
 pub use backup::{BackupError, BackupOptions, BackupOutcome, BackupPassword, BackupRestoreOptions};
 pub use files::{
     AfcPath, AfcPathError, DeviceFileInfo, DeviceFileKind, DeviceFiles, DeviceStorageInfo,

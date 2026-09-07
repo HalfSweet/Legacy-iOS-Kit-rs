@@ -691,6 +691,8 @@ fn normalize_board_config(hardware_model: &str) -> String {
 
 #[derive(Debug, Error)]
 pub enum ServiceError {
+    #[error(transparent)]
+    Application(#[from] crate::app::AppFailure),
     #[error("legacy iOS TLS requires the legacy-tls Cargo feature")]
     LegacyTlsUnavailable,
     #[cfg(feature = "legacy-tls")]

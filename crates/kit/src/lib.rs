@@ -83,12 +83,14 @@ pub use legacy_ios_image::{
     BootMode, BootPartition, DmgError, DmgFirmwareKey, Iboot32PatchOptions,
 };
 pub use legacy_ios_services::{
-    ActivationState, AfcPath, AfcPathError, AppFilter, BackupOptions, BackupOutcome,
+    ActivationState, AfcPath, AfcPathError, AppCancelError, AppFailure, AppFilter, AppIdentifier,
+    AppInstallMode, AppInstallOutcome, AppOperationControl, AppOperationObserver,
+    AppOperationTimeouts, AppPhase, AppProgress, AppRejection, BackupOptions, BackupOutcome,
     BackupPassword, BackupRestoreOptions, DeviceFileInfo, DeviceFileKind, DeviceFiles,
     DeviceInspection, DeviceSession, DeviceStorageInfo, DeviceSyslog, HostKeyPolicy,
-    InspectionIssue, InstalledApp, JailbreakEvidence, JailbreakStatus, NormalBackend, RamdiskSsh,
-    ScpPath, ScpPathError, SshCommandOutput, SshPassword, SshTarget, tar_contains_entry,
-    tar_extract_entry,
+    InspectionIssue, InstalledApp, IpaMetadata, IpaPackage, JailbreakEvidence, JailbreakStatus,
+    NormalBackend, RamdiskSsh, ScpPath, ScpPathError, SshCommandOutput, SshPassword, SshTarget,
+    tar_contains_entry, tar_extract_entry,
 };
 pub use legacy_ios_transport::{
     HostRequirement, HostRequirementCode, RecoveryDeviceInfo, UsbAccess, UsbHostDevice,
