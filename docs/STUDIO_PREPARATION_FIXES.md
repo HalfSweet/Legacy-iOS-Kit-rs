@@ -133,3 +133,14 @@ unmounted raw disk and detaches it afterward. It performs no device writes and
 requires no repair tool in the application. Tests cover folder serialization,
 attribute-owner deletion, empty attribute trees, rejected external forks without
 partial changes, and backup headers after mutations of partially aligned images.
+
+## Successful fresh-DFU hardware validation
+
+After the HFS fixes, the connected iPod touch 4 started from DFU idle state 2
+without a PWND marker. Pocket Studio's native preparation adapter completed A4
+entry with verified PWND, iBSS/iBEC, the complete ramdisk boot chain, USB SSH,
+matching the per-attempt ramdisk session marker, read-only system mounting, and
+checking iOS 6.1.6 / 10B500 on disk. The opt-in `retry_ramdisk` diagnostic reported
+`PASS MountFilesystem` and exited successfully. No untether or package install
+was performed; reboot and installed jailbreak verification remain untested.
+The device was left in the temporary ramdisk with its system partition read-only.
