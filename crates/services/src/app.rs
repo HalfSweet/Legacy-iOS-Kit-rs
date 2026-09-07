@@ -317,6 +317,46 @@ impl NormalDevice {
         info!("User application uninstalled");
         Ok(())
     }
+    /// Read the distribution receipt from the registered application's bundle
+    /// using House Arrest. This never falls back to privileged services.
+    pub async fn app_build_receipt(&self, app: &InstalledApp) -> Result<Vec<u8>, ServiceError> {
+        let id = AppIdentifier::parse(app.bundle_id())?;
+        let path = receipt_path(app)?;
+        bounded(
+            AppOperationTimeouts::default().service,
+            AppPhase::Lookup,
+            async {
+                let stream = self
+                    .connect_service("com.apple.mobile.house_arrest")
+                    .await?;
+                let mut service = PropertyListService::new(stream);
+                let mut request = Dictionary::new();
+                request.insert("Command".into(), "VendContainer".into());
+                request.insert("Identifier".into(), id.as_str().into());
+                service.send(&request).await?;
+                let response = service.receive().await?;
+                protocol::rejection(&response)?;
+                if response.get("Status").and_then(Value::as_string) != Some("Complete") {
+                    return Err(AppFailure::InvalidResponse.into());
+                }
+                StagingClient::new(service.into_inner())
+                    .read_file(&path, 256 * 1024)
+                    .await
+            },
+        )
+        .await
+    }
+    /// Optional, read-only package-manager observation. Service unavailability
+    /// means unknown prerequisites; AFC2 is never a hard installation dependency.
+    pub async fn installed_system_package_status(&self) -> Result<Vec<u8>, ServiceError> {
+        bounded(Duration::from_secs(5), AppPhase::Lookup, async {
+            let stream = self.connect_service("com.apple.afc2").await?;
+            StagingClient::new(stream)
+                .read_file("/var/lib/dpkg/status", 4 * 1024 * 1024)
+                .await
+        })
+        .await
+    }
     pub async fn app_container(&self, bundle_id: &str) -> Result<DeviceFiles, ServiceError> {
         let client = self.service_client::<HouseArrestClient>().await?;
         Ok(DeviceFiles::new(
@@ -353,6 +393,14 @@ impl NormalDevice {
     }
 }
 
+fn receipt_path(app: &InstalledApp) -> Result<String, ServiceError> {
+    let path = app.path().ok_or(AppFailure::InvalidResponse)?;
+    let name = path.rsplit('/').next().ok_or(AppFailure::InvalidResponse)?;
+    if !name.ends_with(".app") || name.len() <= 4 || name.contains(['\0', '\\']) {
+        return Err(AppFailure::InvalidResponse.into());
+    }
+    Ok(format!("/{name}/build-receipt.json"))
+}
 // A disconnected or timed-out installation may still be consuming its IPA.
 // Retain staging until a caller has reconciled the device's actual state.
 fn cleanup_is_safe(committed: bool, result: &Result<(), ServiceError>) -> bool {

@@ -232,3 +232,17 @@ fn uncertain_submission_retains_staging_until_reconciliation() {
         )))
     ));
 }
+
+#[test]
+fn receipt_path_stays_inside_the_registered_container() {
+    let mut installed = app(Some("User"));
+    installed.path = Some("/var/mobile/Applications/container/Example.app".into());
+    assert_eq!(
+        receipt_path(&installed).unwrap(),
+        "/Example.app/build-receipt.json"
+    );
+    for invalid in ["/", "/.app", "/evil\0.app", "/evil\\path.app"] {
+        installed.path = Some(invalid.into());
+        assert!(receipt_path(&installed).is_err());
+    }
+}

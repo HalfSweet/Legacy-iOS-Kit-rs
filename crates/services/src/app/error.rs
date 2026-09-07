@@ -22,6 +22,8 @@ pub enum AppRejection {
 }
 #[derive(Debug, thiserror::Error)]
 pub enum AppFailure {
+    #[error("application metadata exceeds the read limit")]
+    ReadLimit,
     #[error("application operation cancelled before submission")]
     Cancelled,
     #[error("application operation control has already been used")]

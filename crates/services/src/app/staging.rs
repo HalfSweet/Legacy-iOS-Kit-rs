@@ -96,7 +96,10 @@ impl<S: AsyncRead + AsyncWrite + Unpin> StagingClient<S> {
         }
     }
     pub(super) async fn open(&mut self, path: &str) -> Result<u64, ServiceError> {
-        let mut header = (AfcFopenMode::WrOnly as u64).to_le_bytes().to_vec();
+        self.open_mode(path, AfcFopenMode::WrOnly).await
+    }
+    async fn open_mode(&mut self, path: &str, mode: AfcFopenMode) -> Result<u64, ServiceError> {
+        let mut header = (mode as u64).to_le_bytes().to_vec();
         header.extend(path.bytes());
         header.push(0);
         let (operation, response) = self.exchange(AfcOpcode::FileOpen, header, &[]).await?;
@@ -109,6 +112,35 @@ impl<S: AsyncRead + AsyncWrite + Unpin> StagingClient<S> {
                 .try_into()
                 .map_err(|_| AppFailure::InvalidResponse)?,
         ))
+    }
+    pub(super) async fn read_file(
+        &mut self,
+        path: &str,
+        limit: usize,
+    ) -> Result<Vec<u8>, ServiceError> {
+        let fd = self.open_mode(path, AfcFopenMode::RdOnly).await?;
+        let mut bytes = Vec::new();
+        loop {
+            let requested = (limit.saturating_sub(bytes.len()) + 1).min(32 * 1024);
+            let mut header = fd.to_le_bytes().to_vec();
+            header.extend((requested as u64).to_le_bytes());
+            let next = match self.exchange(AfcOpcode::Read, header, &[]).await {
+                Ok((AfcOpcode::Data, data)) if data.len() <= requested => data,
+                Err(ServiceError::Idevice(IdeviceError::Afc(AfcError::EndOfData))) => Vec::new(),
+                Ok(_) => return Err(AppFailure::InvalidResponse.into()),
+                Err(error) => return Err(error),
+            };
+            if next.is_empty() {
+                break;
+            }
+            bytes.extend(next);
+            if bytes.len() > limit {
+                self.close(fd).await?;
+                return Err(AppFailure::ReadLimit.into());
+            }
+        }
+        self.close(fd).await?;
+        Ok(bytes)
     }
     pub(super) async fn write(&mut self, fd: u64, bytes: &[u8]) -> Result<(), ServiceError> {
         self.status(AfcOpcode::Write, fd.to_le_bytes().to_vec(), bytes)
@@ -224,5 +256,76 @@ mod tests {
         assert!(client.write(fd, b"package").await.is_err());
         drop(client);
         device.await.unwrap();
+    }
+}
+
+#[cfg(test)]
+mod read_tests {
+    use super::*;
+    async fn read_request(peer: &mut tokio::io::DuplexStream) -> (u64, u64, Vec<u8>) {
+        assert_eq!(peer.read_u64_le().await.unwrap(), MAGIC);
+        let total = peer.read_u64_le().await.unwrap();
+        let _header = peer.read_u64_le().await.unwrap();
+        let sequence = peer.read_u64_le().await.unwrap();
+        let op = peer.read_u64_le().await.unwrap();
+        let mut bytes = vec![0; (total - 40) as usize];
+        peer.read_exact(&mut bytes).await.unwrap();
+        (sequence, op, bytes)
+    }
+    async fn reply(peer: &mut tokio::io::DuplexStream, seq: u64, op: AfcOpcode, bytes: &[u8]) {
+        for value in [
+            MAGIC,
+            40 + bytes.len() as u64,
+            40 + bytes.len() as u64,
+            seq,
+            op as u64,
+        ] {
+            peer.write_u64_le(value).await.unwrap();
+        }
+        peer.write_all(bytes).await.unwrap();
+    }
+    #[tokio::test]
+    async fn read_opens_read_only_and_rejects_truncation_at_limit() {
+        for (payload, expect_ok) in [
+            (b"receipt".as_slice(), true),
+            (b"receipt plus extra".as_slice(), false),
+        ] {
+            let (host, mut peer) = tokio::io::duplex(8192);
+            let device = tokio::spawn(async move {
+                let (_, op, bytes) = read_request(&mut peer).await;
+                assert_eq!(op, AfcOpcode::FileOpen as u64);
+                assert_eq!(&bytes[..8], &(AfcFopenMode::RdOnly as u64).to_le_bytes());
+                reply(&mut peer, 0, AfcOpcode::FileOpenRes, &7u64.to_le_bytes()).await;
+                let (_, op, bytes) = read_request(&mut peer).await;
+                assert_eq!(op, AfcOpcode::Read as u64);
+                assert_eq!(u64::from_le_bytes(bytes[8..].try_into().unwrap()), 8);
+                reply(
+                    &mut peer,
+                    1,
+                    AfcOpcode::Data,
+                    &payload[..payload.len().min(8)],
+                )
+                .await;
+                if expect_ok {
+                    read_request(&mut peer).await;
+                    reply(&mut peer, 2, AfcOpcode::Data, &[]).await;
+                }
+                let (seq, op, _) = read_request(&mut peer).await;
+                assert_eq!(op, AfcOpcode::FileClose as u64);
+                reply(&mut peer, seq, AfcOpcode::Status, &0u64.to_le_bytes()).await;
+            });
+            let result = StagingClient::new(host)
+                .read_file("/Example.app/build-receipt.json", 7)
+                .await;
+            if expect_ok {
+                assert_eq!(result.unwrap(), payload);
+            } else {
+                assert!(matches!(
+                    result,
+                    Err(ServiceError::Application(AppFailure::ReadLimit))
+                ));
+            }
+            device.await.unwrap();
+        }
     }
 }

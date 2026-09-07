@@ -40,3 +40,10 @@ wrappers remain available with these User-only constraints and default timeouts.
 Tests exercise protocol transcripts, malformed responses, interrupted AFC writes,
 IPA inspection, atomic cancellation and cleanup decisions without device I/O.
 Hardware behavior still requires explicit acceptance on the supported device.
+
+`app_build_receipt` reads a bounded `build-receipt.json` through House Arrest from
+the registered app's container. `installed_system_package_status` optionally
+reads the dpkg status file through an existing AFC2 service, with a five-second
+budget and four-MiB limit. Failure means the prerequisite could not be observed;
+it does not prove that a package is absent. Neither method enables a service or
+changes device contents. AFC reads use bounded frames and read-only file opens.
