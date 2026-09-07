@@ -144,3 +144,22 @@ checking iOS 6.1.6 / 10B500 on disk. The opt-in `retry_ramdisk` diagnostic repor
 `PASS MountFilesystem` and exited successfully. No untether or package install
 was performed; reboot and installed jailbreak verification remain untested.
 The device was left in the temporary ramdisk with its system partition read-only.
+
+## Installation and normal-boot validation
+
+The user then explicitly requested continuing installation. Studio's local
+continuation diagnostic queried restored HardwareInfo to bind the A4/n81 device
+and ECID, checked the RAM-backed root and read-only iOS 6.1.6 / 10B500 system,
+and installed all eight authenticated packages successfully over USB SSH.
+Aquila, Cydia, sshd and launchd configuration checks passed. The device rebooted
+to the home screen, and Studio's native normal-mode discovery reported paired,
+jailbroken, SSH available, and readiness `ready` on iPod4,1 / 6.1.6 / 10B500.
+
+This exposed two application adapter assumptions rather than library transport
+failures: the minimal ramdisk has neither `umount` nor a standalone `sync` binary.
+Studio now updates the existing root mount with `/sbin/mount -u -w /mnt1` and uses
+the original `reboot_bak` with its own filesystem flushing. The earlier diagnostic
+reboot wait timed out; normal-mode discovery subsequently confirmed success.
+The local continuation diagnostic now selects the returning device by ECID,
+matching Studio's existing DFU-entry return matching, instead of retaining the
+ramdisk USB identifier across modes.
