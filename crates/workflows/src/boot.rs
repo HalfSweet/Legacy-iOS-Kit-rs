@@ -64,7 +64,9 @@ pub async fn boot_restore(
     }
     if let Some(image) = find_component(preparation, "RestoreRamDisk") {
         client.upload_payload(image.data()).await?;
-        client.send_command("getenv ramdisk-delay").await?;
+        if client.device_info().effective_cpid() == 0x8900 {
+            client.send_command("getenv ramdisk-delay").await?;
+        }
         client.send_command("ramdisk").await?;
         tokio::time::sleep(Duration::from_secs(2)).await;
     }

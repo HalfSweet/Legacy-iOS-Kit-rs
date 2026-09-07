@@ -97,14 +97,15 @@ pub async fn boot_ramdisk(
     ecid: Ecid,
     progress: &mut (dyn FnMut(RamdiskBootProgress) + Send),
 ) -> Result<RamdiskBootOutcome, RamdiskBootError> {
+    let mut client = wait_for_device(ecid, progress).await?;
     let mut chain = RamdiskBootChain::new(
+        client.device_info().effective_cpid(),
         preparation.find(IBEC).is_some(),
         preparation.find(RAMDISK).is_some(),
         preparation.find(APTICKET).is_some(),
         preparation.find(TRUST_CACHE).is_some(),
         preparation.boot_args.clone(),
     );
-    let mut client = wait_for_device(ecid, progress).await?;
     if matches!(
         preparation.exploit_policy(),
         ExploitPolicy::Auto | ExploitPolicy::AlreadyPwned
@@ -237,6 +238,7 @@ struct RamdiskBootChain {
 
 impl RamdiskBootChain {
     fn new(
+        cpid: u32,
         has_ibec: bool,
         has_ramdisk: bool,
         has_ticket: bool,
@@ -250,7 +252,11 @@ impl RamdiskBootChain {
         }
         if has_ramdisk {
             pending.push_back(RamdiskBootAction::UploadRecovery(RAMDISK));
-            pending.push_back(RamdiskBootAction::Command("getenv ramdisk-delay".into()));
+            // Upstream needs this query only on S5L8900. A4 iBEC stalls
+            // unsupported getenv queries even though ramdisk activation works.
+            if cpid == 0x8900 {
+                pending.push_back(RamdiskBootAction::Command("getenv ramdisk-delay".into()));
+            }
             pending.push_back(RamdiskBootAction::Command("ramdisk".into()));
             pending.push_back(RamdiskBootAction::Settle(RAMDISK_SETTLE));
         }
@@ -417,7 +423,7 @@ mod tests {
 
     #[test]
     fn boots_64_bit_chain_from_dfu() {
-        let mut chain = RamdiskBootChain::new(true, true, true, true, "rd=md0".into());
+        let mut chain = RamdiskBootChain::new(0x8960, true, true, true, true, "rd=md0".into());
 
         let actions = drive(
             &mut chain,
@@ -435,7 +441,6 @@ mod tests {
                 RamdiskBootAction::UploadRecovery(APTICKET),
                 RamdiskBootAction::Command("ticket".into()),
                 RamdiskBootAction::UploadRecovery(RAMDISK),
-                RamdiskBootAction::Command("getenv ramdisk-delay".into()),
                 RamdiskBootAction::Command("ramdisk".into()),
                 RamdiskBootAction::Settle(RAMDISK_SETTLE),
                 RamdiskBootAction::UploadRecovery(DEVICE_TREE),
@@ -452,7 +457,8 @@ mod tests {
 
     #[test]
     fn boots_32_bit_chain_from_recovery() {
-        let mut chain = RamdiskBootChain::new(false, true, false, false, "rd=md0 -v".into());
+        let mut chain =
+            RamdiskBootChain::new(0x8930, false, true, false, false, "rd=md0 -v".into());
 
         let actions = drive(&mut chain, &[DeviceMode::Recovery]).unwrap();
 
@@ -460,7 +466,6 @@ mod tests {
             actions,
             vec![
                 RamdiskBootAction::UploadRecovery(RAMDISK),
-                RamdiskBootAction::Command("getenv ramdisk-delay".into()),
                 RamdiskBootAction::Command("ramdisk".into()),
                 RamdiskBootAction::Settle(RAMDISK_SETTLE),
                 RamdiskBootAction::UploadRecovery(DEVICE_TREE),
@@ -474,8 +479,22 @@ mod tests {
     }
 
     #[test]
+    fn s5l8900_keeps_the_delay_query_before_ramdisk_activation() {
+        let mut chain = RamdiskBootChain::new(0x8900, false, true, false, false, "rd=md0".into());
+        let actions = drive(&mut chain, &[DeviceMode::Recovery]).unwrap();
+        assert_eq!(
+            &actions[..3],
+            &[
+                RamdiskBootAction::UploadRecovery(RAMDISK),
+                RamdiskBootAction::Command("getenv ramdisk-delay".into()),
+                RamdiskBootAction::Command("ramdisk".into()),
+            ]
+        );
+    }
+
+    #[test]
     fn sends_ibec_over_dfu_when_device_stays_in_dfu() {
-        let mut chain = RamdiskBootChain::new(true, true, false, false, "rd=md0".into());
+        let mut chain = RamdiskBootChain::new(0x8930, true, true, false, false, "rd=md0".into());
 
         let actions = drive(
             &mut chain,
@@ -490,7 +509,7 @@ mod tests {
 
     #[test]
     fn requires_ibec_when_device_stays_in_dfu() {
-        let mut chain = RamdiskBootChain::new(false, true, false, false, "rd=md0".into());
+        let mut chain = RamdiskBootChain::new(0x8930, false, true, false, false, "rd=md0".into());
 
         let error = drive(&mut chain, &[DeviceMode::Dfu, DeviceMode::Dfu]).unwrap_err();
 
@@ -499,7 +518,7 @@ mod tests {
 
     #[test]
     fn rejects_unexpected_mode_after_go() {
-        let mut chain = RamdiskBootChain::new(true, true, false, false, "rd=md0".into());
+        let mut chain = RamdiskBootChain::new(0x8930, true, true, false, false, "rd=md0".into());
 
         let error = drive(&mut chain, &[DeviceMode::Recovery, DeviceMode::Dfu]).unwrap_err();
 
@@ -511,7 +530,7 @@ mod tests {
 
     #[test]
     fn sends_go_before_reconnecting_recovery_ibec() {
-        let mut chain = RamdiskBootChain::new(true, true, false, false, "rd=md0".into());
+        let mut chain = RamdiskBootChain::new(0x8930, true, true, false, false, "rd=md0".into());
 
         let actions = drive(&mut chain, &[DeviceMode::Recovery, DeviceMode::Recovery]).unwrap();
 
@@ -522,7 +541,8 @@ mod tests {
 
     #[test]
     fn just_boot_skips_ramdisk() {
-        let mut chain = RamdiskBootChain::new(false, false, false, false, "pio-error=0 -v".into());
+        let mut chain =
+            RamdiskBootChain::new(0x8930, false, false, false, false, "pio-error=0 -v".into());
 
         let actions = drive(&mut chain, &[DeviceMode::Recovery]).unwrap();
 
@@ -536,7 +556,7 @@ mod tests {
 
     #[test]
     fn rejects_normal_mode_entry() {
-        let mut chain = RamdiskBootChain::new(false, true, false, false, "rd=md0".into());
+        let mut chain = RamdiskBootChain::new(0x8930, false, true, false, false, "rd=md0".into());
 
         let error = drive(&mut chain, &[DeviceMode::Normal]).unwrap_err();
 

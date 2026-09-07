@@ -92,3 +92,18 @@ legacy iOS 2 upload path's existing WAIT_RESET behavior is unchanged. Transcript
 tests cover successful recovery, a rejected ABORT, a device that stays non-idle,
 and legacy/error-state handling. Full hardware boot and SSH validation remain
 separate from image parity and these automated checks.
+
+## A4 ramdisk-delay query
+
+The next fresh-DFU attempt verified A4 PWND, iBSS, and iBEC and reached Recovery.
+A4 iBEC rejected `getenv ramdisk-delay` with STALL, while `ramdisk` activation
+succeeded on the same connection. Both boot workflows now issue this query only
+for S5L8900, the chip for which the local upstream script marks it required.
+Transcript tests retain that ordering on S5L8900 and omit the query on A4/64-bit
+chains. Required command transfer failures still propagate.
+
+A Recovery continuation then sent the ramdisk, device tree, and kernel and
+completed boot commands. USB SSH did not appear within 100 seconds, so no device
+filesystem was mounted or modified. Kernel/device-tree containers were also
+verified byte-identical to local xpwntool output. Ramdisk filesystem structure
+and device-screen boot output remain the next diagnostic boundary.
