@@ -107,3 +107,29 @@ completed boot commands. USB SSH did not appear within 100 seconds, so no device
 filesystem was mounted or modified. Kernel/device-tree containers were also
 verified byte-identical to local xpwntool output. Ramdisk filesystem structure
 and device-screen boot output remain the next diagnostic boundary.
+
+## HFS filesystem validation
+
+Read-only macOS `fsck_hfs` on the complete generated ramdisk found an invalid
+catalog node before kernel/SSH validation. Three image-writer defects were fixed:
+
+- New catalog folder records were 84 bytes; `HFSPlusCatalogFolder` requires the
+  final reserved/folder-count word and is 88 bytes. The regression checks the
+  serialized catalog record, since the existing reader accepts the short form.
+- Deleting or replacing a catalog entry left its inline extended attributes
+  orphaned. The B-tree writer now also rebuilds the attributes fork, removes rows
+  for deleted file/folder IDs, and supports an empty tree. External attribute
+  forks fail explicitly before modifying the image; their block reclamation is
+  not yet implemented.
+- The alternate volume header belongs 1024 bytes before the actual volume end.
+  A 32,000,000-byte ramdisk has a partial 4096-byte allocation block; using only
+  the allocation-block count put the backup header 2048 bytes too early. Growth
+  and later mutations now keep the header at the actual end without changing
+  the requested image size.
+
+The rebuilt full ramdisk passes `fsck_hfs -fn` with exit code 0 (volume appears
+OK). This validation attaches only an application-built host image as a read-only,
+unmounted raw disk and detaches it afterward. It performs no device writes and
+requires no repair tool in the application. Tests cover folder serialization,
+attribute-owner deletion, empty attribute trees, rejected external forks without
+partial changes, and backup headers after mutations of partially aligned images.

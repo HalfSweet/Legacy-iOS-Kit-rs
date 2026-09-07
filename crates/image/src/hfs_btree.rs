@@ -1,22 +1,31 @@
-use std::io::Cursor;
+use std::{collections::BTreeSet, io::Cursor};
 
-use hfsplus::{btree, volume::VolumeHeader};
+use hfsplus::{
+    btree,
+    volume::{ForkData, VolumeHeader},
+};
 
 use crate::HfsError;
 
-pub(crate) struct CatalogTree {
+pub(crate) struct HfsBTree {
     volume: VolumeHeader,
+    fork: ForkData,
     header: btree::BTreeHeaderRecord,
     header_node: btree::BTreeNode,
     records: Vec<Vec<u8>>,
 }
 
-impl CatalogTree {
+impl HfsBTree {
     pub(crate) fn read(data: &[u8]) -> Result<Self, HfsError> {
         let mut reader = Cursor::new(data);
         let volume = VolumeHeader::parse(&mut reader)?;
-        let header =
-            btree::read_btree_header(&mut reader, &volume.catalog_file, volume.block_size)?;
+        let fork = volume.catalog_file.clone();
+        Self::read_fork(data, volume, fork)
+    }
+
+    fn read_fork(data: &[u8], volume: VolumeHeader, fork: ForkData) -> Result<Self, HfsError> {
+        let mut reader = Cursor::new(data);
+        let header = btree::read_btree_header(&mut reader, &fork, volume.block_size)?;
         let header_node = btree::read_node(&mut reader, &header, 0)?;
         let mut records = Vec::with_capacity(header.leaf_records as usize);
         let mut node_number = header.first_leaf_node;
@@ -40,6 +49,7 @@ impl CatalogTree {
         }
         Ok(Self {
             volume,
+            fork,
             header,
             header_node,
             records,
@@ -68,7 +78,11 @@ impl CatalogTree {
 
     pub(crate) fn write(self, data: &mut [u8]) -> Result<(), HfsError> {
         let node_size = usize::from(self.header.node_size);
-        let leaf_groups = pack_records(&self.records, node_size)?;
+        let leaf_groups = if self.records.is_empty() {
+            Vec::new()
+        } else {
+            pack_records(&self.records, node_size)?
+        };
         let mut next_number = 1_u32;
         let mut nodes = Vec::new();
         let mut level = Vec::new();
@@ -90,8 +104,8 @@ impl CatalogTree {
                 backward: 0,
             });
         }
-        let first_leaf = level[0].number;
-        let last_leaf = level[level.len() - 1].number;
+        let first_leaf = level.first().map(|node| node.number).unwrap_or(0);
+        let last_leaf = level.last().map(|node| node.number).unwrap_or(0);
 
         while level.len() > 1 {
             let index_records = level
@@ -128,7 +142,9 @@ impl CatalogTree {
                 requested: next_number,
             });
         }
-        for same_level in 1..=level[0].height {
+        let root = level.first();
+        let height = root.map(|node| node.height).unwrap_or(0);
+        for same_level in 1..=height {
             let positions = nodes
                 .iter()
                 .enumerate()
@@ -148,8 +164,12 @@ impl CatalogTree {
         }
 
         let mut header_node = self.header_node.data;
-        write_u16(&mut header_node, 14, u16::from(level[0].height))?;
-        write_u32(&mut header_node, 16, level[0].number)?;
+        write_u16(&mut header_node, 14, u16::from(height))?;
+        write_u32(
+            &mut header_node,
+            16,
+            root.map(|node| node.number).unwrap_or(0),
+        )?;
         write_u32(
             &mut header_node,
             20,
@@ -165,17 +185,17 @@ impl CatalogTree {
         )?;
 
         for number in 1..self.header.total_nodes {
-            let offset = node_offset(&self.volume, &self.header, number)?;
+            let offset = node_offset(&self.volume, &self.fork, &self.header, number)?;
             data.get_mut(offset..offset + node_size)
                 .ok_or(HfsError::InvalidCatalogRecord)?
                 .fill(0);
         }
-        let header_offset = node_offset(&self.volume, &self.header, 0)?;
+        let header_offset = node_offset(&self.volume, &self.fork, &self.header, 0)?;
         data.get_mut(header_offset..header_offset + node_size)
             .ok_or(HfsError::InvalidCatalogRecord)?
             .copy_from_slice(&header_node);
         for node in nodes {
-            let offset = node_offset(&self.volume, &self.header, node.number)?;
+            let offset = node_offset(&self.volume, &self.fork, &self.header, node.number)?;
             let encoded = node.encode(node_size)?;
             data.get_mut(offset..offset + node_size)
                 .ok_or(HfsError::InvalidCatalogRecord)?
@@ -183,6 +203,51 @@ impl CatalogTree {
         }
         Ok(())
     }
+}
+
+/// Remove inline attributes when their catalog owners are deleted/replaced.
+/// Attribute keys have a reserved word before their CNID, unlike catalog keys.
+pub(crate) fn remove_file_attributes(
+    data: &mut [u8],
+    cnids: &BTreeSet<u32>,
+) -> Result<(), HfsError> {
+    let volume = VolumeHeader::parse(&mut Cursor::new(&*data))?;
+    let fork = volume.attributes_file.clone();
+    if fork.logical_size == 0 {
+        return Ok(());
+    }
+    let mut tree = HfsBTree::read_fork(data, volume, fork)?;
+    let original_len = tree.records.len();
+    let mut retained = Vec::with_capacity(original_len);
+    for record in tree.records.drain(..) {
+        let key = record_key(&record)?;
+        let cnid = u32::from_be_bytes(
+            key.get(4..8)
+                .ok_or(HfsError::InvalidCatalogRecord)?
+                .try_into()
+                .unwrap(),
+        );
+        if cnids.contains(&cnid) {
+            let body = record_body_offset(&record)?;
+            let kind = u32::from_be_bytes(
+                record
+                    .get(body..body + 4)
+                    .ok_or(HfsError::InvalidCatalogRecord)?
+                    .try_into()
+                    .unwrap(),
+            );
+            if kind != 0x10 {
+                return Err(HfsError::AttributeForkRemovalUnsupported);
+            }
+        } else {
+            retained.push(record);
+        }
+    }
+    if retained.len() == original_len {
+        return Ok(());
+    }
+    tree.records = retained;
+    tree.write(data)
 }
 
 #[derive(Clone)]
@@ -311,11 +376,12 @@ fn parse_key(record: &[u8]) -> Result<(u32, Vec<u16>), HfsError> {
 
 fn node_offset(
     volume: &VolumeHeader,
+    fork: &ForkData,
     header: &btree::BTreeHeaderRecord,
     number: u32,
 ) -> Result<usize, HfsError> {
     let offset = btree::compute_fork_offset(
-        &volume.catalog_file,
+        fork,
         volume.block_size,
         u64::from(number) * u64::from(header.node_size),
     )?;
@@ -371,6 +437,75 @@ mod tests {
 
     use super::*;
 
+    fn image_with_attributes() -> Vec<u8> {
+        let mut builder = HfsPlusImageBuilder::new();
+        builder.add_file("payload", b"data", 0o644);
+        let mut image = builder.build();
+        image.resize(8 * 4096, 0);
+        image.copy_within(2 * 4096..4 * 4096, 6 * 4096);
+        let fork = image[1024 + 272..1024 + 352].to_vec();
+        image[1024 + 352..1024 + 432].copy_from_slice(&fork);
+        write_u32(&mut image, 1024 + 352 + 16, 6).unwrap();
+        write_u32(&mut image, 1024 + 44, 8).unwrap();
+        let volume = VolumeHeader::parse(&mut Cursor::new(&image)).unwrap();
+        let mut tree = HfsBTree::read_fork(&image, volume.clone(), volume.attributes_file).unwrap();
+        tree.records = [17_u32, 18]
+            .into_iter()
+            .map(|cnid| {
+                // HFSPlusAttrKey: length, reserved, CNID, startBlock, name length, name.
+                let mut record = 14_u16.to_be_bytes().to_vec();
+                record.extend_from_slice(&0_u16.to_be_bytes());
+                record.extend_from_slice(&cnid.to_be_bytes());
+                record.extend_from_slice(&0_u32.to_be_bytes());
+                record.extend_from_slice(&1_u16.to_be_bytes());
+                record.extend_from_slice(&('x' as u16).to_be_bytes());
+                record.extend_from_slice(&0x10_u32.to_be_bytes());
+                record.extend_from_slice(&[0; 8]);
+                record.extend_from_slice(&4_u32.to_be_bytes());
+                record.extend_from_slice(b"data");
+                record
+            })
+            .collect();
+        tree.write(&mut image).unwrap();
+        image
+    }
+
+    #[test]
+    fn removes_attribute_owners_without_touching_catalog_and_can_empty_the_tree() {
+        let mut image = image_with_attributes();
+        let catalog = image[2 * 4096..4 * 4096].to_vec();
+        remove_file_attributes(&mut image, &BTreeSet::from([17])).unwrap();
+        let volume = VolumeHeader::parse(&mut Cursor::new(&image)).unwrap();
+        let tree =
+            HfsBTree::read_fork(&image, volume.clone(), volume.attributes_file.clone()).unwrap();
+        assert_eq!(tree.header.leaf_records, 1);
+        assert_eq!(&tree.records[0][4..8], &18_u32.to_be_bytes());
+        assert_eq!(&image[2 * 4096..4 * 4096], &catalog);
+        remove_file_attributes(&mut image, &BTreeSet::from([18])).unwrap();
+        let tree = HfsBTree::read_fork(&image, volume.clone(), volume.attributes_file).unwrap();
+        assert!(tree.records.is_empty());
+        assert_eq!(tree.header.leaf_records, 0);
+        assert_eq!(tree.header.root_node, 0);
+        assert_eq!(tree.header.first_leaf_node, 0);
+        assert_eq!(tree.header.last_leaf_node, 0);
+    }
+
+    #[test]
+    fn rejects_external_attribute_forks_without_partial_deletion() {
+        let mut image = image_with_attributes();
+        let volume = VolumeHeader::parse(&mut Cursor::new(&image)).unwrap();
+        let mut tree = HfsBTree::read_fork(&image, volume.clone(), volume.attributes_file).unwrap();
+        let body = record_body_offset(&tree.records[1]).unwrap();
+        write_u32(&mut tree.records[1], body, 0x20).unwrap();
+        tree.write(&mut image).unwrap();
+        let before = image.clone();
+        assert!(matches!(
+            remove_file_attributes(&mut image, &BTreeSet::from([17, 18])),
+            Err(HfsError::AttributeForkRemovalUnsupported)
+        ));
+        assert_eq!(image, before);
+    }
+
     #[test]
     fn rebuilds_multilevel_catalog_tree() {
         const BLOCK_SIZE: usize = 4096;
@@ -389,7 +524,7 @@ mod tests {
         write_u32(&mut image, 2 * BLOCK_SIZE + 36, 32).unwrap();
         write_u32(&mut image, 2 * BLOCK_SIZE + 40, 30).unwrap();
 
-        let mut tree = CatalogTree::read(&image).unwrap();
+        let mut tree = HfsBTree::read(&image).unwrap();
         let template = tree
             .records()
             .iter()

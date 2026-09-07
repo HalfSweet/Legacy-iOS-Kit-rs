@@ -6,7 +6,7 @@ use hfsplus::{
 };
 use thiserror::Error;
 
-use crate::hfs_btree::{CatalogTree, record_body_offset};
+use crate::hfs_btree::{HfsBTree, record_body_offset, remove_file_attributes};
 
 const VOLUME_HEADER_SIZE: usize = 512;
 const TOTAL_BLOCKS_OFFSET: usize = 44;
@@ -169,9 +169,8 @@ impl HfsImage {
                 requested: map_logical_size,
             });
         }
-        let alternate = new_blocks
-            .checked_mul(block_size)
-            .and_then(|offset| offset.checked_sub(VOLUME_HEADER_OFFSET as usize))
+        let alternate = new_size
+            .checked_sub(VOLUME_HEADER_OFFSET as usize)
             .ok_or(HfsError::VolumeTooLarge)?;
         let alternate_end = alternate
             .checked_add(VOLUME_HEADER_SIZE)
@@ -230,7 +229,7 @@ impl HfsImage {
             return Err(HfsError::NotAFile);
         }
         let header = volume.volume_header().clone();
-        let mut tree = CatalogTree::read(&self.data)?;
+        let mut tree = HfsBTree::read(&self.data)?;
         let mut file_index = None;
         let mut thread_index = None;
         let mut parent_id = None;
@@ -296,6 +295,7 @@ impl HfsImage {
             )?;
         }
         tree.write(&mut updated)?;
+        remove_file_attributes(&mut updated, &BTreeSet::from([stat.cnid]))?;
         let primary = VOLUME_HEADER_OFFSET as usize;
         write_u32(
             &mut updated,
@@ -341,7 +341,7 @@ impl HfsImage {
         }
         let header = volume.volume_header().clone();
         let folder_id = header.next_catalog_id;
-        let mut tree = CatalogTree::read(&self.data)?;
+        let mut tree = HfsBTree::read(&self.data)?;
         let parent_index = tree
             .records()
             .iter()
@@ -419,7 +419,7 @@ impl HfsImage {
         }
 
         let file_id = header.next_catalog_id;
-        let mut tree = CatalogTree::read(&self.data)?;
+        let mut tree = HfsBTree::read(&self.data)?;
         let parent_index = tree
             .records()
             .iter()
@@ -615,7 +615,7 @@ impl HfsImage {
         if destination_parent.kind != EntryKind::Directory {
             return Err(HfsError::NotADirectory);
         }
-        let mut tree = CatalogTree::read(&self.data)?;
+        let mut tree = HfsBTree::read(&self.data)?;
         if source_stat.kind == EntryKind::Directory {
             let mut ancestor = destination_parent.cnid;
             while ancestor >= 2 {
@@ -694,7 +694,7 @@ impl HfsImage {
             return Err(HfsError::CannotRemoveRoot);
         }
         let header = volume.volume_header().clone();
-        let mut tree = CatalogTree::read(&self.data)?;
+        let mut tree = HfsBTree::read(&self.data)?;
         let target_record = tree
             .records()
             .iter()
@@ -762,6 +762,8 @@ impl HfsImage {
             )?;
         }
         tree.write(&mut updated)?;
+        let removed = folders.union(&files).copied().collect();
+        remove_file_attributes(&mut updated, &removed)?;
         let primary = VOLUME_HEADER_OFFSET as usize;
         write_u32(
             &mut updated,
@@ -1270,7 +1272,7 @@ fn build_catalog_entry(parent_id: u32, name: &str, body: &[u8]) -> Vec<u8> {
 }
 
 fn build_folder_record(folder_id: u32, timestamp: u32) -> Vec<u8> {
-    let mut record = Vec::with_capacity(84);
+    let mut record = Vec::with_capacity(88);
     record.extend_from_slice(&1_u16.to_be_bytes());
     record.extend_from_slice(&0_u16.to_be_bytes());
     record.extend_from_slice(&0_u32.to_be_bytes());
@@ -1284,6 +1286,10 @@ fn build_folder_record(folder_id: u32, timestamp: u32) -> Vec<u8> {
     record.extend_from_slice(&0o040755_u16.to_be_bytes());
     record.extend_from_slice(&0_u32.to_be_bytes());
     record.extend_from_slice(&[0; 32]);
+    record.extend_from_slice(&0_u32.to_be_bytes());
+    // HFSPlusCatalogFolder ends with textEncoding and reserved/folderCount.
+    // Omitting the last word creates an 84-byte record rejected by HFS fsck
+    // and the kernel, even though the hfsplus reader accepts the shorter form.
     record.extend_from_slice(&0_u32.to_be_bytes());
     record
 }
@@ -1360,9 +1366,17 @@ fn sync_alternate_header(
     block_size: usize,
 ) -> Result<(), HfsError> {
     let primary = VOLUME_HEADER_OFFSET as usize;
-    let alternate = total_blocks
+    let allocated_size = total_blocks
         .checked_mul(block_size)
-        .and_then(|offset| offset.checked_sub(VOLUME_HEADER_OFFSET as usize))
+        .ok_or(HfsError::VolumeTooLarge)?;
+    if allocated_size > data.len() {
+        return Err(HfsError::InvalidCatalogRecord);
+    }
+    // The alternate header is 1024 bytes before the volume end, including
+    // any partial allocation block (e.g. the upstream 32,000,000-byte ramdisk).
+    let alternate = data
+        .len()
+        .checked_sub(VOLUME_HEADER_OFFSET as usize)
         .ok_or(HfsError::VolumeTooLarge)?;
     let alternate_end = alternate
         .checked_add(VOLUME_HEADER_SIZE)
@@ -1581,6 +1595,8 @@ pub enum HfsError {
     NotAFile,
     #[error("HFS+ extents overflow updates are not implemented")]
     ExtentsOverflowUnsupported,
+    #[error("removing non-inline HFS+ attribute forks is not supported")]
+    AttributeForkRemovalUnsupported,
     #[error("HFS+ volume has insufficient free blocks")]
     VolumeFull,
     #[error("HFS+ volumes cannot be shrunk")]
@@ -1763,6 +1779,28 @@ mod tests {
     }
 
     #[test]
+    fn partial_allocation_block_keeps_the_backup_header_at_the_volume_end() {
+        for tail in [512, 2048] {
+            let mut image = growable_image();
+            let size = 12 * 4096 + tail;
+            image.grow(size).unwrap();
+            assert_eq!(image.data().len(), size);
+            let primary = VOLUME_HEADER_OFFSET as usize;
+            let alternate = size - primary;
+            assert_eq!(
+                &image.data()[alternate..alternate + VOLUME_HEADER_SIZE],
+                &image.data()[primary..primary + VOLUME_HEADER_SIZE]
+            );
+            image.add_file("/added", b"payload").unwrap();
+            assert_eq!(
+                &image.data()[alternate..alternate + VOLUME_HEADER_SIZE],
+                &image.data()[primary..primary + VOLUME_HEADER_SIZE]
+            );
+            assert_eq!(image.read("/added").unwrap(), b"payload");
+        }
+    }
+
+    #[test]
     fn expands_file_into_free_allocation_blocks() {
         const BLOCK_SIZE: usize = 4096;
         let mut image = growable_image();
@@ -1813,6 +1851,24 @@ mod tests {
         assert_eq!(volume.stat("/newdir").unwrap().permissions.mode, 0o040755);
         assert_eq!(volume.volume_header().folder_count, 2);
         assert_eq!(volume.volume_header().next_catalog_id, 18);
+        let folder_id = volume.stat("/newdir").unwrap().cnid;
+        let tree = HfsBTree::read(image.data()).unwrap();
+        let record = tree
+            .records()
+            .iter()
+            .find(|record| {
+                let body = record_body_offset(record).unwrap();
+                read_u16(record, body).unwrap() == 1
+                    && read_u32(record, body + 8).unwrap() == folder_id
+            })
+            .unwrap();
+        let body = record_body_offset(record).unwrap();
+        assert_eq!(
+            record.len() - body,
+            88,
+            "HFSPlusCatalogFolder has a fixed on-disk size"
+        );
+        assert_eq!(read_u32(record, body + 84).unwrap(), 0);
     }
 
     #[test]
