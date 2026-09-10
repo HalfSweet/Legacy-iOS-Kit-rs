@@ -9,7 +9,9 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest as _, Sha256};
 use thiserror::Error;
 
-use crate::aux::{AppleDbCatalog, AuxFirmwareCatalog, AuxFirmwareError, AuxFirmwareResolution};
+use crate::auxiliary::{
+    AppleDbCatalog, AuxFirmwareCatalog, AuxFirmwareError, AuxFirmwareResolution,
+};
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct RestoreRequest {
@@ -304,8 +306,8 @@ impl RestorePlan {
                 return Err(RestorePlanError::MissingProvidedSep);
             }
         }
-        let aux = crate::aux::resolve_aux(
-            &crate::aux::AuxTarget {
+        let aux = crate::auxiliary::resolve_aux(
+            &crate::auxiliary::AuxTarget {
                 device: &request.device,
                 profile,
                 manifest: &manifest,
@@ -323,7 +325,7 @@ impl RestorePlan {
             // upstream passes --rdsk/--rkrn without --no-rsep.
             RsepPolicy::Auto if boot_overrides.is_some() => RsepPolicy::Send,
             RsepPolicy::Auto => {
-                match crate::aux::major_version(manifest.product_version().as_str()) {
+                match crate::auxiliary::major_version(manifest.product_version().as_str()) {
                     Some(major) if major >= 16 => RsepPolicy::Send,
                     _ => RsepPolicy::Skip,
                 }
@@ -333,7 +335,7 @@ impl RestorePlan {
         let cryptex = match request.cryptex {
             CryptexPolicy::None => None,
             CryptexPolicy::Auto => {
-                let gated = crate::aux::major_version(manifest.product_version().as_str())
+                let gated = crate::auxiliary::major_version(manifest.product_version().as_str())
                     .is_some_and(|major| major >= 16)
                     && identity.manifest().contains_key("Cryptex1,SystemOS");
                 gated.then(|| request.cryptex_source.clone())
@@ -691,7 +693,7 @@ mod tests {
     use zip::{ZipWriter, write::SimpleFileOptions};
 
     use super::*;
-    use crate::aux::{AuxCatalogFuture, AuxFirmwareSource};
+    use crate::auxiliary::{AuxCatalogFuture, AuxFirmwareSource};
 
     #[tokio::test]
     async fn resolves_plan_and_binds_consent() {

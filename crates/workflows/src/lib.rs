@@ -2,7 +2,7 @@
 
 //! High-level Legacy iOS Kit operations.
 
-mod aux;
+mod auxiliary;
 mod baseband;
 mod boot;
 mod cryptex;
@@ -15,7 +15,7 @@ mod restore;
 mod runner;
 mod sep;
 
-pub use aux::{
+pub use auxiliary::{
     AppleDbCatalog, AuxBasebandResolution, AuxCatalogFuture, AuxFirmwareCatalog, AuxFirmwareError,
     AuxFirmwareResolution, AuxFirmwareSource,
 };

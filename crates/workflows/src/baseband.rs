@@ -11,7 +11,7 @@ use sha1::{Digest as _, Sha1};
 use thiserror::Error;
 use zip::{ZipArchive, ZipWriter, write::SimpleFileOptions};
 
-use crate::{RestorePlan, aux::AuxContext};
+use crate::{RestorePlan, auxiliary::AuxContext};
 
 const MAX_ENTRY_SIZE: u64 = 256 * 1024 * 1024;
 
@@ -106,7 +106,7 @@ impl BasebandFirmware {
 #[derive(Clone, Debug)]
 pub struct BasebandResolver {
     _inputs: Vec<crate::input::PinnedInput>,
-    archive: crate::aux::AuxArchive,
+    archive: crate::auxiliary::AuxArchive,
     identity: BuildIdentity,
     firmware_path: String,
     firmware_sha1: Option<String>,
@@ -157,7 +157,7 @@ impl BasebandResolver {
         let firmware_path = identity.component_path("BasebandFirmware")?.to_owned();
         Ok(Self {
             _inputs: Vec::new(),
-            archive: crate::aux::AuxArchive::Local(archive),
+            archive: crate::auxiliary::AuxArchive::Local(archive),
             identity,
             firmware_path,
             firmware_sha1: None,
@@ -195,17 +195,17 @@ impl BasebandResolver {
             .ok_or(BasebandRequestError::MissingArgument("Arguments"))?;
         let (parameters, nonce, chip_id) = baseband_parameters(arguments, self.ecid)?;
         let data = match &self.archive {
-            crate::aux::AuxArchive::Local(archive) => {
+            crate::auxiliary::AuxArchive::Local(archive) => {
                 let archive = archive.clone();
                 let path = self.firmware_path.clone();
                 tokio::task::spawn_blocking(move || archive.read_entry(&path))
                     .await
                     .map_err(|error| BasebandRequestError::Task(error.to_string()))??
             }
-            crate::aux::AuxArchive::Remote(archive) => archive
+            crate::auxiliary::AuxArchive::Remote(archive) => archive
                 .read_entry(&self.firmware_path)
                 .await
-                .map_err(crate::aux::AuxFirmwareError::from)?,
+                .map_err(crate::auxiliary::AuxFirmwareError::from)?,
         };
         // The plan-recorded table SHA-1 pins the aux baseband content
         // (upstream verifies the download the same way, restore.sh:6116-6126).
@@ -286,7 +286,7 @@ pub enum BasebandRequestError {
     #[error("baseband worker task failed: {0}")]
     Task(String),
     #[error(transparent)]
-    Aux(#[from] crate::aux::AuxFirmwareError),
+    Aux(#[from] crate::auxiliary::AuxFirmwareError),
     #[error(transparent)]
     Firmware(#[from] FirmwareError),
     #[error(transparent)]
@@ -505,7 +505,7 @@ mod tests {
             .clone();
         let resolver = BasebandResolver {
             _inputs: Vec::new(),
-            archive: crate::aux::AuxArchive::Local(archive),
+            archive: crate::auxiliary::AuxArchive::Local(archive),
             identity,
             firmware_path: "Firmware/baseband.bbfw".to_owned(),
             firmware_sha1: Some(hex::encode(Sha1::digest(b"different bytes"))),

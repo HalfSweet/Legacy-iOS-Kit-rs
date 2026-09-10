@@ -16,7 +16,7 @@ use tracing::info;
 
 use crate::{
     PersonalizationError, RestorePlan, SepPolicy,
-    aux::{AuxContext, AuxFirmwareError},
+    auxiliary::{AuxContext, AuxFirmwareError},
     personalization::personalize_data,
 };
 
